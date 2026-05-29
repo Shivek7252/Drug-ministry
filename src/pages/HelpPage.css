@@ -1,0 +1,82 @@
+.help-page { min-height: calc(100vh - 200px); padding: 24px 20px 40px; background: var(--bg-light); }
+.help-container { max-width: 900px; margin: 0 auto; }
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 22px; font-weight: 800; color: #003580; }
+.page-header p  { font-size: 13px; color: #78909C; margin-top: 3px; }
+
+.help-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 768px) { .help-contact-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .help-contact-grid { grid-template-columns: 1fr; } }
+
+.help-contact-card {
+  background: #fff;
+  border: 1px solid #CFD8DC;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,53,128,0.06);
+}
+.hc-icon { font-size: 28px; margin-bottom: 8px; }
+.help-contact-card h3 { font-size: 13px; font-weight: 700; color: #003580; margin-bottom: 6px; }
+.hc-value { font-size: 13.5px; font-weight: 600; color: #1A237E; }
+.hc-sub   { font-size: 11.5px; color: #78909C; margin-top: 3px; }
+
+.faq-item { border-bottom: 1px solid #F0F4F8; }
+.faq-item:last-child { border-bottom: none; }
+.faq-question {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A237E;
+  text-align: left;
+  gap: 12px;
+  transition: background 0.15s;
+}
+.faq-question:hover { background: #F8FBFF; }
+.faq-item.open .faq-question { background: #E3F2FD; }
+.faq-arrow { font-size: 11px; flex-shrink: 0; color: #78909C; }
+.faq-answer {
+  padding: 0 20px 16px 20px;
+  font-size: 13.5px;
+  color: #546E7A;
+  line-height: 1.7;
+  background: #F8FBFF;
+}
+
+.resources-grid { display: flex; flex-direction: column; gap: 12px; }
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid #E8EEF4;
+  border-radius: 8px;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.resource-item:hover { background: #F0F7FF; }
+.resource-icon { font-size: 24px; flex-shrink: 0; }
+.resource-title { font-size: 13.5px; font-weight: 600; color: #1A237E; }
+.resource-desc  { font-size: 12px; color: #78909C; margin-top: 2px; }
+.resource-type {
+  margin-left: auto;
+  background: #E3F2FD;
+  color: #003580;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
