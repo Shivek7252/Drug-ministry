@@ -1,463 +1,288 @@
-/* ============================================================
-   DOCUMENT VIEWER — Full-screen preview
-   ============================================================ */
+/* ── DocumentViewer.css — critical fixes ── */
 
-/* ---- Eye icon button on upload-card header ---- */
-.uc-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.dv-eye-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #E3F2FD;
-  border: 1.5px solid #90CAF9;
-  color: #1565C0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  flex-shrink: 0;
-  padding: 0;
-}
-.dv-eye-btn:hover {
-  background: #1565C0;
-  border-color: #1565C0;
-  color: #fff;
-  transform: scale(1.15);
-  box-shadow: 0 3px 10px rgba(21,101,192,0.35);
-}
-.dv-eye-btn svg { pointer-events: none; display: block; }
-
-/* ---- Preview + Remove buttons in uploaded-file row ---- */
-.uc-file-btns {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.uc-preview-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #E3F2FD;
-  color: #1565C0;
-  border: 1.5px solid #90CAF9;
-  border-radius: 6px;
-  padding: 5px 11px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  font-family: inherit;
-  white-space: nowrap;
-}
-.uc-preview-btn:hover {
-  background: #1565C0;
-  border-color: #1565C0;
-  color: #fff;
-}
-.uc-preview-btn svg { pointer-events: none; flex-shrink: 0; }
-
-/* ============================================================
-   OVERLAY — full-screen backdrop
-   ============================================================ */
+/* Modal must be a flex column so body can scroll */
 .dv-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 12, 28, 0.92);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  z-index: 999999;          /* above everything */
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
-  animation: dvFadeIn 0.2s ease;
+  padding: 20px;
+  backdrop-filter: blur(2px);
 }
-@keyframes dvFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* ============================================================
-   MODAL BOX
-   ============================================================ */
 .dv-modal {
-  width: 100%;
-  max-width: 1120px;
-  /* Use dvh so it's truly full-screen height minus padding */
-  height: calc(100dvh - 24px);
-  max-height: 920px;
-  background: #111827;
+  background: #0f1923;
+  border: 1px solid #1e2d45;
   border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  /* FIX: use vh so modal never overflows viewport */
+  height: min(92vh, 900px);
+  /* FIX: flex column is the key — allows body to flex-grow and scroll */
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.7);
-  animation: dvSlideIn 0.25s cubic-bezier(0.34,1.4,0.64,1);
-}
-@keyframes dvSlideIn {
-  from { opacity: 0; transform: translateY(-20px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
 }
 
-/* ============================================================
-   HEADER
-   ============================================================ */
+/* Header — fixed height, never shrinks */
 .dv-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #1e2d45;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e2d45;
+  background: #0f1923;
   flex-shrink: 0;
-  min-height: 56px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
+
 .dv-header-left {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  flex: 1;
 }
-.dv-file-icon { font-size: 24px; flex-shrink: 0; line-height: 1; }
+
+.dv-file-icon { font-size: 22px; flex-shrink: 0; }
+
 .dv-file-name {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 700;
   color: #e2e8f0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 380px;
-  display: block;
+  max-width: 260px;
 }
-.dv-file-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-/* ---- Toolbar ---- */
+.dv-file-meta { font-size: 11px; color: #64748b; margin-top: 1px; }
+
+/* Toolbar */
 .dv-toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  gap: 6px;
+  flex-wrap: wrap;
 }
-.dv-tool-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 7px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s;
-  text-decoration: none;
-  flex-shrink: 0;
-  padding: 0;
-}
-.dv-tool-btn svg { width: 15px; height: 15px; pointer-events: none; display: block; }
-.dv-tool-btn:hover {
-  background: rgba(255,255,255,0.15);
-  color: #f1f5f9;
-  border-color: rgba(255,255,255,0.22);
-}
-.dv-zoom-badge {
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  min-width: 38px;
-  text-align: center;
-  user-select: none;
-}
+
 .dv-sep {
   width: 1px;
-  height: 22px;
-  background: rgba(255,255,255,0.1);
-  margin: 0 3px;
-}
-.dv-close-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 7px;
-  background: rgba(220,38,38,0.15);
-  border: 1px solid rgba(220,38,38,0.35);
-  color: #f87171;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s;
-  margin-left: 6px;
-  flex-shrink: 0;
-  padding: 0;
-}
-.dv-close-btn svg { width: 15px; height: 15px; pointer-events: none; display: block; }
-.dv-close-btn:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
-
-/* ============================================================
-   BODY — THE CONTENT AREA
-   ============================================================ */
-.dv-body {
-  flex: 1;              /* takes remaining height */
-  min-height: 0;        /* CRITICAL: lets flexbox shrink below content size */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0d1520;
-  overflow: hidden;
-  position: relative;
-}
-
-/* ---- Image viewer ---- */
-.dv-scroll-area {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  cursor: grab;
-}
-.dv-scroll-area:active { cursor: grabbing; }
-.dv-img-stage {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s ease;
-  transform-origin: center center;
-}
-.dv-img {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  border-radius: 4px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-/* ---- PDF iframe ---- */
-.dv-iframe {
-  display: block;       /* CRITICAL: block removes bottom gap */
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: #fff;
-  flex: 1;
-  min-height: 0;
-}
-
-/* ---- Fallback / unsupported ---- */
-.dv-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
-  text-align: center;
-  color: #94a3b8;
-  max-width: 480px;
-}
-.dv-fallback-icon { font-size: 60px; margin-bottom: 16px; line-height: 1; }
-.dv-fallback-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #cbd5e1;
-  margin-bottom: 8px;
-  word-break: break-all;
-}
-.dv-fallback-msg {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #64748b;
-  margin-bottom: 20px;
-}
-.dv-dl-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #1565C0;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background 0.2s;
-  font-family: inherit;
-}
-.dv-dl-btn:hover { background: #0d47a1; color: #fff; }
-
-/* ============================================================
-   FOOTER
-   ============================================================ */
-.dv-footer {
-  flex-shrink: 0;
-  padding: 7px 16px;
+  height: 20px;
   background: #1e2d45;
-  border-top: 1px solid rgba(255,255,255,0.05);
-  display: flex;
-  justify-content: center;
-}
-.dv-kbd-hint {
-  font-size: 11px;
-  color: #475569;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 10px;
-  color: #94a3b8;
-  font-family: monospace;
-  min-width: 20px;
-  line-height: 1.4;
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-@media (max-width: 640px) {
-  .dv-modal  { border-radius: 8px; height: calc(100dvh - 16px); }
-  .dv-header { padding: 8px 12px; }
-  .dv-file-name { max-width: 160px; font-size: 12px; }
-  .dv-file-meta, .dv-footer { display: none; }
-  .dv-zoom-badge { display: none; }
-  .uc-file-btns { flex-direction: column; align-items: flex-end; gap: 4px; }
-}
-
-/* ─── Search bar in PDF viewer header ─────────────────────────────────────── */
+/* Search */
 .dv-search-wrap {
   position: relative;
   display: flex;
   align-items: center;
 }
+
 .dv-search-icon {
   position: absolute;
-  left: 9px;
+  left: 8px;
   color: #64748b;
   pointer-events: none;
-  flex-shrink: 0;
 }
+
 .dv-search-input {
-  background: #0d1520;
-  border: 1.5px solid #334155;
-  border-radius: 8px;
+  background: #1a2535;
+  border: 1px solid #2d3f58;
+  border-radius: 7px;
   color: #e2e8f0;
-  font-size: 13px;
-  padding: 6px 32px 6px 30px;
+  font-size: 12px;
+  height: 30px;
+  padding: 0 28px 0 28px;
   outline: none;
-  width: 220px;
+  width: 200px;
+  transition: border-color .15s, width .2s;
   font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
+
 .dv-search-input:focus {
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+  width: 240px;
 }
+
 .dv-search-input::placeholder { color: #475569; }
+
 .dv-search-clear {
   position: absolute;
-  right: 7px;
+  right: 6px;
   background: none;
   border: none;
   color: #64748b;
   cursor: pointer;
-  font-size: 12px;
-  padding: 2px 4px;
+  font-size: 11px;
   line-height: 1;
-  transition: color 0.15s;
+  padding: 2px;
 }
-.dv-search-clear:hover { color: #e2e8f0; }
+.dv-search-clear:hover { color: #94a3b8; }
 
-.dv-match-badge {
-  background: #fef3c7;
-  color: #92400e;
-  border-radius: 20px;
-  padding: 2px 9px;
-  font-size: 11.5px;
-  font-weight: 700;
-  white-space: nowrap;
+/* Tool buttons */
+.dv-tool-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #1e2d45;
+  border-radius: 6px;
+  background: #1a2535;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 11px;
+}
+.dv-tool-btn:hover { background: #243448; color: #e2e8f0; }
+
+.dv-close-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #3d2222;
+  border-radius: 6px;
+  background: #2a1515;
+  color: #f87171;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
   flex-shrink: 0;
 }
+.dv-close-btn:hover { background: #3d1c1c; color: #fca5a5; }
 
-/* ─── PDF scroll area ──────────────────────────────────────────────────────── */
-.dv-pdf-scroll {
+.dv-eye-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #1e2d45;
+  border-radius: 6px;
+  background: #1a2535;
+  color: #60a5fa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.dv-eye-btn:hover { background: #1e3a5f; }
+
+.dv-zoom-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* FIX: Body — must be flex:1 + min-height:0 for scroll to work */
+.dv-body {
   flex: 1;
-  min-height: 0;
+  min-height: 0;    /* ← THIS is the critical fix for flex scroll */
   overflow-y: auto;
   overflow-x: auto;
-  background: #525659;
-  padding: 24px 16px;
+}
+
+.dv-pdf-scroll {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 20px 16px;
+  background: #525659;
+  gap: 0;
 }
 
-/* PDFViewer fills the modal body completely */
-.dv-pdf-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: #f8fafc;
-}
-
-/* ─── Image viewer body ────────────────────────────────────────────────────── */
+/* Image viewer body */
 .dv-img-body {
-  overflow: hidden;
-  background: #0a1220;
+  background: #0a0f18;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* ─── Loading spinner inside viewer ───────────────────────────────────────── */
-.dv-loading {
+.dv-scroll-area {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.dv-img-stage {
+  transition: transform .2s ease;
+  transform-origin: center center;
+}
+
+.dv-img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+  border-radius: 4px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.5);
+}
+
+/* No preview placeholder */
+.dv-no-preview {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 60px 20px;
-  color: #94a3b8;
-  font-size: 13px;
+  height: 100%;
+  min-height: 200px;
+  color: #64748b;
+  text-align: center;
+  padding: 32px;
 }
+
+/* Footer */
+.dv-footer {
+  border-top: 1px solid #1e2d45;
+  padding: 8px 16px;
+  background: #0a0f18;
+  flex-shrink: 0;
+}
+
+.dv-kbd-hint {
+  font-size: 11px;
+  color: #334155;
+}
+
+.dv-kbd-hint kbd {
+  background: #1a2535;
+  border: 1px solid #2d3f58;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: #64748b;
+  font-family: inherit;
+}
+
+/* Loading spinner */
 .dv-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid rgba(255,255,255,0.1);
+  width: 32px;
+  height: 32px;
+  border: 3px solid #1e2d45;
   border-top-color: #3b82f6;
   border-radius: 50%;
-  animation: dvSpin 0.7s linear infinite;
+  animation: spin .7s linear infinite;
 }
-@keyframes dvSpin { to { transform: rotate(360deg); } }
 
-/* ─── Responsive tweaks ────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .dv-search-input { width: 140px; font-size: 12px; }
-  .dv-file-name { max-width: 140px; }
-}
-@media (max-width: 480px) {
-  .dv-search-wrap { display: none; }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Scrollbar styling for pdf area */
+.dv-pdf-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.dv-pdf-scroll::-webkit-scrollbar-track { background: #3d4043; }
+.dv-pdf-scroll::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 4px; }
+.dv-pdf-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
