@@ -286,3 +286,277 @@
 .dv-pdf-scroll::-webkit-scrollbar-track { background: #3d4043; }
 .dv-pdf-scroll::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 4px; }
 .dv-pdf-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ============================================================
+   SPLIT-SCREEN MODAL + CHECKLIST PANEL
+   ============================================================ */
+
+/* Wider modal for split layout */
+.dv-modal-split {
+  max-width: 1300px;
+  width: 96vw;
+}
+
+/* Split body container */
+.dv-split-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* LEFT — PDF scroll area */
+.dv-split-left {
+  flex: 1.1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: #525659;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* RIGHT — Checklist panel */
+.dv-split-right {
+  width: 360px;
+  min-width: 320px;
+  max-width: 380px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Checklist Panel ─────────────────────────────────────── */
+.cl-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.cl-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #1a56a0, #2d7dd2);
+  color: #fff;
+  flex-shrink: 0;
+}
+.cl-header-icon { font-size: 20px; }
+.cl-header-title { font-size: 13px; font-weight: 800; }
+.cl-header-sub   { font-size: 10px; opacity: 0.75; margin-top: 1px; }
+
+.cl-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Idle state */
+.cl-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+/* Loading state */
+.cl-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  text-align: center;
+}
+.cl-spin {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #1a56a0;
+  border-radius: 50%;
+  animation: clSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes clSpin { to { transform: rotate(360deg); } }
+
+/* Error state */
+.cl-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+/* Buttons */
+.cl-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #1a56a0, #2d7dd2);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: inherit;
+  box-shadow: 0 3px 10px rgba(26,86,160,0.3);
+}
+.cl-btn-primary:hover { background: linear-gradient(135deg, #0f3d7a, #1a56a0); transform: translateY(-1px); }
+
+.cl-btn-secondary {
+  width: 100%;
+  margin-top: 12px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: inherit;
+}
+.cl-btn-secondary:hover { background: #e2e8f0; }
+
+/* Score card */
+.cl-score {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+.cl-score-num   { font-size: 32px; font-weight: 900; line-height: 1; }
+.cl-score-label { font-size: 11px; color: #64748b; margin: 3px 0 8px; }
+.cl-score-bar-wrap {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.cl-score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease;
+}
+.cl-score-row { display: flex; justify-content: center; gap: 10px; }
+.cl-cnt { font-size: 11px; font-weight: 700; }
+.cl-cnt.yes { color: #16a34a; }
+.cl-cnt.no  { color: #dc2626; }
+.cl-cnt.unk { color: #94a3b8; }
+
+/* Checklist items */
+.cl-items-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.cl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1.5px solid;
+}
+.cl-item-yes { background: #f0fdf4; border-color: #bbf7d0; }
+.cl-item-no  { background: #fef2f2; border-color: #fecaca; }
+.cl-item-unk { background: #f8fafc; border-color: #e2e8f0; }
+.cl-item-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.cl-item-text { flex: 1; min-width: 0; }
+.cl-item-label { font-size: 11.5px; font-weight: 600; color: #1e293b; line-height: 1.4; }
+.cl-item-note  { font-size: 10.5px; color: #64748b; margin-top: 2px; line-height: 1.4; }
+.cl-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+  margin-top: 1px;
+}
+.cl-badge-yes { background: #dcfce7; color: #15803d; }
+.cl-badge-no  { background: #fee2e2; color: #dc2626; }
+.cl-badge-unk { background: #f1f5f9; color: #94a3b8; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .dv-split-body { flex-direction: column; }
+  .dv-split-left  { flex: none; height: 55%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .dv-split-right { width: 100%; max-width: 100%; height: 45%; }
+}
+
+/* ── Clickable checklist items ─────────────────────────────────────────── */
+.cl-item-clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.cl-item-clickable:hover {
+  transform: translateX(3px);
+  box-shadow: 0 2px 8px rgba(26,86,160,0.15);
+  border-color: #93c5fd !important;
+}
+.cl-item-active {
+  border-color: #3b82f6 !important;
+  background: #eff6ff !important;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+
+/* Locate tag inside item */
+.cl-locate-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #3b82f6;
+  margin-top: 3px;
+  font-weight: 600;
+}
+.cl-locate-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #93c5fd;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.cl-locate-dot.active {
+  background: #3b82f6;
+  animation: clLocatePulse 1s ease infinite;
+}
+.cl-locate-tag em {
+  font-style: normal;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #dbeafe;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+@keyframes clLocatePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.4); }
+}
+
+/* Hint bar above checklist items */
+.cl-locate-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 11px;
+  color: #1d4ed8;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
