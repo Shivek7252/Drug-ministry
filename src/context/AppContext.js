@@ -84,7 +84,13 @@ export function AppProvider({ children }) {
       ...prev,
       documents: {
         ...prev.documents,
-        [docId]: { name: file.name, size: file.size, type: file.type, uploadedAt: new Date().toLocaleTimeString() }
+        [docId]: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          uploadedAt: new Date().toLocaleTimeString(),
+          objectUrl: file.objectUrl || ''
+        }
       }
     }));
 
