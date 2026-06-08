@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { REQUIRED_DOCUMENTS } from '../../data/mockData';
+import { downloadFullApplicationPDF } from '../../utils/generatePDF';
 import './WizardStep.css';
 
 function ReviewSection({ title, icon, step, children, onEdit }) {
@@ -29,55 +30,29 @@ function ReviewRow({ label, value }) {
 }
 
 export default function Step7Review() {
-  const { formData, setCurrentStep, setSubmitted } = useApp();
+  const { formData, setCurrentStep, submitToBackend } = useApp();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setCurrentStep(8);
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setSubmitError('');
+    const result = await submitToBackend();
+    setSubmitting(false);
+    if (result.success) {
+      setCurrentStep(8);
+    } else {
+      // If backend offline, proceed anyway (graceful degradation)
+      if (result.error && result.error.includes('fetch')) {
+        setCurrentStep(8); // allow offline submission
+      } else {
+        setSubmitError(result.error || 'Submission failed. Please try again.');
+      }
+    }
   };
 
-  const handleDownload = () => {
-    const content = `
-EXPORT NOC APPLICATION SUMMARY
-================================
-Application Date: ${formData.applicationDate}
-Application Type: ${formData.applicationType}
-Export Purpose: ${formData.exportPurpose}
-Export Category: ${formData.exportCategory}
-Destination Country: ${formData.destinationCountry}
-
-APPLICANT
----------
-Name: ${formData.applicantName}
-Organization: ${formData.applicantOrganization}
-Contact: ${formData.contactNumber}
-Email: ${formData.email}
-
-CONSIGNEE
----------
-Name: ${formData.consigneeName}
-Organization: ${formData.consigneeOrg}
-Address: ${formData.addressLine1}, ${formData.city}, ${formData.consigneeCountry}
-
-PRODUCTS (${formData.products.length})
----------
-${formData.products.map((p, i) => `${i + 1}. ${p.productName} (${p.genericName}) - ${p.dosageForm} ${p.strength} - Batch: ${p.batchNumber}`).join('\n')}
-
-MANUFACTURER
------------
-Name: ${formData.manufacturerName}
-License No: ${formData.mfgLicenseNo}
-Signatory: ${formData.signatoryName} (${formData.signatoryDesignation})
-
-Generated: ${new Date().toLocaleString()}
-    `.trim();
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'Export_NOC_Application_Summary.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownloadPDF = () => {
+    downloadFullApplicationPDF(formData);
   };
 
   return (
@@ -195,11 +170,19 @@ Generated: ${new Date().toLocaleString()}
         </div>
       </ReviewSection>
 
+      {submitError && (
+        <div className="alert alert-danger" style={{marginTop:12}}>
+          <span>⚠️</span><span>{submitError}</span>
+        </div>
+      )}
+
       <div className="step-actions review-actions">
-        <button className="btn btn-outline" onClick={() => setCurrentStep(6)}>← Previous</button>
-        <button className="btn btn-outline" onClick={handleDownload}>⬇️ Download Summary</button>
-        <button className="btn btn-success btn-lg" onClick={handleSubmit}>
-          🚀 Submit Application
+        <button className="btn btn-outline" onClick={() => setCurrentStep(6)} disabled={submitting}>← Previous</button>
+        <button className="btn btn-outline btn-primary-light" onClick={handleDownloadPDF} disabled={submitting}>
+          ⬇ Download PDF
+        </button>
+        <button className="btn btn-success btn-lg" onClick={handleSubmit} disabled={submitting}>
+          {submitting ? '⏳ Submitting…' : '🚀 Submit Application'}
         </button>
       </div>
     </div>

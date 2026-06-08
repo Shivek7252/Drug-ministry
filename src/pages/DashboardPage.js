@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { MOCK_APPLICATIONS, CHART_DATA } from '../data/mockData';
+import { listApplications, getDashboardStats } from '../api/applicationService';
 import './DashboardPage.css';
 
 const PIE_COLORS = ['#003580','#1565C0','#0277BD','#2E7D32','#FF6F00','#C62828','#7B1FA2'];
@@ -34,6 +35,50 @@ function StatusBadge({ status }) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [stats,    setStats]    = useState(null);
+  const [apps,     setApps]     = useState([]);
+  const [dbOnline, setDbOnline] = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [monthly,  setMonthly]  = useState(CHART_DATA.monthly);
+  const [byCountry,setByCountry]= useState(CHART_DATA.countryExports);
+  const [byCat,    setByCat]    = useState(CHART_DATA.drugCategory);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [statsRes, appsRes] = await Promise.all([
+        getDashboardStats(),
+        listApplications({ limit: 10 }),
+      ]);
+
+      if (statsRes.success) {
+        setStats(statsRes.stats);
+        if (statsRes.monthly?.some(m => m.applications > 0)) setMonthly(statsRes.monthly);
+        if (statsRes.byCountry?.length  > 0) setByCountry(statsRes.byCountry);
+        if (statsRes.byCategory?.length > 0) setByCat(statsRes.byCategory);
+        setDbOnline(true);
+      } else {
+        // Backend offline — keep dbOnline false so we show demo label
+        setDbOnline(false);
+      }
+      if (appsRes.success) {
+        setApps(appsRes.applications || []);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  // Use live stats when DB online, demo numbers only when backend is offline
+  const statValues = dbOnline
+    ? (stats || { total: 0, approved: 0, pending: 0, rejected: 0, underReview: 0 })
+    : { total: 972, approved: 784, pending: 143, rejected: 45, underReview: 0 };
+
+  const approvalRate = statValues.total > 0
+    ? Math.round((statValues.approved / statValues.total) * 100)
+    : 0;
+  const rejectionRate = statValues.total > 0
+    ? Math.round((statValues.rejected / statValues.total) * 100)
+    : 0;
 
   return (
     <div className="dashboard-page">
@@ -51,10 +96,10 @@ export default function DashboardPage() {
 
         {/* Stat Cards */}
         <div className="stats-grid">
-          <StatCard icon="📋" label="Total Applications" value="972" color="#003580" sub="↑ 12% this month" />
-          <StatCard icon="✅" label="Approved" value="784" color="#2E7D32" sub="80.7% approval rate" />
-          <StatCard icon="⏳" label="Pending" value="143" color="#FF6F00" sub="Avg. 5 days processing" />
-          <StatCard icon="❌" label="Rejected" value="45" color="#C62828" sub="4.6% rejection rate" />
+          <StatCard icon="📋" label="Total Applications" value={loading ? '…' : statValues.total}    color="#003580" sub={loading ? 'Loading…' : dbOnline ? '✓ Live data' : '⚠ Demo data'} />
+          <StatCard icon="✅" label="Approved"           value={loading ? '…' : statValues.approved} color="#2E7D32" sub={loading ? '' : `${approvalRate}% approval rate`} />
+          <StatCard icon="⏳" label="Pending / Submitted" value={loading ? '…' : (statValues.pending || (statValues.total - statValues.approved - statValues.rejected))} color="#FF6F00" sub={loading ? '' : 'Awaiting review'} />
+          <StatCard icon="❌" label="Rejected"           value={loading ? '…' : statValues.rejected} color="#C62828" sub={loading ? '' : `${rejectionRate}% rejection rate`} />
         </div>
 
         {/* Charts Row 1 */}
@@ -65,7 +110,7 @@ export default function DashboardPage() {
             </div>
             <div className="chart-card-body">
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={CHART_DATA.monthly} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <BarChart data={monthly} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F0F4F8" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
@@ -86,7 +131,7 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie
-                    data={CHART_DATA.drugCategory}
+                    data={byCat}
                     cx="50%" cy="50%"
                     outerRadius={90}
                     dataKey="value"
@@ -129,7 +174,7 @@ export default function DashboardPage() {
             </div>
             <div className="chart-card-body">
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={CHART_DATA.countryExports} layout="vertical" margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
+                <BarChart data={byCountry} layout="vertical" margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F0F4F8" />
                   <XAxis type="number" tick={{ fontSize: 12 }} />
                   <YAxis dataKey="country" type="category" tick={{ fontSize: 12 }} width={60} />
@@ -151,6 +196,16 @@ export default function DashboardPage() {
             <button className="btn btn-outline btn-sm" onClick={() => navigate('/track')}>View All →</button>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
+            {apps.length === 0 ? (
+              <div style={{padding:'32px',textAlign:'center',color:'#94a3b8'}}>
+                <div style={{fontSize:36,marginBottom:8}}>📋</div>
+                <p style={{fontWeight:600,color:'#475569',marginBottom:4}}>No applications yet</p>
+                <p style={{fontSize:12,marginBottom:16}}>Submitted applications will appear here.</p>
+                <button className="btn btn-primary btn-sm" onClick={() => navigate('/apply')}>
+                  ➕ Submit First Application
+                </button>
+              </div>
+            ) : (
             <div className="table-wrapper">
               <table>
                 <thead>
@@ -167,15 +222,15 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_APPLICATIONS.map(app => (
-                    <tr key={app.id}>
-                      <td><strong style={{ color: '#003580' }}>{app.id}</strong></td>
-                      <td><code>{app.refNo}</code></td>
-                      <td>{app.applicant}</td>
-                      <td>{app.country}</td>
-                      <td>{app.category}</td>
-                      <td><span className="badge badge-primary">{app.products}</span></td>
-                      <td>{app.date}</td>
+                  {apps.map((app, i) => (
+                    <tr key={app.applicationNumber || i}>
+                      <td><strong style={{ color: '#003580' }}>{app.applicationNumber}</strong></td>
+                      <td><code>{app.referenceNumber}</code></td>
+                      <td>{app.applicantOrganization || app.applicantName || '—'}</td>
+                      <td>{app.destinationCountry || '—'}</td>
+                      <td>{app.exportCategory || '—'}</td>
+                      <td><span className="badge badge-primary">{app.products?.length || 0}</span></td>
+                      <td>{app.applicationDate || (app.createdAt ? new Date(app.createdAt).toLocaleDateString('en-IN') : '—')}</td>
                       <td><StatusBadge status={app.status} /></td>
                       <td>
                         <button className="btn btn-outline btn-sm" onClick={() => navigate('/track')}>
@@ -187,6 +242,7 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         </div>
 

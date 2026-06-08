@@ -8,8 +8,12 @@ const REF_NO = 'REF-789654';
 
 export default function Step8Success() {
   const navigate = useNavigate();
-  const { resetForm, formData } = useApp();
+  const { resetForm, formData, submittedAppNo, submittedRefNo } = useApp();
   const [show, setShow] = useState(false);
+
+  // Use real submitted numbers if available, else fallback
+  const appNo = submittedAppNo || APP_NO;
+  const refNo = submittedRefNo || REF_NO;
 
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 100);
@@ -23,8 +27,8 @@ ACKNOWLEDGEMENT RECEIPT
 Central Drugs Standard Control Organisation (CDSCO)
 Ministry of Health & Family Welfare, Government of India
 
-Application Number : ${APP_NO}
-Reference Number   : ${REF_NO}
+Application Number : ${appNo}
+Reference Number   : ${refNo}
 Application Date   : ${formData.applicationDate || new Date().toLocaleDateString()}
 Applicant Name     : ${formData.applicantName || 'N/A'}
 Organization       : ${formData.applicantOrganization || 'N/A'}
@@ -46,7 +50,7 @@ Helpdesk: 1800-11-4477 | helpdesk-cdsco@nic.in
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Acknowledgement_${APP_NO}.txt`;
+    a.download = `Acknowledgement_${appNo}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -75,12 +79,12 @@ Helpdesk: 1800-11-4477 | helpdesk-cdsco@nic.in
         <div className="success-ref-cards">
           <div className="ref-card">
             <div className="ref-card-label">Application Number</div>
-            <div className="ref-card-value">{APP_NO}</div>
+            <div className="ref-card-value">{appNo}</div>
             <div className="ref-card-hint">Use this to track your application</div>
           </div>
           <div className="ref-card ref-card-secondary">
             <div className="ref-card-label">Reference Number</div>
-            <div className="ref-card-value">{REF_NO}</div>
+            <div className="ref-card-value">{refNo}</div>
             <div className="ref-card-hint">Quote in all correspondence</div>
           </div>
         </div>

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { saveDraft, submitApplication } from '../api/applicationService';
 
 const AppContext = createContext();
 
@@ -44,11 +45,14 @@ const initialFormData = {
 };
 
 export function AppProvider({ children }) {
-  const [formData, setFormData]     = useState(initialFormData);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [submitted, setSubmitted]   = useState(false);
-  const [draftSaved, setDraftSaved] = useState(false);
-  const [notifOpen, setNotifOpen]   = useState(false);
+  const [formData, setFormData]         = useState(initialFormData);
+  const [currentStep, setCurrentStep]   = useState(1);
+  const [submitted, setSubmitted]       = useState(false);
+  const [draftSaved, setDraftSaved]     = useState(false);
+  const [notifOpen, setNotifOpen]       = useState(false);
+  const [submittedAppNo, setSubmittedAppNo] = useState('');
+  const [submittedRefNo, setSubmittedRefNo] = useState('');
+  const autoSaveTimer = useRef(null);
 
   // ── Auth ──────────────────────────────────────────────
   const [isLoggedIn, setIsLoggedIn]   = useState(false);
@@ -66,7 +70,21 @@ export function AppProvider({ children }) {
     setCurrentUser(null);
     resetForm();
   };
-  // ─────────────────────────────────────────────────────
+
+  // ── Auto-save draft every 30s when form has data ──────
+  useEffect(() => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    // Only auto-save if user has entered meaningful data
+    if (!formData.email && !formData.applicantName) return;
+    autoSaveTimer.current = setTimeout(async () => {
+      const result = await saveDraft(formData, currentUser || 'anonymous');
+      if (result.success) {
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 2000);
+      }
+    }, 30000); // 30s debounce
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [formData]); // eslint-disable-line
 
   const updateForm = (fields) => setFormData(prev => ({ ...prev, ...fields }));
 
@@ -100,9 +118,33 @@ export function AppProvider({ children }) {
   const updateDeclaration = (key, value) =>
     setFormData(prev => ({ ...prev, declarations: { ...prev.declarations, [key]: value } }));
 
-  const saveDraft = () => { setDraftSaved(true); setTimeout(() => setDraftSaved(false), 3000); };
+  // ── Manual save draft ─────────────────────────────────
+  const saveDraftManual = useCallback(async () => {
+    const result = await saveDraft(formData, currentUser || 'anonymous');
+    if (result.success) {
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 3000);
+    }
+  }, [formData, currentUser]);
 
-  const resetForm = () => { setFormData(initialFormData); setCurrentStep(1); setSubmitted(false); };
+  // ── Submit application to backend ─────────────────────
+  const submitToBackend = useCallback(async () => {
+    const result = await submitApplication(formData, currentUser || 'anonymous');
+    if (result.success) {
+      setSubmittedAppNo(result.applicationNumber);
+      setSubmittedRefNo(result.referenceNumber);
+      setSubmitted(true);
+    }
+    return result;
+  }, [formData, currentUser]);
+
+  const resetForm = () => {
+    setFormData(initialFormData);
+    setCurrentStep(1);
+    setSubmitted(false);
+    setSubmittedAppNo('');
+    setSubmittedRefNo('');
+  };
 
   return (
     <AppContext.Provider value={{
@@ -112,7 +154,9 @@ export function AppProvider({ children }) {
       updateDeclaration,
       currentStep, setCurrentStep,
       submitted, setSubmitted,
-      draftSaved, saveDraft,
+      draftSaved, saveDraft: saveDraftManual,
+      submittedAppNo, submittedRefNo,
+      submitToBackend,
       notifOpen, setNotifOpen,
       resetForm,
       // auth
