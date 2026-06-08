@@ -58,16 +58,19 @@ export function AppProvider({ children }) {
   const [isLoggedIn, setIsLoggedIn]   = useState(false);
   const [loginOpen, setLoginOpen]     = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole]       = useState('applicant'); // 'applicant' | 'reviewer'
 
-  const login = (username) => {
+  const login = (username, role = 'applicant') => {
     setIsLoggedIn(true);
     setCurrentUser(username);
+    setUserRole(role);
     setLoginOpen(false);
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
+    setUserRole('applicant');
     resetForm();
   };
 
@@ -162,7 +165,7 @@ export function AppProvider({ children }) {
       // auth
       isLoggedIn, login, logout,
       loginOpen, setLoginOpen,
-      currentUser
+      currentUser, userRole
     }}>
       {children}
     </AppContext.Provider>

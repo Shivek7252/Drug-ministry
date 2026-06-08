@@ -50,17 +50,19 @@ export default function LoginModal() {
   const handleLogin = () => {
     if (!validate()) return;
 
-    // Credential check — username: shivek, password: 1234
-    if (username.trim().toLowerCase() !== 'shivek' || password !== '1234') {
-      setErrors({ general: 'Invalid username or password. Use shivek / 1234' });
-      refreshCaptcha();
-      setCaptchaVal('');
+    // Credential check — applicant: shivek/1234, reviewer: reviewer/1234
+    const isApplicant = username.trim().toLowerCase() === 'shivek' && password === '1234';
+    const isReviewer  = username.trim().toLowerCase() === 'reviewer' && password === '1234';
+
+    if (!isApplicant && !isReviewer) {
+      setErrors({ general: 'Invalid username or password.' });
+      refreshCaptcha(); setCaptchaVal('');
       return;
     }
 
     setLoading(true);
     setTimeout(() => {
-      login(username.trim());
+      login(username.trim(), isReviewer ? 'reviewer' : 'applicant');
       setLoading(false);
     }, 900);
   };
@@ -165,10 +167,9 @@ export default function LoginModal() {
           </div>
         </div>
 
-        {/* Hint */}
-        <div className="login-hint">
-          <span>💡 Demo credentials: username <strong>shivek</strong> · password <strong>1234</strong></span>
-        </div>
+          <div className="login-hint">
+            <span>💡 Applicant: <strong>shivek / 1234</strong> &nbsp;|&nbsp; Review Officer: <strong>reviewer / 1234</strong></span>
+          </div>
       </div>
     </>
   );

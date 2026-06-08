@@ -295,6 +295,56 @@ router.get('/', async (req, res) => {
   }
 });
 
+/* ── POST /api/applications/:id/review — reviewer action ────────────────── */
+router.post('/:id/review', async (req, res) => {
+  try {
+    const { status, remarks, officer = 'reviewer' } = req.body;
+    const app = await Application.findOne({
+      $or: [{ applicationNumber: req.params.id }, { _id: req.params.id }],
+    });
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+
+    const prev = app.status;
+    if (status) app.status = status;
+    app.auditLog.push({
+      action:    'reviewer_action',
+      detail:    `Status: ${prev} → ${status || prev}. Remarks: ${remarks || '—'}`,
+      user:      officer,
+      timestamp: new Date(),
+    });
+    if (remarks) {
+      if (!app.reviewerRemarks) app.reviewerRemarks = [];
+      app.reviewerRemarks.push({ text: remarks, officer, timestamp: new Date(), status: status || prev });
+    }
+    await app.save();
+    res.json({ success: true, status: app.status, auditLog: app.auditLog });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── GET /api/applications/:id/full — full detail with audit log ─────────── */
+router.get('/:id/full', async (req, res) => {
+  try {
+    const app = await Application.findOne({
+      $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
+    });
+    if (!app) return res.status(404).json({ error: 'Not found' });
+    const obj = app.toObject();
+    // Exclude binary doc data
+    if (obj.documents) {
+      const docsOut = {};
+      for (const [k, v] of Object.entries(obj.documents)) {
+        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated, objectUrl: v.objectUrl || '' };
+      }
+      obj.documents = docsOut;
+    }
+    res.json({ success: true, application: obj });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── PATCH /api/applications/:id/status — update status ─────────────────── */
 router.patch('/:id/status', async (req, res) => {
   try {

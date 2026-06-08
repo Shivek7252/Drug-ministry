@@ -82,3 +82,16 @@ export async function updateStatus(appNumber, status, note = '') {
     body: JSON.stringify({ status, note }),
   });
 }
+
+/* ── Reviewer: add remark + status update ─────────────────────────────── */
+export async function reviewerAction(appNumber, { status, remarks, officer = 'reviewer' }) {
+  return apiFetch(`${BASE}/${appNumber}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ status, remarks, officer }),
+  });
+}
+
+/* ── Reviewer: get full application with audit log ──────────────────────── */
+export async function getApplicationFull(id) {
+  return apiFetch(`${BASE}/${id}/full`);
+}

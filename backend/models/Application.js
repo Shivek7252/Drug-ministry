@@ -111,6 +111,14 @@ const ApplicationSchema = new mongoose.Schema({
   // Audit trail
   auditLog: [AuditSchema],
 
+  // Reviewer remarks
+  reviewerRemarks: [{
+    text:      String,
+    officer:   String,
+    status:    String,
+    timestamp: { type: Date, default: Date.now },
+  }],
+
 }, {
   timestamps: true,   // adds createdAt + updatedAt
   strict: false,      // allow extra fields
