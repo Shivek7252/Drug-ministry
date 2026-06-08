@@ -26,3 +26,7 @@ Thumbs.db
 
 # Cache
 .cache/
+
+# Backend
+backend/node_modules/
+backend/.env
