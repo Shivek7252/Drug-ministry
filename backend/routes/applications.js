@@ -1,11 +1,11 @@
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const Application = require('../models/Application');
 
 /* ── Generate unique IDs ─────────────────────────────────────────────────── */
 function generateAppNumber() {
   const year = new Date().getFullYear();
-  const seq  = Math.floor(100000 + Math.random() * 900000);
+  const seq = Math.floor(100000 + Math.random() * 900000);
   return `EXP-${year}-${seq}`;
 }
 function generateRefNumber() {
@@ -17,7 +17,7 @@ function generateRefNumber() {
 async function uniqueAppNumber() {
   let num, exists = true;
   while (exists) {
-    num    = generateAppNumber();
+    num = generateAppNumber();
     exists = await Application.exists({ applicationNumber: num });
   }
   return num;
@@ -25,7 +25,7 @@ async function uniqueAppNumber() {
 async function uniqueRefNumber() {
   let num, exists = true;
   while (exists) {
-    num    = generateRefNumber();
+    num = generateRefNumber();
     exists = await Application.exists({ referenceNumber: num });
   }
   return num;
@@ -40,15 +40,19 @@ router.post('/draft', async (req, res) => {
     let app = null;
     if (formData.email) {
       app = await Application.findOne({
-        email:   formData.email,
+        email: formData.email,
         isDraft: true,
-        status:  'Draft',
+        status: 'Draft',
       }).sort({ lastSavedAt: -1 });
     }
 
     if (app) {
       // Update existing draft
-      Object.assign(app, formData, { lastSavedAt: new Date() });
+      const { documents: incomingDocs, ...restFormData } = formData;
+      Object.assign(app, restFormData, { lastSavedAt: new Date() });
+      if (incomingDocs && typeof incomingDocs === 'object') {
+        app.documents = new Map(Object.entries(incomingDocs));
+      }
       app.auditLog.push({ action: 'draft_saved', detail: 'Auto-saved draft', user });
       await app.save();
       return res.json({ success: true, applicationNumber: app.applicationNumber, referenceNumber: app.referenceNumber, message: 'Draft saved' });
@@ -56,15 +60,15 @@ router.post('/draft', async (req, res) => {
 
     // Create new draft with generated IDs
     const applicationNumber = await uniqueAppNumber();
-    const referenceNumber   = await uniqueRefNumber();
+    const referenceNumber = await uniqueRefNumber();
     const newApp = new Application({
       ...formData,
       applicationNumber,
       referenceNumber,
-      status:    'Draft',
-      isDraft:   true,
+      status: 'Draft',
+      isDraft: true,
       submittedBy: user,
-      auditLog:  [{ action: 'draft_created', detail: 'New draft created', user }],
+      auditLog: [{ action: 'draft_created', detail: 'New draft created', user }],
     });
     await newApp.save();
     res.json({ success: true, applicationNumber, referenceNumber, message: 'Draft created' });
@@ -100,40 +104,45 @@ router.post('/submit', async (req, res) => {
     const submittedAt = new Date();
     const timeline = [
       { step: 'Application Submitted', date: submittedAt.toLocaleString('en-IN'), status: 'completed', desc: 'Application received and assigned reference number' },
-      { step: 'Under Review',          date: 'Pending', status: 'pending',   desc: 'Application will be assigned to Drug Controller Officer' },
-      { step: 'Document Verification', date: 'Pending', status: 'pending',   desc: 'Documents will be verified' },
-      { step: 'Compliance Check',      date: 'Pending', status: 'pending',   desc: 'Awaiting document verification' },
-      { step: 'NOC Decision',          date: 'Pending', status: 'pending',   desc: 'Awaiting compliance check' },
+      { step: 'Under Review', date: 'Pending', status: 'pending', desc: 'Application will be assigned to Drug Controller Officer' },
+      { step: 'Document Verification', date: 'Pending', status: 'pending', desc: 'Documents will be verified' },
+      { step: 'Compliance Check', date: 'Pending', status: 'pending', desc: 'Awaiting document verification' },
+      { step: 'NOC Decision', date: 'Pending', status: 'pending', desc: 'Awaiting compliance check' },
     ];
 
     if (app) {
-      Object.assign(app, formData, {
-        status:      'Submitted',
-        isDraft:     false,
+      const { documents: incomingDocs, ...restFormData } = formData;
+      Object.assign(app, restFormData, {
+        status: 'Submitted',
+        isDraft: false,
         submittedAt,
         lastSavedAt: submittedAt,
         submittedBy: user,
         timeline,
       });
+      // Explicitly set documents so Mongoose converts plain object → Map
+      if (incomingDocs && typeof incomingDocs === 'object') {
+        app.documents = new Map(Object.entries(incomingDocs));
+      }
       app.auditLog.push({ action: 'submitted', detail: 'Final application submitted', user, timestamp: submittedAt });
       await app.save();
       return res.json({
-        success:           true,
+        success: true,
         applicationNumber: app.applicationNumber,
-        referenceNumber:   app.referenceNumber,
-        message:           'Application submitted successfully',
+        referenceNumber: app.referenceNumber,
+        message: 'Application submitted successfully',
       });
     }
 
     // No draft — create and submit immediately
     const applicationNumber = await uniqueAppNumber();
-    const referenceNumber   = await uniqueRefNumber();
+    const referenceNumber = await uniqueRefNumber();
     const newApp = new Application({
       ...formData,
       applicationNumber,
       referenceNumber,
-      status:      'Submitted',
-      isDraft:     false,
+      status: 'Submitted',
+      isDraft: false,
       submittedAt,
       submittedBy: user,
       timeline,
@@ -163,14 +172,16 @@ router.get('/search', async (req, res) => {
     else if (refNo) query.referenceNumber = { $regex: refNo.trim(), $options: 'i' };
     else if (q) {
       const re = { $regex: q.trim(), $options: 'i' };
-      query = { $or: [
-        { applicationNumber: re },
-        { referenceNumber: re },
-        { applicantName: re },
-        { applicantOrganization: re },
-        { email: re },
-        { mfgLicenseNo: re },
-      ]};
+      query = {
+        $or: [
+          { applicationNumber: re },
+          { referenceNumber: re },
+          { applicantName: re },
+          { applicantOrganization: re },
+          { email: re },
+          { mfgLicenseNo: re },
+        ]
+      };
     }
 
     const results = await Application
@@ -200,15 +211,17 @@ router.get('/stats/summary', async (req, res) => {
     const year = new Date().getFullYear();
     const monthly = await Application.aggregate([
       { $match: { createdAt: { $gte: new Date(`${year}-01-01`) }, isDraft: false } },
-      { $group: {
+      {
+        $group: {
           _id: { $month: '$createdAt' },
           applications: { $sum: 1 },
           approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } },
-      }},
+        }
+      },
       { $sort: { _id: 1 } },
     ]);
 
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyData = months.map((month, i) => {
       const found = monthly.find(m => m._id === i + 1);
       return { month, applications: found?.applications || 0, approved: found?.approved || 0 };
@@ -233,7 +246,7 @@ router.get('/stats/summary', async (req, res) => {
 
     res.json({
       success: true,
-      stats:   { total, approved, pending, rejected, underReview },
+      stats: { total, approved, pending, rejected, underReview },
       monthly: monthlyData,
       byCountry,
       byCategory,
@@ -250,7 +263,7 @@ router.get('/:id', async (req, res) => {
     const app = await Application.findOne({
       $or: [
         { applicationNumber: id },
-        { referenceNumber:   id },
+        { referenceNumber: id },
         { _id: mongoose.isValidObjectId(id) ? id : null },
       ],
     });
@@ -258,13 +271,18 @@ router.get('/:id', async (req, res) => {
 
     // Don't send raw document binary data in the detail view
     const obj = app.toObject();
-    if (obj.documents) {
-      const docsOut = {};
+    // documents is stored as a Mongoose Map — convert to plain object
+    const docsOut = {};
+    if (app.documents && app.documents instanceof Map) {
+      for (const [k, v] of app.documents.entries()) {
+        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated };
+      }
+    } else if (obj.documents && typeof obj.documents === 'object') {
       for (const [k, v] of Object.entries(obj.documents)) {
         docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated };
       }
-      obj.documents = docsOut;
     }
+    obj.documents = docsOut;
     res.json({ success: true, application: obj });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -276,7 +294,7 @@ router.get('/', async (req, res) => {
   try {
     const { status, limit = 20, skip = 0, isDraft } = req.query;
     const filter = {};
-    if (status)  filter.status  = status;
+    if (status) filter.status = status;
     if (isDraft !== undefined) filter.isDraft = isDraft === 'true';
     else filter.isDraft = false; // default: only submitted apps
 
@@ -307,9 +325,9 @@ router.post('/:id/review', async (req, res) => {
     const prev = app.status;
     if (status) app.status = status;
     app.auditLog.push({
-      action:    'reviewer_action',
-      detail:    `Status: ${prev} → ${status || prev}. Remarks: ${remarks || '—'}`,
-      user:      officer,
+      action: 'reviewer_action',
+      detail: `Status: ${prev} → ${status || prev}. Remarks: ${remarks || '—'}`,
+      user: officer,
       timestamp: new Date(),
     });
     if (remarks) {
@@ -331,14 +349,18 @@ router.get('/:id/full', async (req, res) => {
     });
     if (!app) return res.status(404).json({ error: 'Not found' });
     const obj = app.toObject();
-    // Exclude binary doc data
-    if (obj.documents) {
-      const docsOut = {};
+    // documents is stored as a Mongoose Map — convert to plain object
+    const docsOut = {};
+    if (app.documents && app.documents instanceof Map) {
+      for (const [k, v] of app.documents.entries()) {
+        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated, objectUrl: v.objectUrl || '' };
+      }
+    } else if (obj.documents && typeof obj.documents === 'object') {
       for (const [k, v] of Object.entries(obj.documents)) {
         docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated, objectUrl: v.objectUrl || '' };
       }
-      obj.documents = docsOut;
     }
+    obj.documents = docsOut;
     res.json({ success: true, application: obj });
   } catch (err) {
     res.status(500).json({ error: err.message });
