@@ -13,6 +13,22 @@ function generateRefNumber() {
   return `REF-${seq}`;
 }
 
+/* ── helper: explicitly replace a Mongoose Map field ─────────────────────── */
+function assignDocuments(app, docs) {
+  if (!docs || typeof docs !== 'object') return;
+  // Build a clean plain object — Mongoose will cast it to Map<DocumentSchema>
+  const clean = {};
+  for (const [k, v] of Object.entries(docs)) {
+    if (v && typeof v === 'object') clean[k] = v;
+  }
+  // Mongoose's .set() casts plain objects to the schema's Map type properly.
+  // Direct assignment (`app.documents = new Map()`) bypasses Mongoose's change
+  // tracking and the Map entries are not persisted.
+  app.set('documents', clean);
+  app.markModified('documents');
+  console.log(`[assignDocuments] received ${Object.keys(docs).length} keys, set ${Object.keys(clean).length}, app.documents.size=${app.documents?.size}`);
+}
+
 /* ── Ensure uniqueness by checking DB ───────────────────────────────────── */
 async function uniqueAppNumber() {
   let num, exists = true;
@@ -48,11 +64,9 @@ router.post('/draft', async (req, res) => {
 
     if (app) {
       // Update existing draft
-      const { documents: incomingDocs, ...restFormData } = formData;
-      Object.assign(app, restFormData, { lastSavedAt: new Date() });
-      if (incomingDocs && typeof incomingDocs === 'object') {
-        app.documents = new Map(Object.entries(incomingDocs));
-      }
+      const { documents, ...rest } = formData;
+      Object.assign(app, rest, { lastSavedAt: new Date() });
+      assignDocuments(app, documents);
       app.auditLog.push({ action: 'draft_saved', detail: 'Auto-saved draft', user });
       await app.save();
       return res.json({ success: true, applicationNumber: app.applicationNumber, referenceNumber: app.referenceNumber, message: 'Draft saved' });
@@ -61,8 +75,9 @@ router.post('/draft', async (req, res) => {
     // Create new draft with generated IDs
     const applicationNumber = await uniqueAppNumber();
     const referenceNumber = await uniqueRefNumber();
+    const { documents, ...rest } = formData;
     const newApp = new Application({
-      ...formData,
+      ...rest,
       applicationNumber,
       referenceNumber,
       status: 'Draft',
@@ -70,6 +85,7 @@ router.post('/draft', async (req, res) => {
       submittedBy: user,
       auditLog: [{ action: 'draft_created', detail: 'New draft created', user }],
     });
+    assignDocuments(newApp, documents);
     await newApp.save();
     res.json({ success: true, applicationNumber, referenceNumber, message: 'Draft created' });
 
@@ -83,6 +99,16 @@ router.post('/draft', async (req, res) => {
 router.post('/submit', async (req, res) => {
   try {
     const { formData, user = 'anonymous' } = req.body;
+
+    // DEBUG: log incoming document keys + sizes
+    if (formData?.documents) {
+      const summary = Object.entries(formData.documents).map(([k, v]) =>
+        `${k}(${v?.name || '?'}, ${v?.size || 0}B, data:${v?.data ? v.data.length + 'ch' : 'none'})`
+      ).join(', ');
+      console.log(`[submit] documents from client: ${summary || 'EMPTY'}`);
+    } else {
+      console.log('[submit] no documents field in formData');
+    }
 
     // Required field validation
     const required = ['applicantName', 'applicantOrganization', 'email', 'destinationCountry', 'exportCategory'];
@@ -111,8 +137,8 @@ router.post('/submit', async (req, res) => {
     ];
 
     if (app) {
-      const { documents: incomingDocs, ...restFormData } = formData;
-      Object.assign(app, restFormData, {
+      const { documents, ...rest } = formData;
+      Object.assign(app, rest, {
         status: 'Submitted',
         isDraft: false,
         submittedAt,
@@ -120,12 +146,10 @@ router.post('/submit', async (req, res) => {
         submittedBy: user,
         timeline,
       });
-      // Explicitly set documents so Mongoose converts plain object → Map
-      if (incomingDocs && typeof incomingDocs === 'object') {
-        app.documents = new Map(Object.entries(incomingDocs));
-      }
+      assignDocuments(app, documents);
       app.auditLog.push({ action: 'submitted', detail: 'Final application submitted', user, timestamp: submittedAt });
       await app.save();
+      console.log(`[submit] saved ${app.applicationNumber} with ${app.documents?.size || 0} documents`);
       return res.json({
         success: true,
         applicationNumber: app.applicationNumber,
@@ -137,8 +161,9 @@ router.post('/submit', async (req, res) => {
     // No draft — create and submit immediately
     const applicationNumber = await uniqueAppNumber();
     const referenceNumber = await uniqueRefNumber();
+    const { documents, ...rest } = formData;
     const newApp = new Application({
-      ...formData,
+      ...rest,
       applicationNumber,
       referenceNumber,
       status: 'Submitted',
@@ -150,7 +175,9 @@ router.post('/submit', async (req, res) => {
         { action: 'submitted', detail: 'Application created and submitted', user, timestamp: submittedAt },
       ],
     });
+    assignDocuments(newApp, documents);
     await newApp.save();
+    console.log(`[submit] created ${applicationNumber} with ${newApp.documents?.size || 0} documents`);
     res.json({ success: true, applicationNumber, referenceNumber, message: 'Application submitted successfully' });
 
   } catch (err) {
@@ -256,6 +283,40 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
+/* ── GET /api/applications/:id/document/:docId — stream raw document file ── */
+router.get('/:id/document/:docId', async (req, res) => {
+  try {
+    const { id, docId } = req.params;
+    const app = await Application.findOne({
+      $or: [
+        { applicationNumber: id },
+        { referenceNumber:   id },
+        { _id: mongoose.isValidObjectId(id) ? id : null },
+      ],
+    });
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+
+    const doc = app.documents?.get ? app.documents.get(docId) : app.documents?.[docId];
+    if (!doc || !doc.data) return res.status(404).json({ error: 'Document file not stored' });
+
+    // doc.data is a data URL ("data:<mime>;base64,...") or bare base64
+    let b64 = String(doc.data);
+    const comma = b64.indexOf(',');
+    if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
+
+    const buf = Buffer.from(b64, 'base64');
+    res.set({
+      'Content-Type':        doc.type || 'application/octet-stream',
+      'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
+      'Content-Length':      buf.length,
+    });
+    res.send(buf);
+  } catch (err) {
+    console.error('Doc fetch error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── GET /api/applications/:id — get full application by appNo ──────────── */
 router.get('/:id', async (req, res) => {
   try {
@@ -269,20 +330,20 @@ router.get('/:id', async (req, res) => {
     });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
-    // Don't send raw document binary data in the detail view
-    const obj = app.toObject();
-    // documents is stored as a Mongoose Map — convert to plain object
-    const docsOut = {};
-    if (app.documents && app.documents instanceof Map) {
-      for (const [k, v] of app.documents.entries()) {
-        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated };
-      }
-    } else if (obj.documents && typeof obj.documents === 'object') {
+    // Strip raw bytes; emit a download URL instead
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const obj = app.toObject({ flattenMaps: true });
+    if (obj.documents) {
+      const docsOut = {};
       for (const [k, v] of Object.entries(obj.documents)) {
-        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated };
+        docsOut[k] = {
+          name: v.name, size: v.size, type: v.type,
+          uploadedAt: v.uploadedAt, validated: v.validated,
+          objectUrl: v.data ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
+        };
       }
+      obj.documents = docsOut;
     }
-    obj.documents = docsOut;
     res.json({ success: true, application: obj });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -348,19 +409,19 @@ router.get('/:id/full', async (req, res) => {
       $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
     });
     if (!app) return res.status(404).json({ error: 'Not found' });
-    const obj = app.toObject();
-    // documents is stored as a Mongoose Map — convert to plain object
-    const docsOut = {};
-    if (app.documents && app.documents instanceof Map) {
-      for (const [k, v] of app.documents.entries()) {
-        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated, objectUrl: v.objectUrl || '' };
-      }
-    } else if (obj.documents && typeof obj.documents === 'object') {
+    const obj = app.toObject({ flattenMaps: true });
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    if (obj.documents) {
+      const docsOut = {};
       for (const [k, v] of Object.entries(obj.documents)) {
-        docsOut[k] = { name: v.name, size: v.size, type: v.type, uploadedAt: v.uploadedAt, validated: v.validated, objectUrl: v.objectUrl || '' };
+        docsOut[k] = {
+          name: v.name, size: v.size, type: v.type,
+          uploadedAt: v.uploadedAt, validated: v.validated,
+          objectUrl: v.data ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
+        };
       }
+      obj.documents = docsOut;
     }
-    obj.documents = docsOut;
     res.json({ success: true, application: obj });
   } catch (err) {
     res.status(500).json({ error: err.message });

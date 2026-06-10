@@ -22,23 +22,38 @@ async function apiFetch(url, options = {}) {
   }
 }
 
+/* Strip blob URLs (only valid in caller's browser) but ship base64 data */
+function cleanDocuments(docs) {
+  const out = {};
+  if (!docs) return out;
+  for (const [id, doc] of Object.entries(docs)) {
+    out[id] = {
+      name: doc.name,
+      size: doc.size,
+      type: doc.type,
+      uploadedAt: doc.uploadedAt,
+      data: doc.data || '',
+    };
+  }
+  return out;
+}
+
 /* ── Auto-save draft ─────────────────────────────────────────────────────── */
 export async function saveDraft(formData, user = 'anonymous') {
+  const cleanDocs = cleanDocuments(formData.documents);
   return apiFetch(`${BASE}/draft`, {
     method: 'POST',
-    body: JSON.stringify({ formData, user }),
+    body: JSON.stringify({ formData: { ...formData, documents: cleanDocs }, user }),
   });
 }
 
 /* ── Final submit ────────────────────────────────────────────────────────── */
 export async function submitApplication(formData, user = 'anonymous') {
-  // Exclude objectUrl (blob URLs) from documents — send only metadata
-  const cleanDocs = {};
-  if (formData.documents) {
-    for (const [id, doc] of Object.entries(formData.documents)) {
-      cleanDocs[id] = { name: doc.name, size: doc.size, type: doc.type, uploadedAt: doc.uploadedAt };
-    }
-  }
+  const cleanDocs = cleanDocuments(formData.documents);
+  console.log('[submitApplication] doc keys being sent:',
+    Object.keys(cleanDocs),
+    'data sizes:',
+    Object.fromEntries(Object.entries(cleanDocs).map(([k, v]) => [k, v.data?.length || 0])));
   return apiFetch(`${BASE}/submit`, {
     method: 'POST',
     body: JSON.stringify({ formData: { ...formData, documents: cleanDocs }, user }),

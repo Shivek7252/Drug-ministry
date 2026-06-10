@@ -1,7 +1,7 @@
 {
   "name": "drug-ministry-backend",
   "version": "1.0.0",
-  "description": "Backend for Drug Ministry document verification using Mistral AI",
+  "description": "Backend for Drug Ministry document verification using ANUVADINI AI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

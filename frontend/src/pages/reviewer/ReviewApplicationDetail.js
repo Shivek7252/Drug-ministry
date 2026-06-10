@@ -390,6 +390,9 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           fileName={viewerDoc.fileName}
           fileSize={viewerDoc.fileSize}
           fileType={viewerDoc.fileType}
+          verificationResult={docResult[viewerDoc.docId]}
+          onVerify={(id) => setDocResult(p => ({ ...p, [id]: 'ok' }))}
+          onDecline={(id) => setDocResult(p => ({ ...p, [id]: 'bad' }))}
           onClose={() => setViewerDoc(null)}
         />
       )}

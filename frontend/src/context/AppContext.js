@@ -110,7 +110,8 @@ export function AppProvider({ children }) {
           size: file.size,
           type: file.type,
           uploadedAt: new Date().toLocaleTimeString(),
-          objectUrl: file.objectUrl || ''
+          objectUrl: file.objectUrl || '',
+          data: file.data || ''
         }
       }
     }));

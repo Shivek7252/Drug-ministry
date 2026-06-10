@@ -424,7 +424,7 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
         <span className="cl-header-icon">🤖</span>
         <div>
           <div className="cl-header-title">AI Document Verification</div>
-          <div className="cl-header-sub">Powered by Mistral AI</div>
+          <div className="cl-header-sub">Powered by ANUVADINI AI</div>
         </div>
       </div>
       <div className="cl-body">
@@ -444,7 +444,7 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
           <div className="cl-loading">
             <div className="cl-spin"/>
             <p style={{fontWeight:600,color:'#1e293b',margin:'12px 0 4px'}}>Analyzing document…</p>
-            <p style={{fontSize:11,color:'#64748b'}}>Sending to Mistral AI (5–15 sec)</p>
+            <p style={{fontSize:11,color:'#64748b'}}>Sending to ANUVADINI AI (5–15 sec)</p>
           </div>
         )}
         {status==='no-key' && (
@@ -777,16 +777,27 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
     if (file.size > MAX_SIZE) { alert('File size must be under 5MB.'); return; }
     FILE_STORE.set(doc.id, file); URL_CACHE.delete(doc.id);
     setUploading(true); setProgress(0);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += 20; setProgress(Math.min(p, 100));
-      if (p >= 100) {
-        clearInterval(iv); setUploading(false);
-        const url = getStableUrl(doc.id, null);
-        onUpload(doc.id, { name: file.name, size: file.size, type: file.type,
-          objectUrl: url || '', uploadedAt: new Date().toLocaleTimeString() });
-      }
-    }, 120);
+
+    const reader = new FileReader();
+    reader.onerror = () => { setUploading(false); alert('Could not read file.'); };
+    reader.onload  = () => {
+      const base64 = reader.result; // data:<mime>;base64,...
+      let p = 0;
+      const iv = setInterval(() => {
+        p += 20; setProgress(Math.min(p, 100));
+        if (p >= 100) {
+          clearInterval(iv); setUploading(false);
+          const url = getStableUrl(doc.id, null);
+          onUpload(doc.id, {
+            name: file.name, size: file.size, type: file.type,
+            objectUrl: url || '',
+            data: base64,
+            uploadedAt: new Date().toLocaleTimeString(),
+          });
+        }
+      }, 120);
+    };
+    reader.readAsDataURL(file);
   }, [doc.id, onUpload]);
 
   const handleDrop = (e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); };

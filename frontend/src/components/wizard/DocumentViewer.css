@@ -252,7 +252,41 @@
   padding: 8px 16px;
   background: #0a0f18;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
+
+.dv-verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dv-verdict-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.dv-verdict-ok  { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.35); }
+.dv-verdict-bad { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.35); }
+.dv-verdict-btn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1.5px solid;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.dv-verdict-btn-verify  { color: #4ade80; border-color: #16a34a; background: transparent; }
+.dv-verdict-btn-verify:hover  { background: #16a34a; color: #fff; }
+.dv-verdict-btn-decline { color: #f87171; border-color: #dc2626; background: transparent; }
+.dv-verdict-btn-decline:hover { background: #dc2626; color: #fff; }
 
 .dv-kbd-hint {
   font-size: 11px;

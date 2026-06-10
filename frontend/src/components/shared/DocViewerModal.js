@@ -14,6 +14,7 @@
  *   onClose    – callback when modal should close
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as pdfjsLib from 'pdfjs-dist';
 import '../wizard/DocumentViewer.css';
 
@@ -332,7 +333,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                 <span className="cl-header-icon">🤖</span>
                 <div>
                     <div className="cl-header-title">AI Document Verification</div>
-                    <div className="cl-header-sub">Powered by Mistral AI</div>
+                    <div className="cl-header-sub">Powered by ANUVADINI AI</div>
                 </div>
             </div>
             <div className="cl-body">
@@ -350,7 +351,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                     <div className="cl-loading">
                         <div className="cl-spin" />
                         <p style={{ fontWeight: 600, color: '#1e293b', margin: '12px 0 4px' }}>Analyzing document…</p>
-                        <p style={{ fontSize: 11, color: '#64748b' }}>Sending to Mistral AI (5–15 sec)</p>
+                        <p style={{ fontSize: 11, color: '#64748b' }}>Sending to ANUVADINI AI (5–15 sec)</p>
                     </div>
                 )}
                 {status === 'no-key' && (
@@ -462,7 +463,7 @@ function ImageViewer({ fileUrl, fileName, fileSize, onClose }) {
         window.addEventListener('keydown', fn);
         return () => window.removeEventListener('keydown', fn);
     }, [onClose]);
-    return (
+    return createPortal(
         <div className="dv-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="dv-modal" onClick={e => e.stopPropagation()}>
                 <div className="dv-header">
@@ -499,12 +500,13 @@ function ImageViewer({ fileUrl, fileName, fileSize, onClose }) {
                     <span className="dv-kbd-hint"><kbd>Esc</kbd> Close · <kbd>+</kbd><kbd>-</kbd> Zoom · <kbd>R</kbd> Rotate</span>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
 /* ─── Main exported component ────────────────────────────────────────────── */
-export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose }) {
+export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, verificationResult }) {
     const isPDF = fileType?.includes('pdf') || fileName?.toLowerCase().endsWith('.pdf');
     const isImg = fileType?.startsWith('image/');
 
@@ -605,7 +607,7 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
 
     // non-PDF, non-image fallback
     if (!isPDF) {
-        return (
+        return createPortal(
             <div className="dv-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
                 <div className="dv-modal" style={{ maxHeight: 240 }} onClick={e => e.stopPropagation()}>
                     <div className="dv-header">
@@ -624,12 +626,13 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                         <p style={{ fontWeight: 700 }}>Preview unavailable for this file type</p>
                     </div>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     }
 
     // PDF viewer with checklist
-    return (
+    return createPortal(
         <div className="dv-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="dv-modal dv-modal-split" onClick={e => e.stopPropagation()}>
 
@@ -745,8 +748,27 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                         <kbd>Enter</kbd> next · <kbd>Shift+Enter</kbd> prev &nbsp;·&nbsp;
                         <kbd>+</kbd><kbd>−</kbd> Zoom
                     </span>
+                    {(onVerify || onDecline) && (
+                        <div className="dv-verdict">
+                            {verificationResult === 'ok' && <span className="dv-verdict-chip dv-verdict-ok">✓ Verified</span>}
+                            {verificationResult === 'bad' && <span className="dv-verdict-chip dv-verdict-bad">✗ Declined</span>}
+                            {onDecline && (
+                                <button className="dv-verdict-btn dv-verdict-btn-decline"
+                                    onClick={() => { onDecline(docId, docLabel); onClose(); }}>
+                                    ✗ Decline
+                                </button>
+                            )}
+                            {onVerify && (
+                                <button className="dv-verdict-btn dv-verdict-btn-verify"
+                                    onClick={() => { onVerify(docId, docLabel); onClose(); }}>
+                                    ✓ Verify
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
