@@ -582,14 +582,7 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
   useEffect(() => { setActive(0); }, [query]);
 
   useEffect(() => {
-    const fn = (e) => {
-      if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'Enter' && document.activeElement === inputRef.current) {
-        e.preventDefault();
-        const t = totalRef.current;
-        if (t > 0) setActive(a => e.shiftKey ? (a-1+t)%t : (a+1)%t);
-      }
-    };
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, [onClose]);
@@ -650,49 +643,21 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
             </div>
           </div>
           <div className="dv-toolbar">
-            <div className="dv-search-wrap">
-              <svg className="dv-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input ref={inputRef} className="dv-search-input" placeholder="Search…"
-                value={query} onChange={e => { setQuery(e.target.value); setActive(0); }}/>
-              {query && <button className="dv-search-clear" onClick={()=>{ setQuery(''); setActive(0); }}>✕</button>}
-            </div>
-            {query.trim() && (
-              <span className="dv-match-badge" style={{
-                background:total>0?'#fef3c7':'#fef2f2',
-                color:total>0?'#92400e':'#dc2626',
-                borderRadius:20,padding:'2px 9px',fontSize:11,fontWeight:700
-              }}>
-                {total>0?`${safeIdx+1}/${total}`:'0'}
-              </span>
-            )}
-            {total>1 && <>
-              <button className="dv-tool-btn" onClick={()=>setActive(a=>(a-1+total)%total)}>‹</button>
-              <button className="dv-tool-btn" onClick={()=>setActive(a=>(a+1)%total)}>›</button>
-            </>}
-            <div className="dv-sep"/>
-            <button className="dv-tool-btn" onClick={()=>setZoom(z=>Math.max(.5,+(z-.25).toFixed(2)))} title="-">
+            <button className="dv-tool-btn" onClick={()=>setZoom(z=>Math.max(.5,+(z-.25).toFixed(2)))} title="Zoom out">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
             <span className="dv-zoom-badge">{Math.round(zoom*100)}%</span>
-            <button className="dv-tool-btn" onClick={()=>setZoom(z=>Math.min(3,+(z+.25).toFixed(2)))} title="+">
+            <button className="dv-tool-btn" onClick={()=>setZoom(z=>Math.min(3,+(z+.25).toFixed(2)))} title="Zoom in">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
-            <button className="dv-tool-btn" onClick={()=>setZoom(1)} style={{fontSize:10,width:'auto',padding:'0 7px'}}>Reset</button>
-            <div className="dv-sep"/>
-            {viewUrl && <a className="dv-tool-btn" href={viewUrl} download={fileName} title="Download">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            </a>}
             <button className="dv-close-btn" onClick={onClose}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         </div>
 
-        {/* Split body */}
+        {/* PDF body (preview only) */}
         <div className="dv-split-body">
-          {/* LEFT: PDF */}
           <div ref={scrollRef} className="dv-split-left">
             {!viewUrl && <div className="dv-no-preview"><div style={{fontSize:52}}>📄</div><p>Preview unavailable</p></div>}
             {viewUrl && !pdf && <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:12,color:'#94a3b8'}}><div className="dv-spinner"/><span style={{fontSize:13}}>Loading…</span></div>}
@@ -704,21 +669,8 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
                 ocrWords={ocrWords[n]||null}/>
             ))}
           </div>
-
-          {/* RIGHT: Checklist */}
-          <div className="dv-split-right">
-            <ChecklistPanel docId={docId} docLabel={docLabel} viewUrl={viewUrl}
-              onSearch={(term) => { setQuery(term); setActive(0); }}
-              activeQuery={query}
-            />
-          </div>
         </div>
 
-        <div className="dv-footer">
-          <span className="dv-kbd-hint">
-            <kbd>Esc</kbd> Close &nbsp;·&nbsp; Type to search · <kbd>Enter</kbd> next · <kbd>Shift+Enter</kbd> prev &nbsp;·&nbsp; <kbd>+</kbd><kbd>-</kbd> Zoom
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -854,13 +806,6 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
           </div>
           <div className="uc-header-right">
             {uploaded && <span className="upload-status-badge">✓ Uploaded</span>}
-            {uploaded && (
-              <button className="dv-eye-btn" onClick={() => setViewerOpen(true)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                </svg>
-              </button>
-            )}
           </div>
         </div>
         {uploaded ? (
