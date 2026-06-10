@@ -1,8 +1,11 @@
 # Dependencies
 node_modules/
+frontend/node_modules/
+backend/node_modules/
 
 # Production build
 build/
+frontend/build/
 
 # Environment files
 .env
@@ -10,6 +13,8 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+frontend/.env
+backend/.env
 
 # Logs
 npm-debug.log*
@@ -26,7 +31,3 @@ Thumbs.db
 
 # Cache
 .cache/
-
-# Backend
-backend/node_modules/
-backend/.env
