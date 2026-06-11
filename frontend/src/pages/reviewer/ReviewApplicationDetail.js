@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getApplicationFull } from '../../api/applicationService';
 import DocViewerModal from '../../components/shared/DocViewerModal';
 import './ReviewDashboard.css';
@@ -41,23 +42,52 @@ function F({ label, value }) {
 
 /* ── Mismatch popup ─────────────────────────────────────── */
 function MismatchPopup({ docLabel, onClose, onForward, onReject }) {
-  return (
+  return createPortal(
     <div className="rv-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="rv-popup-box">
         <div className="rv-popup-icon">🚫</div>
-        <h2 className="rv-popup-title">Document Mismatched</h2>
+        <h2 className="rv-popup-title">Document Mismatch Detected</h2>
         <p className="rv-popup-body">
-          Uploaded document does not match the prescribed template.
+          The uploaded document does not match the prescribed template for this document type.
         </p>
         <div className="rv-popup-doc"><strong>Document:</strong> {docLabel}</div>
+        <div className="rv-popup-divider" />
+        <p className="rv-popup-action-label">What would you like to do?</p>
         <div className="rv-popup-btns">
-          <button className="rv-popup-btn-fwd" onClick={onForward}>⏩ Forward for Further Review</button>
-          <button className="rv-popup-btn-rej" onClick={onReject} >❌ Reject Application</button>
-          <button className="rv-popup-btn-cancel" onClick={onClose}  >Cancel</button>
+          <button className="rv-popup-btn-fwd" onClick={onForward}>⏩ Forward for Further Review &amp; Preview</button>
+          <button className="rv-popup-btn-rej" onClick={onReject}>❌ Reject Application</button>
+          <button className="rv-popup-btn-cancel" onClick={onClose}>✕ Cancel</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
+}
+
+/* ── Filename-based document type check (no API needed) ────
+   Returns true if the uploaded file name looks like the expected doc type.
+   Checks against the file's original name stored as up.name.              */
+const DOC_FILENAME_KEYWORDS = {
+  mfg_license:      [['manufactur', 'mfg', 'form-25', 'form-28', 'form25', 'form28', 'form 25', 'form 28', 'license', 'licence', 'drug license', 'dsir', 'loan licence', 'loan license']],
+  product_approval: [['approval', 'approved', 'cdsco', 'product approval', 'registration', 'marketing auth', 'certificate of approval', 'nda', 'new drug']],
+  export_auth:      [['export', 'authorization', 'authorisation', 'auth letter', 'noc', 'no objection', 'export noc', 'export auth']],
+  qa_cert:          [['quality', 'gmp', 'iso', 'assurance', 'qa cert', 'good manufacturing', 'who-gmp', 'who gmp', 'cgmp', 'compliance']],
+  batch_analysis:   [['batch', 'analysis', 'coa', 'certificate of analysis', 'analytical', 'test report', 'quality control', 'batch report']],
+  product_info:     [['product info', 'product information', 'package insert', 'prescribing', 'smpc', 'monograph', 'indications', 'product sheet']],
+};
+
+function filenameMatchesDocType(fileName, docType) {
+  if (!fileName || !docType) return true; // no info → allow
+  const lower = fileName.toLowerCase().replace(/[_\-]/g, ' ');
+  const kwGroups = DOC_FILENAME_KEYWORDS[docType];
+  if (!kwGroups) return true; // unknown type → allow
+  // Any keyword in any group matches → pass
+  for (const group of kwGroups) {
+    for (const kw of group) {
+      if (lower.includes(kw)) return true;
+    }
+  }
+  return false;
 }
 
 export default function ReviewApplicationDetail({ app, onClose, onAction, actionLoading }) {
@@ -66,10 +96,9 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [actionStatus, setActionStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [docVerifying, setDocVerifying] = useState({});
-  const [docResult, setDocResult] = useState({}); // docId → 'ok'|'bad' (template-match result)
+  const [docResult, setDocResult] = useState({}); // docId → 'ok'|'bad'
   const [docVerdict, setDocVerdict] = useState({}); // docId → 'ok'|'bad' (reviewer's explicit verdict)
-  const [mismatchDoc, setMismatchDoc] = useState(null);
+  const [mismatchDoc, setMismatchDoc] = useState(null); // { docId, docLabel, docType, up }
   const [activeTab, setActiveTab] = useState('details');
   const [viewerDoc, setViewerDoc] = useState(null); // { docId, docLabel, docType, fileUrl, fileName, fileSize, fileType }
 
@@ -83,40 +112,35 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
   const data = full || app;
 
-  /* Verify doc */
-  const verifyDoc = async (docId, docLabel, docType, objectUrl) => {
-    if (!objectUrl) { setDocResult(p => ({ ...p, [docId]: 'no-url' })); return false; }
-    setDocVerifying(p => ({ ...p, [docId]: true }));
-    try {
-      const blob = await fetch(objectUrl).then(r => r.blob());
-      const form = new FormData();
-      form.append('file', blob, docLabel + '.pdf');
-      form.append('docType', docType);
-      const res = await fetch('http://localhost:5001/api/validate-template', { method: 'POST', body: form });
-      const json = await res.json();
-      const ok = json.matched !== false;
-      setDocResult(p => ({ ...p, [docId]: ok ? 'ok' : 'bad' }));
-      if (!ok) { setMismatchDoc({ docId, docLabel }); return false; }
-      return true;
-    } catch {
-      setDocResult(p => ({ ...p, [docId]: 'ok' }));
-      return true;
-    } finally {
-      setDocVerifying(p => ({ ...p, [docId]: false }));
-    }
+  /* Check doc by filename only — instant, no API call */
+  const checkDocFilename = (docId, docType, up) => {
+    const fileName = up?.name || '';
+    const ok = filenameMatchesDocType(fileName, docType);
+    setDocResult(p => ({ ...p, [docId]: ok ? 'ok' : 'bad' }));
+    return ok;
   };
 
-  const handleDocClick = async (docId, docLabel, docType, up) => {
+  const handleDocClick = (docId, docLabel, docType, up) => {
     if (!up) return;
     const prev = docResult[docId];
-    // Already validated — open viewer directly
-    if (prev === 'ok' || prev === 'bad') {
+
+    // Already checked — cached result
+    if (prev === 'ok') {
       openViewer(docId, docLabel, docType, up);
       return;
     }
-    // Validate template first, then open viewer regardless
-    await verifyDoc(docId, docLabel, docType, up.objectUrl || '');
-    openViewer(docId, docLabel, docType, up);
+    if (prev === 'bad') {
+      setMismatchDoc({ docId, docLabel, docType, up });
+      return;
+    }
+
+    // First time — check filename
+    const ok = checkDocFilename(docId, docType, up);
+    if (ok) {
+      openViewer(docId, docLabel, docType, up);
+    } else {
+      setMismatchDoc({ docId, docLabel, docType, up });
+    }
   };
 
   const openViewer = (docId, docLabel, docType, up) => {
@@ -274,7 +298,6 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
             {REQUIRED_DOCS.map(doc => {
               const up = data.documents?.[doc.id];
               const verdict = docVerdict[doc.id];
-              const ver = docVerifying[doc.id];
               const cls = !up ? 'rv-doc-none' : verdict === 'ok' ? 'rv-doc-ok' : verdict === 'bad' ? 'rv-doc-bad' : '';
               return (
                 <div key={doc.id} className={`rv-doc-row ${cls}`}>
@@ -290,8 +313,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                   <div className="rv-doc-actions">
                     {verdict === 'ok' && <span className="rv-status-chip rv-chip-ok">✓ Verified</span>}
                     {verdict === 'bad' && <span className="rv-status-chip rv-chip-bad">✗ Declined</span>}
-                    {ver && <span className="rv-verifying-lbl">🔍 Verifying…</span>}
-                    {up && !ver && (
+                    {up && (
                       <button className="rv-verify-btn"
                         onClick={() => handleDocClick(doc.id, doc.label, doc.docType, up)}>
                         {verdict ? '👁 Open & Inspect' : '🔍 Verify & Open'}
@@ -363,14 +385,17 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
         )}
       </div>
 
-      {/* Mismatch popup */}
+      {/* Mismatch popup — rendered via portal to escape stacking context */}
       {mismatchDoc && (
         <MismatchPopup
           docLabel={mismatchDoc.docLabel}
           onClose={() => setMismatchDoc(null)}
           onForward={() => {
+            const { docId, docLabel, docType, up } = mismatchDoc;
             setMismatchDoc(null);
-            onAction(data.applicationNumber, 'Query Raised', `Document mismatch: ${mismatchDoc.docLabel} does not match prescribed template. Forwarded for further review.`);
+            // Forward for review AND open viewer so reviewer can inspect
+            onAction(data.applicationNumber, 'Query Raised', `Document mismatch: ${docLabel} does not match prescribed template. Forwarded for further review.`);
+            openViewer(docId, docLabel, docType, up);
           }}
           onReject={() => {
             setMismatchDoc(null);

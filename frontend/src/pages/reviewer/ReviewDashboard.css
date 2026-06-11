@@ -362,22 +362,41 @@
 
 /* ── Mismatch popup ─────────────────────────────────────── */
 .rv-popup-overlay {
-  position: fixed; inset: 0; background: rgba(10,20,50,.65);
-  backdrop-filter: blur(4px); z-index: 99999;
-  display: flex; align-items: center; justify-content: center; padding: 16px;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 50, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  overflow-y: auto;
 }
 .rv-popup-box {
-  background: #fff; border-radius: 16px; padding: 36px 32px; max-width: 480px; width: 100%;
-  box-shadow: 0 32px 80px rgba(0,0,0,.28); text-align: center;
-  animation: rvPopIn .28s cubic-bezier(.34,1.56,.64,1);
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 28px 28px;
+  max-width: 460px;
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.28);
+  text-align: center;
+  animation: rvPopIn .28s cubic-bezier(.34, 1.56, .64, 1);
+  flex-shrink: 0;
+  position: relative;
+  margin: auto;
 }
-@keyframes rvPopIn { from { opacity:0; transform:scale(.93) translateY(-12px); } to { opacity:1; transform:none; } }
-.rv-popup-icon  { font-size: 52px; margin-bottom: 14px; line-height: 1; }
+@keyframes rvPopIn { from { opacity: 0; transform: scale(.93) translateY(-12px); } to { opacity: 1; transform: none; } }
+.rv-popup-icon  { font-size: 48px; margin-bottom: 12px; line-height: 1; }
 .rv-popup-title { font-size: 18px; font-weight: 800; color: #dc2626; margin-bottom: 10px; }
 .rv-popup-body  { font-size: 13.5px; color: #475569; line-height: 1.7; margin-bottom: 10px; }
-.rv-popup-doc   { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 9px 14px; margin-bottom: 20px; font-size: 13px; color: #991b1b; }
-.rv-popup-btns  { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; }
-.rv-popup-btn-fwd { background: #f59e0b; color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+.rv-popup-doc   { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 9px 14px; margin-bottom: 16px; font-size: 13px; color: #991b1b; }
+.rv-popup-divider { height: 1px; background: #f1f5f9; margin: 0 0 12px; }
+.rv-popup-action-label { font-size: 11.5px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+.rv-popup-btns  { display: flex; flex-direction: column; gap: 9px; align-items: stretch; }
+.rv-popup-btn-fwd { background: #f59e0b; color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; transition: opacity .15s; }
 .rv-popup-btn-rej { background: #dc2626; color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; transition: opacity .15s; }
 .rv-popup-btn-cancel { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 18px; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; transition: background .15s; }
 .rv-popup-btn-fwd:hover, .rv-popup-btn-rej:hover { opacity: .87; }

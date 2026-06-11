@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DocViewerModal.js
  * Shared PDF viewer + AI checklist panel, extracted from Step5DocumentUpload.
  * Used by both the applicant wizard and the reviewer detail page.
@@ -406,22 +406,19 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                             </svg>
-                            Click a ✅ item to locate it in the document
+                            Click 🔍 on a ✅ item to highlight it in the PDF
                         </div>
                         <div className="cl-items-list">
                             {results.map((r, i) => {
                                 const isActive = activeItem === i;
                                 const isPresent = r.present === true;
                                 const isMissing = r.present === false;
-                                const isSearching = isActive && activeQuery;
                                 return (
                                     <div key={i}
-                                        className={`cl-item ${isMissing ? 'cl-item-no' : isPresent ? 'cl-item-yes' : 'cl-item-unk'} ${isPresent ? 'cl-item-clickable' : ''} ${isActive ? 'cl-item-active' : ''}`}
-                                        onClick={() => handleItemClick(r, i)}
-                                        title={isPresent ? `Click to find "${getSearchTerm(r.item, r.note)}" in document` : isMissing ? 'Not found in document' : ''}
-                                    >
+                                        className={`cl-item ${isMissing ? 'cl-item-no' : isPresent ? 'cl-item-yes' : 'cl-item-unk'} ${isActive ? 'cl-item-active' : ''}`}
+                                        >
                                         <span className="cl-item-icon">
-                                            {isSearching ? '🔍' : isMissing ? '❌' : isPresent ? '✅' : '❓'}
+                                            {isMissing ? '❌' : isPresent ? '✅' : '❓'}
                                         </span>
                                         <div className="cl-item-text">
                                             <div className="cl-item-label">{r.item}</div>
@@ -436,15 +433,29 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                                             {isPresent && (
                                                 <div className="cl-locate-tag">
                                                     {isActive && activeQuery
-                                                        ? <><span className="cl-locate-dot active" />Searching: <em>{activeQuery}</em></>
-                                                        : <><span className="cl-locate-dot" />Click to locate in PDF</>}
+                                                        ? <><span className="cl-locate-dot active" />Highlighting: <em>{activeQuery}</em></>
+                                                        : <><span className="cl-locate-dot" />Press 🔍 to highlight in PDF</>}
                                                 </div>
                                             )}
                                             {r.note && <div className="cl-item-note">{r.note}</div>}
                                         </div>
-                                        <span className={`cl-badge ${isMissing ? 'cl-badge-no' : isPresent ? 'cl-badge-yes' : 'cl-badge-unk'}`}>
-                                            {isMissing ? 'NO' : isPresent ? 'YES' : '?'}
-                                        </span>
+                                        <div className="cl-item-right">
+                                            <span className={`cl-badge ${isMissing ? 'cl-badge-no' : isPresent ? 'cl-badge-yes' : 'cl-badge-unk'}`}>
+                                                {isMissing ? 'NO' : isPresent ? 'YES' : '?'}
+                                            </span>
+                                            {isPresent && (
+                                                <button
+                                                    className={`cl-search-btn${isActive && activeQuery ? ' cl-search-btn-active' : ''}`}
+                                                    title={`Highlight "${getSearchTerm(r.item, r.note)}" in PDF`}
+                                                    onClick={() => handleItemClick(r, i)}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="13" height="13">
+                                                        <circle cx="11" cy="11" r="8" />
+                                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}

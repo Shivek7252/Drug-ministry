@@ -618,3 +618,48 @@
   font-weight: 600;
   margin-bottom: 10px;
 }
+
+/* ── Search button on green (found) checklist items ─────────────────────── */
+.cl-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.cl-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1.5px solid #16a34a;
+  background: #dcfce7;
+  color: #15803d;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.cl-search-btn:hover {
+  background: #16a34a;
+  color: #fff;
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.4);
+}
+
+.cl-search-btn-active {
+  background: #15803d;
+  color: #fff;
+  border-color: #14532d;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+  animation: clSearchPulse 1.2s ease infinite;
+}
+
+@keyframes clSearchPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35); }
+  50%       { box-shadow: 0 0 0 5px rgba(22, 163, 74, 0.15); }
+}

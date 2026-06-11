@@ -480,13 +480,21 @@ ${textForAI}
       confidence = 'low';
       reason     = `Scanned document — text not extractable. Please ensure this is a ${tmpl.label}.`;
     } else {
-      // Keyword fallback (no AI)
-      const keywordPassed = anyHits >= 1 && wrongDocHits < 2;
-      matched    = keywordPassed;
-      confidence = 'medium';
-      reason     = keywordPassed
-        ? `Document keywords match expected ${tmpl.label} format`
-        : `Document keywords do not match ${tmpl.label} requirements`;
+      // No AI available — only hard-fail on strong wrong-doc signals (mustNotContain).
+      // Keyword presence check is advisory only: without AI we cannot reliably classify,
+      // so we fail-open to avoid blocking legitimate documents.
+      if (wrongDocHits >= 2) {
+        // Already returned above — but guard here too
+        matched    = false;
+        confidence = 'medium';
+        reason     = `Document appears to be a different document type. Expected: ${tmpl.label}`;
+      } else {
+        matched    = true;
+        confidence = anyHits >= 1 ? 'medium' : 'low';
+        reason     = anyHits >= 1
+          ? `Document keywords match expected ${tmpl.label} format`
+          : `Document accepted — configure MISTRAL_API_KEY for stricter AI-based validation`;
+      }
     }
 
     res.json({
