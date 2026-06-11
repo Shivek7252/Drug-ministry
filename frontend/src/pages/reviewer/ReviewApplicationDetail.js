@@ -67,13 +67,14 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [remarks, setRemarks] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [docVerifying, setDocVerifying] = useState({});
-  const [docResult, setDocResult] = useState({}); // docId → 'ok'|'bad'
+  const [docResult, setDocResult] = useState({}); // docId → 'ok'|'bad' (template-match result)
+  const [docVerdict, setDocVerdict] = useState({}); // docId → 'ok'|'bad' (reviewer's explicit verdict)
   const [mismatchDoc, setMismatchDoc] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
   const [viewerDoc, setViewerDoc] = useState(null); // { docId, docLabel, docType, fileUrl, fileName, fileSize, fileType }
 
   useEffect(() => {
-    setFull(null); setLoadingFull(true); setDocResult({}); setShowForm(false);
+    setFull(null); setLoadingFull(true); setDocResult({}); setDocVerdict({}); setShowForm(false);
     getApplicationFull(app.applicationNumber).then(res => {
       if (res.success) setFull(res.application);
       setLoadingFull(false);
@@ -272,13 +273,13 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
             </div>
             {REQUIRED_DOCS.map(doc => {
               const up = data.documents?.[doc.id];
-              const res = docResult[doc.id];
+              const verdict = docVerdict[doc.id];
               const ver = docVerifying[doc.id];
-              const cls = !up ? 'rv-doc-none' : res === 'ok' ? 'rv-doc-ok' : res === 'bad' ? 'rv-doc-bad' : '';
+              const cls = !up ? 'rv-doc-none' : verdict === 'ok' ? 'rv-doc-ok' : verdict === 'bad' ? 'rv-doc-bad' : '';
               return (
                 <div key={doc.id} className={`rv-doc-row ${cls}`}>
                   <span className="rv-doc-icon-big">
-                    {!up ? '❌' : res === 'ok' ? '✅' : res === 'bad' ? '🚫' : '📄'}
+                    {!up ? '❌' : verdict === 'ok' ? '✅' : verdict === 'bad' ? '🚫' : '📄'}
                   </span>
                   <div className="rv-doc-info">
                     <div className="rv-doc-name">{doc.label}</div>
@@ -287,13 +288,13 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                       : <div className="rv-doc-missing-lbl">Not uploaded</div>}
                   </div>
                   <div className="rv-doc-actions">
-                    {res === 'ok' && <span className="rv-status-chip rv-chip-ok">✓ Verified</span>}
-                    {res === 'bad' && <span className="rv-status-chip rv-chip-bad">✗ Mismatch</span>}
+                    {verdict === 'ok' && <span className="rv-status-chip rv-chip-ok">✓ Verified</span>}
+                    {verdict === 'bad' && <span className="rv-status-chip rv-chip-bad">✗ Declined</span>}
                     {ver && <span className="rv-verifying-lbl">🔍 Verifying…</span>}
                     {up && !ver && (
                       <button className="rv-verify-btn"
                         onClick={() => handleDocClick(doc.id, doc.label, doc.docType, up)}>
-                        {res === 'ok' ? '👁 Open & Inspect' : '🔍 Verify & Open'}
+                        {verdict ? '👁 Open & Inspect' : '🔍 Verify & Open'}
                       </button>
                     )}
                   </div>
@@ -390,9 +391,9 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           fileName={viewerDoc.fileName}
           fileSize={viewerDoc.fileSize}
           fileType={viewerDoc.fileType}
-          verificationResult={docResult[viewerDoc.docId]}
-          onVerify={(id) => setDocResult(p => ({ ...p, [id]: 'ok' }))}
-          onDecline={(id) => setDocResult(p => ({ ...p, [id]: 'bad' }))}
+          verificationResult={docVerdict[viewerDoc.docId]}
+          onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}
+          onDecline={(id) => setDocVerdict(p => ({ ...p, [id]: 'bad' }))}
           onClose={() => setViewerDoc(null)}
         />
       )}

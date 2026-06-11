@@ -168,13 +168,14 @@ function getHighlightsFromOcr(query, ocrWords) {
 }
 
 /* ─── doc-type → checklist key mapping ──────────────────────────────────── */
+/* All uploaded docs are checked against the Export NOC master checklist */
 const DOC_CHECKLISTS = {
-    mfg_license: 'manufacturing_license',
-    product_approval: 'product_approval',
-    export_auth: 'export_authorization',
-    qa_cert: 'quality_assurance',
-    batch_analysis: 'quality_assurance',
-    product_info: 'default',
+    mfg_license: 'export_noc',
+    product_approval: 'export_noc',
+    export_auth: 'export_noc',
+    qa_cert: 'export_noc',
+    batch_analysis: 'export_noc',
+    product_info: 'export_noc',
 };
 
 /* ─── Single PDF page ────────────────────────────────────────────────────── */
@@ -316,8 +317,14 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
     };
 
     const handleItemClick = (r, i) => {
-        if (!onSearch || r.present === false) return;
-        const term = getSearchTerm(r.item, r.note);
+        if (!onSearch || r.present !== true) return;
+        // Prefer the AI's verbatim evidence quote (already proven to appear in the doc).
+        // Use the first ~6 words so search is forgiving of OCR/whitespace noise.
+        let term = '';
+        if (r.evidence) {
+            term = r.evidence.replace(/^["'`]+|["'`]+$/g, '').split(/\s+/).slice(0, 6).join(' ');
+        }
+        if (!term) term = getSearchTerm(r.item, r.note);
         if (!term) return;
         setActiveItem(i);
         onSearch(term);
@@ -418,6 +425,14 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                                         </span>
                                         <div className="cl-item-text">
                                             <div className="cl-item-label">{r.item}</div>
+                                            {isPresent && r.evidence && (
+                                                <div className="cl-item-evidence">
+                                                    <span className="cl-evidence-label">
+                                                        📍 Evidence{typeof r.page === 'number' ? ` (Page ${r.page})` : ''}:
+                                                    </span>
+                                                    <span className="cl-evidence-quote">“{r.evidence}”</span>
+                                                </div>
+                                            )}
                                             {isPresent && (
                                                 <div className="cl-locate-tag">
                                                     {isActive && activeQuery
@@ -743,11 +758,6 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                 </div>
 
                 <div className="dv-footer">
-                    <span className="dv-kbd-hint">
-                        <kbd>Esc</kbd> Close &nbsp;·&nbsp; Type to search &nbsp;·&nbsp;
-                        <kbd>Enter</kbd> next · <kbd>Shift+Enter</kbd> prev &nbsp;·&nbsp;
-                        <kbd>+</kbd><kbd>−</kbd> Zoom
-                    </span>
                     {(onVerify || onDecline) && (
                         <div className="dv-verdict">
                             {verificationResult === 'ok' && <span className="dv-verdict-chip dv-verdict-ok">✓ Verified</span>}

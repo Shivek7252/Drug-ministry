@@ -32,6 +32,14 @@ app.get('/health', (_, res) => res.json({ status: 'ok', model: 'mistral-large-la
 
 /* ─── Document checklist items per document type ───────────────────────── */
 const CHECKLISTS = {
+  export_noc: [
+    'System generated Integrated Registration Form (IRF) is present',
+    'Legal undertaking in Annexure-II on Rs. 100 non-judicial stamp paper is present',
+    'Copy of Manufacturing License (Form-29 / Form-25 / Form-28 / Form-28D / Loan Licence) or DSIR / Form-29 is present',
+    'Historical data of Export NOC for the applied product is uploaded',
+    'Approval Status in importing Country is mentioned (NRA Registration/Approval certificate, or CDSCO approval in India if NRA not available)',
+    'Justification in support of applied quantity (based on one year PO / Export NOC history) is present',
+  ],
   manufacturing_license: [
     'License number is present',
     'Manufacturer name is mentioned',
@@ -81,19 +89,67 @@ const CHECKLISTS = {
   ],
 };
 
-/* ─── Extract text from PDF buffer ─────────────────────────────────────── */
+/* ─── Extract combined text from PDF buffer (legacy callers) ──────────── */
 async function extractTextFromPdf(buffer) {
-  try {
-    const data = await pdfParse(buffer);
-    return data.text || '';
-  } catch (e) {
-    console.error('PDF parse error:', e.message);
-    return '';
-  }
+  const pages = await extractTextFromPdfPages(buffer);
+  return pages.join('\n\n');
 }
 
-/* ─── Call Mistral API ──────────────────────────────────────────────────── */
-async function callMistral(messages) {
+/* ─── Extract per-page text from PDF buffer ────────────────────────────── */
+async function extractTextFromPdfPages(buffer) {
+  const pages = [];
+  try {
+    const renderPage = async (pageData) => {
+      const tc = await pageData.getTextContent({
+        normalizeWhitespace: false,
+        disableCombineTextItems: false,
+      });
+      let lastY;
+      let text = '';
+      for (const item of tc.items) {
+        if (lastY === item.transform[5] || lastY == null) {
+          text += item.str;
+        } else {
+          text += '\n' + item.str;
+        }
+        lastY = item.transform[5];
+      }
+      pages.push(text);
+      return text;
+    };
+    await pdfParse(buffer, { pagerender: renderPage });
+  } catch (e) {
+    console.error('PDF parse error:', e.message);
+  }
+  return pages;
+}
+
+/* ─── Mistral OCR fallback for scanned / image-only PDFs ───────────────── */
+async function ocrPdfWithMistral(buffer) {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey || apiKey === 'your_mistral_api_key_here') {
+    throw new Error('MISTRAL_API_KEY is not configured');
+  }
+  const b64 = buffer.toString('base64');
+  const response = await fetch('https://api.mistral.ai/v1/ocr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'mistral-ocr-latest',
+      document: { type: 'document_url', document_url: `data:application/pdf;base64,${b64}` },
+      include_image_base64: false,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Mistral OCR error ${response.status}: ${err}`);
+  }
+  const data = await response.json();
+  return (data.pages || []).map(p => p.markdown || p.text || '');
+}
+
+/* ─── Call Mistral chat completions (plain text response) ──────────────── */
+async function callMistral(messages, { model = 'mistral-large-latest', maxTokens = 2000 } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
@@ -101,16 +157,8 @@ async function callMistral(messages) {
 
   const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'mistral-large-latest',
-      messages,
-      temperature: 0.1,
-      max_tokens: 2000,
-    }),
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, messages, temperature: 0.1, max_tokens: maxTokens }),
   });
 
   if (!response.ok) {
@@ -120,6 +168,31 @@ async function callMistral(messages) {
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
+}
+
+/* ─── Call Mistral chat completions in strict JSON mode ────────────────── */
+async function callMistralJson(messages, { model = 'mistral-large-latest', maxTokens = 3500 } = {}) {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey || apiKey === 'your_mistral_api_key_here') {
+    throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
+  }
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Mistral API error ${response.status}: ${err}`);
+  }
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || '{}';
 }
 
 /* ─── Parse Mistral's checklist response ───────────────────────────────── */
@@ -513,50 +586,132 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
     const docLabel = req.body.docLabel || 'document';
     const items    = CHECKLISTS[docType] || CHECKLISTS.default;
 
-    // Extract text from PDF
-    let docText = '';
+    // ── Step 1: extract per-page text ──────────────────────────────────────
+    let pages = [];
+    let textSource = 'none';
     if (req.file.mimetype === 'application/pdf') {
-      docText = await extractTextFromPdf(req.file.buffer);
+      pages = await extractTextFromPdfPages(req.file.buffer);
+      if (pages.join('').trim().length > 50) textSource = 'pdf-text';
     }
 
-    const hasText = docText.trim().length > 100;
+    // ── Step 2: OCR fallback for scanned / image-only PDFs ────────────────
+    const totalChars = pages.reduce((s, p) => s + (p || '').length, 0);
+    if (req.file.mimetype === 'application/pdf' && totalChars < 200) {
+      try {
+        const ocrPages = await ocrPdfWithMistral(req.file.buffer);
+        if (ocrPages.join('').trim().length > 50) {
+          pages = ocrPages;
+          textSource = 'mistral-ocr';
+        }
+      } catch (e) {
+        console.warn('OCR fallback failed:', e.message);
+      }
+    }
 
-    // Build prompt
-    const systemPrompt = `You are a document verification assistant for the Indian pharmaceutical regulatory system (CDSCO / Drug Ministry). 
-You analyze uploaded documents and check whether specific required items are present.
-Be precise and concise. For each item, answer YES or NO clearly.`;
+    const hasText = pages.join('').trim().length > 100;
 
-    const userPrompt = `Document type: "${docLabel}"
+    if (!hasText) {
+      const blankResults = items.map(it => ({
+        item: it, present: null, page: null, evidence: '',
+        note: 'No readable text could be extracted from the PDF (text layer empty and OCR unavailable).'
+      }));
+      return res.json({
+        success: true, docType, docLabel, hasText: false, textSource,
+        results: blankResults,
+        summary: { total: items.length, present: 0, missing: 0, unknown: items.length, score: 0 },
+      });
+    }
 
-${hasText
-  ? `Extracted document text:\n\`\`\`\n${docText.slice(0, 6000)}\n\`\`\``
-  : `Note: This appears to be a scanned image-based PDF. Make reasonable inferences based on document type.`
-}
+    // ── Step 3: build prompt with page markers ────────────────────────────
+    const MAX_CHARS = 60000;
+    let pageText = pages
+      .map((p, i) => `\n===== PAGE ${i + 1} =====\n${(p || '').trim()}`)
+      .join('\n');
+    if (pageText.length > MAX_CHARS) pageText = pageText.slice(0, MAX_CHARS) + '\n...[truncated]';
 
-Please verify each of the following items in the document. 
-For each item, respond with the item number, YES/NO, and a brief note if relevant.
-Format: "1. YES - [brief note]" or "1. NO - [brief note]"
+    const systemPrompt = `You are a strict document verifier for the Indian pharmaceutical Export NOC process (CDSCO / Drug Ministry).
+You receive the full text of an uploaded document (with per-page markers) and a list of checklist items.
+For each checklist item decide whether it is clearly PRESENT in the document.
 
-Items to check:
-${items.map((item, i) => `${i + 1}. ${item}`).join('\n')}`;
+Strict rules:
+- If the item is not clearly present, mark present=false. Do NOT guess.
+- For every present=true item you MUST quote a short verbatim "evidence" string (max 25 words) copied from the document text.
+- For every present=true item you MUST report the page number where the evidence appears.
+- Do not invent quotes. If you cannot find a quote, mark present=false.
+- Output strict JSON only, matching the schema below.
 
-    const content = await callMistral([
+JSON schema:
+{
+  "items": [
+    {
+      "index": <1..N>,
+      "present": true | false,
+      "page": <integer page number or null>,
+      "evidence": "<verbatim short quote from document, or empty>",
+      "note": "<one-line reason in <= 20 words>"
+    }
+  ]
+}`;
+
+    const userPrompt = `Document label: "${docLabel}"
+Document type key: "${docType}"
+Text source: ${textSource}
+
+Document text (with page markers):
+"""
+${pageText}
+"""
+
+Checklist items to verify (return one entry per item, in order):
+${items.map((it, i) => `${i + 1}. ${it}`).join('\n')}
+
+Return only the JSON object — no preamble, no markdown fences.`;
+
+    // ── Step 4: call Mistral in strict JSON mode ──────────────────────────
+    const raw = await callMistralJson([
       { role: 'system', content: systemPrompt },
       { role: 'user',   content: userPrompt   },
     ]);
 
-    const results = parseChecklistResponse(content, items);
+    // ── Step 5: parse and normalise ───────────────────────────────────────
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (e) {
+      console.error('Failed to parse Mistral JSON:', e.message, '\nRaw:', raw.slice(0, 500));
+      parsed = { items: [] };
+    }
 
-    // Count totals
+    const byIndex = new Map();
+    for (const e of (parsed.items || [])) {
+      if (e && typeof e.index === 'number') byIndex.set(e.index, e);
+    }
+
+    const results = items.map((it, i) => {
+      const m = byIndex.get(i + 1) || {};
+      const present = m.present === true ? true : m.present === false ? false : null;
+      const evidence = typeof m.evidence === 'string' ? m.evidence.trim() : '';
+      // If model claimed present but failed to provide evidence, downgrade to unknown
+      const finalPresent = present === true && !evidence ? null : present;
+      return {
+        item: it,
+        present: finalPresent,
+        page: typeof m.page === 'number' ? m.page : null,
+        evidence: finalPresent === true ? evidence : '',
+        note: typeof m.note === 'string' ? m.note.trim() : '',
+      };
+    });
+
     const presentCount = results.filter(r => r.present === true).length;
     const missingCount = results.filter(r => r.present === false).length;
     const unknownCount = results.filter(r => r.present === null).length;
 
     res.json({
-      success:      true,
+      success:    true,
       docType,
       docLabel,
       hasText,
+      textSource,
+      pageCount:  pages.length,
       results,
       summary: {
         total:   items.length,
@@ -565,7 +720,7 @@ ${items.map((item, i) => `${i + 1}. ${item}`).join('\n')}`;
         unknown: unknownCount,
         score:   Math.round((presentCount / items.length) * 100),
       },
-      rawResponse: content,
+      rawResponse: raw,
     });
 
   } catch (err) {
