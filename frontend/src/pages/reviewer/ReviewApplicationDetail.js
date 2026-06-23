@@ -101,6 +101,9 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [mismatchDoc, setMismatchDoc] = useState(null); // { docId, docLabel, docType, up }
   const [activeTab, setActiveTab] = useState('details');
   const [viewerDoc, setViewerDoc] = useState(null); // { docId, docLabel, docType, fileUrl, fileName, fileSize, fileType }
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState({}); // docId → { status: 'idle'|'loading'|'done'|'error', results, summary, error }
+  const [summaryDocId, setSummaryDocId] = useState(null); // which doc is expanded in summary
 
   useEffect(() => {
     setFull(null); setLoadingFull(true); setDocResult({}); setDocVerdict({}); setShowForm(false);
@@ -109,6 +112,16 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
       setLoadingFull(false);
     });
   }, [app.applicationNumber]);
+
+  // Lock body scroll whenever any modal overlay is open
+  useEffect(() => {
+    const anyOpen = showSummary || !!mismatchDoc || !!viewerDoc;
+    if (anyOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [showSummary, mismatchDoc, viewerDoc]);
 
   const data = full || app;
 
@@ -152,6 +165,46 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
       fileName: up.name || docLabel,
       fileSize: up.size || 0,
       fileType: up.type || 'application/pdf',
+    });
+  };
+
+  /* Open query form pre-filled for a specific document */
+  const handleDocQuery = (docLabel) => {
+    setActionStatus('Query Raised');
+    setRemarks(`Query regarding document: ${docLabel}`);
+    setShowForm(true);
+  };
+
+  /* Fetch verify results for a single document (for summary) */
+  const fetchDocSummary = async (docId, docLabel, docType, up) => {
+    if (!up) return;
+    setSummaryData(p => ({ ...p, [docId]: { status: 'loading', results: null, summary: null, error: '' } }));
+    try {
+      const resp = await fetch(up.objectUrl || '');
+      if (!resp.ok) throw new Error('Could not read document file.');
+      const blob = await resp.blob();
+      const form = new FormData();
+      form.append('file', blob, docLabel + '.pdf');
+      form.append('docType', 'export_noc');
+      form.append('docLabel', docLabel);
+      const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
+      const data = await apiResp.json();
+      if (!apiResp.ok) throw new Error(data.error || 'Verification failed.');
+      setSummaryData(p => ({ ...p, [docId]: { status: 'done', results: data.results, summary: data.summary, error: '' } }));
+    } catch (e) {
+      setSummaryData(p => ({ ...p, [docId]: { status: 'error', results: null, summary: null, error: e.message } }));
+    }
+  };
+
+  /* Trigger summary panel: load all uploaded docs */
+  const handleOpenSummary = () => {
+    setShowSummary(true);
+    const docs = data.documents || {};
+    REQUIRED_DOCS.forEach(doc => {
+      const up = docs[doc.id];
+      if (up && !summaryData[doc.id]) {
+        fetchDocSummary(doc.id, doc.label, doc.docType, up);
+      }
     });
   };
 
@@ -314,10 +367,17 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                     {verdict === 'ok' && <span className="rv-status-chip rv-chip-ok">✓ Verified</span>}
                     {verdict === 'bad' && <span className="rv-status-chip rv-chip-bad">✗ Declined</span>}
                     {up && (
-                      <button className="rv-verify-btn"
-                        onClick={() => handleDocClick(doc.id, doc.label, doc.docType, up)}>
-                        {verdict ? '👁 Open & Inspect' : '🔍 Verify & Open'}
-                      </button>
+                      <>
+                        <button className="rv-verify-btn"
+                          onClick={() => handleDocClick(doc.id, doc.label, doc.docType, up)}>
+                          {verdict ? '👁 Open & Inspect' : '🔍 Verify & Open'}
+                        </button>
+                        <button className="rv-doc-query-btn"
+                          onClick={() => handleDocQuery(doc.label)}
+                          title={`Raise a query for ${doc.label}`}>
+                          ❓ Query
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -357,7 +417,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           <div className="rv-action-btns">
             <button className="rv-act-btn rv-act-btn-review" onClick={() => { setActionStatus('Under Review'); setShowForm(true); }}>🔍 Under Review</button>
             <button className="rv-act-btn rv-act-btn-approve" onClick={() => { setActionStatus('Approved'); setShowForm(true); }}>✅ Approve</button>
-            <button className="rv-act-btn rv-act-btn-query" onClick={() => { setActionStatus('Query Raised'); setShowForm(true); }}>❓ Query</button>
+            <button className="rv-act-btn rv-act-btn-summary" onClick={handleOpenSummary}>📊 Summary</button>
             <button className="rv-act-btn rv-act-btn-reject" onClick={() => { setActionStatus('Rejected'); setShowForm(true); }}>❌ Reject</button>
           </div>
         ) : (
@@ -384,6 +444,92 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           </div>
         )}
       </div>
+
+      {/* Summary Modal */}
+      {showSummary && createPortal(
+        <div className="rv-popup-overlay" onClick={e => e.target === e.currentTarget && setShowSummary(false)}>
+          <div className="rv-summary-box" onClick={e => e.stopPropagation()}>
+            <div className="rv-summary-head">
+              <span style={{ fontSize: 20 }}>📊</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 15, color: '#0f2d5e' }}>Document Summary</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>AI-verified parameter check for each uploaded document</div>
+              </div>
+              <button className="rv-popup-btn-cancel" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setShowSummary(false)}>✕ Close</button>
+            </div>
+            <div className="rv-summary-body">
+              {REQUIRED_DOCS.map(doc => {
+                const up = data.documents?.[doc.id];
+                const sd = summaryData[doc.id];
+                return (
+                  <div key={doc.id} className="rv-summary-doc-card">
+                    <div className="rv-summary-doc-header" onClick={() => setSummaryDocId(summaryDocId === doc.id ? null : doc.id)}>
+                      <span className="rv-doc-icon-big" style={{ fontSize: 16 }}>
+                        {!up ? '❌' : sd?.status === 'done' ? (sd.summary?.score >= 75 ? '✅' : sd.summary?.score >= 50 ? '⚠️' : '🔴') : '📄'}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 12.5, color: '#1e293b' }}>{doc.label}</div>
+                        {!up && <div style={{ fontSize: 10.5, color: '#dc2626', fontStyle: 'italic' }}>Not uploaded</div>}
+                        {up && sd?.status === 'done' && (
+                          <div style={{ fontSize: 10.5, color: '#64748b' }}>
+                            Score: <strong style={{ color: sd.summary.score >= 75 ? '#16a34a' : sd.summary.score >= 50 ? '#d97706' : '#dc2626' }}>{sd.summary.score}%</strong>
+                            &nbsp;·&nbsp;✓ {sd.summary.present} found &nbsp;·&nbsp; ✗ {sd.summary.missing} missing
+                            {sd.summary.unknown > 0 && <>&nbsp;·&nbsp; ? {sd.summary.unknown} unknown</>}
+                          </div>
+                        )}
+                        {up && sd?.status === 'loading' && <div style={{ fontSize: 10.5, color: '#3b82f6' }}>⏳ Analyzing…</div>}
+                        {up && sd?.status === 'error' && <div style={{ fontSize: 10.5, color: '#dc2626' }}>⚠️ {sd.error}</div>}
+                        {up && !sd && <div style={{ fontSize: 10.5, color: '#94a3b8' }}>Pending analysis</div>}
+                      </div>
+                      {up && sd?.status === 'done' && (
+                        <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{summaryDocId === doc.id ? '▲' : '▼'}</span>
+                      )}
+                      {up && (!sd || sd.status === 'idle') && (
+                        <button className="rv-verify-btn" style={{ fontSize: 10, padding: '3px 8px' }}
+                          onClick={e => { e.stopPropagation(); fetchDocSummary(doc.id, doc.label, doc.docType, up); }}>
+                          Analyze
+                        </button>
+                      )}
+                      {up && sd?.status === 'error' && (
+                        <button className="rv-verify-btn" style={{ fontSize: 10, padding: '3px 8px' }}
+                          onClick={e => { e.stopPropagation(); fetchDocSummary(doc.id, doc.label, doc.docType, up); }}>
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                    {up && sd?.status === 'done' && summaryDocId === doc.id && (
+                      <div className="rv-summary-doc-items">
+                        {sd.results.map((r, i) => {
+                          const isPresent = r.present === true;
+                          const isMissing = r.present === false;
+                          return (
+                            <div key={i} className={`rv-summary-item ${isMissing ? 'rv-summary-item-no' : isPresent ? 'rv-summary-item-yes' : 'rv-summary-item-unk'}`}>
+                              <span className="rv-summary-item-icon">{isMissing ? '❌' : isPresent ? '✅' : '❓'}</span>
+                              <div className="rv-summary-item-text">
+                                <div className="rv-summary-item-label">{r.item}</div>
+                                {isPresent && r.evidence && (
+                                  <div className="rv-summary-item-evidence">
+                                    📍 {typeof r.page === 'number' ? `Page ${r.page}: ` : ''}"{r.evidence}"
+                                  </div>
+                                )}
+                                {r.note && <div className="rv-summary-item-note">{r.note}</div>}
+                              </div>
+                              <span className={`cl-badge rv-summary-item-badge ${isMissing ? 'cl-badge-no' : isPresent ? 'cl-badge-yes' : 'cl-badge-unk'}`}>
+                                {isMissing ? 'NO' : isPresent ? 'YES' : '?'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Mismatch popup — rendered via portal to escape stacking context */}
       {mismatchDoc && (

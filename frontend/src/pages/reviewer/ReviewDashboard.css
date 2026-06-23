@@ -293,6 +293,86 @@
 .rv-verify-btn:hover { background: #1a56a0; color: #fff; border-color: #1a56a0; }
 .rv-verifying-lbl { font-size: 10.5px; color: #1d4ed8; font-weight: 600; }
 
+/* Per-doc Query button */
+.rv-doc-query-btn {
+  background: #fff7ed; color: #c2410c; border: 1px solid #fdba74;
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap;
+}
+.rv-doc-query-btn:hover { background: #c2410c; color: #fff; border-color: #c2410c; }
+
+/* ── Summary Modal ──────────────────────────────────────────────────────── */
+.rv-summary-box {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 680px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 32px 80px rgba(0,0,0,.28);
+  overflow: hidden;
+  animation: rvPopIn .28s cubic-bezier(.34,1.56,.64,1);
+  margin: auto;
+}
+.rv-summary-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #f0f9ff, #fff);
+  flex-shrink: 0;
+}
+.rv-summary-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+  padding: 12px 14px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.rv-summary-doc-card {
+  border: 1.5px solid #e2e8f0; border-radius: 8px; overflow: visible;
+  transition: border-color .15s;
+}
+.rv-summary-doc-card:hover { border-color: #bfdbfe; }
+.rv-summary-doc-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; cursor: pointer; background: #f8fafc;
+  border-radius: 8px;
+  transition: background .15s;
+}
+.rv-summary-doc-header:hover { background: #f0f4f8; }
+.rv-summary-doc-items {
+  border-top: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 5px;
+  background: #fff;
+  border-radius: 0 0 8px 8px;
+}
+.rv-summary-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 10px; border-radius: 6px; border: 1px solid transparent;
+  width: 100%; box-sizing: border-box;
+}
+.rv-summary-item-yes { background: #f0fdf4; border-color: #bbf7d0; }
+.rv-summary-item-no  { background: #fef2f2; border-color: #fecaca; }
+.rv-summary-item-unk { background: #fefce8; border-color: #fde68a; }
+.rv-summary-item-icon { font-size: 14px; flex-shrink: 0; margin-top: 2px; line-height: 1; }
+.rv-summary-item-text { flex: 1; min-width: 0; word-break: break-word; }
+.rv-summary-item-badge { flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+.rv-summary-item-label { font-size: 11.5px; font-weight: 600; color: #1e293b; line-height: 1.45; }
+.rv-summary-item-evidence { font-size: 10px; color: #475569; margin-top: 3px; font-style: italic; line-height: 1.5; }
+.rv-summary-item-note { font-size: 10px; color: #64748b; margin-top: 2px; line-height: 1.4; }
+
+/* Badge used inside summary (mirrors DocumentViewer.css cl-badge) */
+.cl-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 7px; border-radius: 20px;
+  font-size: 9.5px; font-weight: 800; white-space: nowrap; margin-top: 1px;
+}
+.cl-badge-yes { background: #dcfce7; color: #15803d; }
+.cl-badge-no  { background: #fee2e2; color: #dc2626; }
+.cl-badge-unk { background: #f1f5f9; color: #94a3b8; }
+
 /* Audit log */
 .rv-audit-panel { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
 .rv-audit-entry { display: flex; gap: 10px; }
@@ -329,6 +409,7 @@
 .rv-act-btn-approve{ background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
 .rv-act-btn-query  { background:#fff7ed; color:#c2410c; border-color:#fdba74; }
 .rv-act-btn-reject { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
+.rv-act-btn-summary{ background:#f0f9ff; color:#0369a1; border-color:#bae6fd; }
 
 .rv-action-form { display: flex; flex-direction: column; gap: 8px; }
 .rv-action-form-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -368,10 +449,10 @@
   backdrop-filter: blur(4px);
   z-index: 99999;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 20px 16px;
-  overflow-y: auto;
+  padding: 24px 16px;
+  overflow: hidden;
 }
 .rv-popup-box {
   background: #fff;
@@ -381,6 +462,7 @@
   width: 100%;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.28);
   text-align: center;
   animation: rvPopIn .28s cubic-bezier(.34, 1.56, .64, 1);
