@@ -519,6 +519,80 @@
   font-size: 10.5px;
   line-height: 1.45;
 }
+
+/* ── Tampering / forensics block ─────────────────────────── */
+.tmp-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #f8fafc;
+}
+.tmp-bad   { background: #fef2f2; border-color: #fecaca; }
+.tmp-warn  { background: #fffbeb; border-color: #fde68a; }
+.tmp-ok    { background: #f0fdf4; border-color: #bbf7d0; }
+.tmp-unavail { background: #f1f5f9; border-color: #cbd5e1; }
+.tmp-head {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;
+}
+.tmp-icon { font-size: 18px; flex-shrink: 0; line-height: 1; }
+.tmp-title { font-weight: 700; font-size: 12.5px; color: #0f172a; }
+.tmp-bad   .tmp-title { color: #b91c1c; }
+.tmp-warn  .tmp-title { color: #b45309; }
+.tmp-ok    .tmp-title { color: #15803d; }
+.tmp-sub   { font-size: 10.5px; color: #475569; margin-top: 2px; }
+.tmp-sub code {
+  background: #1e293b; color: #f1f5f9;
+  padding: 1px 4px; border-radius: 3px; font-size: 10px;
+}
+.tmp-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #94a3b8; flex-shrink: 0; margin-top: 4px;
+}
+.tmp-dot-unavail { background: #94a3b8; }
+.tmp-bullets {
+  list-style: none; margin: 8px 0 0 0; padding: 0;
+}
+.tmp-bullet {
+  position: relative;
+  padding: 5px 6px 5px 18px;
+  font-size: 11px; line-height: 1.4; color: #1e293b;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+.tmp-bullet:last-child { border-bottom: none; }
+.tmp-bullet::before {
+  content: ''; position: absolute; left: 4px; top: 9px;
+  width: 8px; height: 8px; border-radius: 50%; background: #94a3b8;
+}
+.tmp-bullet.tmp-good::before { background: #16a34a; }
+.tmp-bullet.tmp-warn::before { background: #d97706; }
+.tmp-bullet.tmp-bad::before  { background: #dc2626; }
+.tmp-bullet.tmp-info::before { background: #64748b; }
+
+.tmp-fields {
+  margin-top: 10px; padding: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+}
+.tmp-fields-title {
+  font-size: 10px; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+}
+.tmp-field-row {
+  display: flex; gap: 8px; font-size: 10.5px;
+  padding: 2px 0;
+}
+.tmp-field-key { color: #64748b; min-width: 30%; }
+.tmp-field-val { color: #0f172a; font-weight: 600; word-break: break-word; }
+
+.tmp-ela {
+  margin-top: 10px; font-size: 11px; cursor: pointer;
+}
+.tmp-ela summary { color: #2563eb; font-weight: 600; }
+.tmp-ela img {
+  max-width: 100%; margin-top: 6px;
+  border: 1px solid #cbd5e1; border-radius: 4px;
+}
 .cl-evidence-label {
   display: block;
   font-weight: 700;

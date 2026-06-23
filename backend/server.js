@@ -3,10 +3,14 @@ const express  = require('express');
 const cors     = require('cors');
 const multer   = require('multer');
 const fetch    = require('node-fetch');
+const FormData = require('form-data');
 const pdfParse = require('pdf-parse');
 const JSZip    = require('jszip');
 const mongoose = require('mongoose');
 const { fillAllTemplates } = require('./templateFiller');
+
+/* ── Tampering / forensics service (Python FastAPI in /tampering) ───────── */
+const TAMPER_SERVICE_URL = process.env.TAMPER_SERVICE_URL || 'http://localhost:8000';
 
 /* ── MongoDB connection ──────────────────────────────────────────────────── */
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/drug_ministry';
@@ -168,6 +172,36 @@ async function callMistral(messages, { model = 'mistral-large-latest', maxTokens
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
+}
+
+/* ─── Tampering / forensics check (calls the Python service in /tampering) ── */
+async function checkTampering(buffer, filename) {
+  try {
+    const form = new FormData();
+    form.append('file', buffer, { filename: filename || 'document.pdf' });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+
+    const response = await fetch(`${TAMPER_SERVICE_URL}/analyze`, {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders(),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      console.warn(`Tampering service ${response.status}: ${text.slice(0, 200)}`);
+      return { available: false, error: `service returned ${response.status}` };
+    }
+    const data = await response.json();
+    return { available: true, ...data };
+  } catch (e) {
+    console.warn('Tampering service unreachable:', e.message);
+    return { available: false, error: e.message };
+  }
 }
 
 /* ─── Call Mistral chat completions in strict JSON mode ────────────────── */
@@ -594,6 +628,9 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
     const docLabel = req.body.docLabel || 'document';
     const items    = CHECKLISTS[docType] || CHECKLISTS.default;
 
+    // ── Step 0: kick off tampering / forensics check in parallel ──────────
+    const tamperingPromise = checkTampering(req.file.buffer, req.file.originalname);
+
     // ── Step 1: extract per-page text ──────────────────────────────────────
     let pages = [];
     let textSource = 'none';
@@ -623,10 +660,12 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
         item: it, present: null, page: null, evidence: '',
         note: 'No readable text could be extracted from the PDF (text layer empty and OCR unavailable).'
       }));
+      const tamperingNoText = await tamperingPromise;
       return res.json({
         success: true, docType, docLabel, hasText: false, textSource,
         results: blankResults,
         summary: { total: items.length, present: 0, missing: 0, unknown: items.length, score: 0 },
+        tampering: tamperingNoText,
       });
     }
 
@@ -713,6 +752,9 @@ Return only the JSON object — no preamble, no markdown fences.`;
     const missingCount = results.filter(r => r.present === false).length;
     const unknownCount = results.filter(r => r.present === null).length;
 
+    // ── Step 6: await tampering / forensics result (was kicked off in Step 0) ──
+    const tampering = await tamperingPromise;
+
     res.json({
       success:    true,
       docType,
@@ -728,6 +770,7 @@ Return only the JSON object — no preamble, no markdown fences.`;
         unknown: unknownCount,
         score:   Math.round((presentCount / items.length) * 100),
       },
+      tampering,
       rawResponse: raw,
     });
 

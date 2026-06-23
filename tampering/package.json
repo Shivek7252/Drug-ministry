@@ -1,0 +1,10 @@
+{
+  "name": "document-forensics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Document tampering detection — npm wrapper around the Python forensics engine.",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "setup": "pip install -r requirements.txt"
+  }
+}
