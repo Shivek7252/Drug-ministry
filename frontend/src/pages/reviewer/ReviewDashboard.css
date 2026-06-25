@@ -148,16 +148,45 @@
   background: linear-gradient(135deg, #f8fafc, #fff);
 }
 .rv-table-card-title { font-size: 14px; font-weight: 700; color: #0f2d5e; }
-.rv-table-scroll { overflow-x: auto; }
+.rv-table-scroll { overflow-x: hidden; }
 
-.rv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.rv-table thead th {
-  background: #f0f4f8; text-align: left; padding: 10px 12px;
-  font-size: 10.5px; font-weight: 700; color: #64748b;
-  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
-  border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; z-index: 1;
+.rv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
 }
-.rv-table tbody td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+
+/* Fixed column widths — applied via inline style on col elements */
+
+.rv-table thead th {
+  background: #f0f4f8;
+  text-align: left;
+  padding: 9px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  border-bottom: 2px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.rv-table tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0; /* required for text-overflow on table cells */
+}
+/* Allow wrapping only on applicant cell (name + email stacked) */
+.rv-table tbody td.td-applicant { white-space: normal; }
+
 .rv-table tbody tr { cursor: pointer; transition: background .1s; }
 .rv-table tbody tr:hover { background: #f8fafc; }
 .rv-table tbody tr:last-child td { border-bottom: none; }
@@ -165,20 +194,36 @@
 .rv-table tbody tr.rv-row-selected td { border-left: 3px solid #1a56a0; }
 .rv-table tbody tr.rv-row-selected td:not(:first-child) { border-left: none; }
 
-.rv-app-no  { font-size: 12.5px; font-weight: 800; color: #1a56a0; }
-.rv-ref-no  { font-family: monospace; font-size: 11px; color: #64748b; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
-.rv-org-name{ font-weight: 600; color: #1e293b; }
-.rv-org-email{ font-size: 10.5px; color: #94a3b8; }
+.rv-app-no {
+  font-size: 11.5px; font-weight: 800; color: #1a56a0;
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rv-ref-no {
+  font-family: monospace; font-size: 10.5px; color: #64748b;
+  background: #f1f5f9; padding: 1px 4px; border-radius: 3px;
+  display: inline-block; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rv-org-name {
+  font-weight: 600; color: #1e293b; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rv-org-email {
+  font-size: 10px; color: #94a3b8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .rv-cat-pill {
   background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
-  border-radius: 20px; padding: 2px 8px; font-size: 10px; font-weight: 700; white-space: nowrap;
+  border-radius: 20px; padding: 2px 7px; font-size: 10px; font-weight: 700;
+  white-space: nowrap; display: inline-block;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
-.rv-date-cell{ font-size: 11.5px; color: #64748b; white-space: nowrap; }
+.rv-date-cell { font-size: 11px; color: #64748b; white-space: nowrap; }
 .rv-open-btn {
   background: linear-gradient(135deg, #1a56a0, #2563c9); color: #fff;
-  border: none; border-radius: 6px; padding: 5px 12px; font-size: 11.5px;
+  border: none; border-radius: 6px; padding: 5px 8px; font-size: 11px;
   font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
-  transition: opacity .15s;
+  transition: opacity .15s; width: 100%;
 }
 .rv-open-btn:hover { opacity: .85; }
 
@@ -484,11 +529,20 @@
 .rv-popup-btn-fwd:hover, .rv-popup-btn-rej:hover { opacity: .87; }
 .rv-popup-btn-cancel:hover { background: #e2e8f0; }
 
+/* ── Matched (success) popup variant ────────────────────── */
+.rv-popup-box-ok { border: 2px solid #bbf7d0; }
+.rv-popup-icon-ok { color: #16a34a; }
+.rv-popup-title-ok { color: #15803d; }
+.rv-popup-doc-ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.rv-popup-btn-view { background: #16a34a; color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+.rv-popup-btn-view:hover { opacity: .87; }
+
 /* Status badge generic */
 .rv-status-badge {
   display: inline-flex; align-items: center;
-  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 700;
   white-space: nowrap; border: 1px solid;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* ── Responsive ─────────────────────────────────────────── */

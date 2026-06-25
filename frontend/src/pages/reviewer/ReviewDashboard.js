@@ -193,6 +193,17 @@ export default function ReviewDashboard() {
               ) : (
                 <div className="rv-table-scroll">
                   <table className="rv-table">
+                    <colgroup>
+                      <col style={{width:'10%'}} />
+                      <col style={{width:'9%'}} />
+                      <col style={{width:'18%'}} />
+                      <col style={{width:'9%'}} />
+                      <col style={{width:'17%'}} />
+                      <col style={{width:'9%'}} />
+                      <col style={{width:'9%'}} />
+                      <col style={{width:'11%'}} />
+                      <col style={{width:'8%'}} />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th>App No.</th>
@@ -213,7 +224,7 @@ export default function ReviewDashboard() {
                           onClick={() => setSelectedApp(app)}>
                           <td><span className="rv-app-no">{app.applicationNumber}</span></td>
                           <td><span className="rv-ref-no">{app.referenceNumber}</span></td>
-                          <td>
+                          <td className="td-applicant">
                             <div className="rv-org-name">{app.applicantOrganization || app.applicantName || '—'}</div>
                             <div className="rv-org-email">{app.email || ''}</div>
                           </td>
