@@ -161,18 +161,15 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
     if (!up) return;
     const prev = docResult[docId];
 
-    // Already checked — cached result
-    if (prev === 'ok') {
-      openViewer(docId, docLabel, docType, up);
-      return;
-    }
-    if (prev === 'bad') {
-      setMismatchDoc({ docId, docLabel, docType, up });
-      return;
+    // Always show the popup on every click.
+    // Use cached result if available, otherwise run the check now.
+    let ok;
+    if (prev === 'ok' || prev === 'bad') {
+      ok = prev === 'ok';
+    } else {
+      ok = checkDocFilename(docId, docType, up);
     }
 
-    // First time — check filename
-    const ok = checkDocFilename(docId, docType, up);
     if (ok) {
       setMatchedDoc({ docId, docLabel, docType, up });
     } else {
