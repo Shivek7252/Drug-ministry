@@ -40,6 +40,29 @@ function F({ label, value }) {
   );
 }
 
+/* ── Verified popup (shown when filename matches the prescribed template) ──── */
+function VerifiedPopup({ docLabel, onClose, onOpen }) {
+  return createPortal(
+    <div className="rv-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="rv-popup-box">
+        <div className="rv-popup-icon rv-popup-icon-ok">✅</div>
+        <h2 className="rv-popup-title rv-popup-title-ok">Document Verified</h2>
+        <p className="rv-popup-body">
+          The uploaded document matches the prescribed template for this document type.
+        </p>
+        <div className="rv-popup-doc rv-popup-doc-ok"><strong>Document:</strong> {docLabel}</div>
+        <div className="rv-popup-divider" />
+        <p className="rv-popup-action-label">What would you like to do?</p>
+        <div className="rv-popup-btns">
+          <button className="rv-popup-btn-open" onClick={onOpen}>👁 Open &amp; Inspect Document</button>
+          <button className="rv-popup-btn-cancel" onClick={onClose}>✕ Close</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /* ── Mismatch popup ─────────────────────────────────────── */
 function MismatchPopup({ docLabel, onClose, onForward, onReject }) {
   return createPortal(
@@ -99,6 +122,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [docResult, setDocResult] = useState({}); // docId → 'ok'|'bad'
   const [docVerdict, setDocVerdict] = useState({}); // docId → 'ok'|'bad' (reviewer's explicit verdict)
   const [mismatchDoc, setMismatchDoc] = useState(null); // { docId, docLabel, docType, up }
+  const [verifiedDoc, setVerifiedDoc] = useState(null); // { docId, docLabel, docType, up }
   const [activeTab, setActiveTab] = useState('details');
   const [viewerDoc, setViewerDoc] = useState(null); // { docId, docLabel, docType, fileUrl, fileName, fileSize, fileType }
   const [showSummary, setShowSummary] = useState(false);
@@ -115,13 +139,13 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
   // Lock body scroll whenever any modal overlay is open
   useEffect(() => {
-    const anyOpen = showSummary || !!mismatchDoc || !!viewerDoc;
+    const anyOpen = showSummary || !!mismatchDoc || !!verifiedDoc || !!viewerDoc;
     if (anyOpen) {
       const prev = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => { document.body.style.overflow = prev; };
     }
-  }, [showSummary, mismatchDoc, viewerDoc]);
+  }, [showSummary, mismatchDoc, verifiedDoc, viewerDoc]);
 
   const data = full || app;
 
@@ -139,7 +163,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
     // Already checked — cached result
     if (prev === 'ok') {
-      openViewer(docId, docLabel, docType, up);
+      setVerifiedDoc({ docId, docLabel, docType, up });
       return;
     }
     if (prev === 'bad') {
@@ -150,7 +174,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
     // First time — check filename
     const ok = checkDocFilename(docId, docType, up);
     if (ok) {
-      openViewer(docId, docLabel, docType, up);
+      setVerifiedDoc({ docId, docLabel, docType, up });
     } else {
       setMismatchDoc({ docId, docLabel, docType, up });
     }
@@ -529,6 +553,19 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Verified popup — shown when filename matches the prescribed template */}
+      {verifiedDoc && (
+        <VerifiedPopup
+          docLabel={verifiedDoc.docLabel}
+          onClose={() => setVerifiedDoc(null)}
+          onOpen={() => {
+            const { docId, docLabel, docType, up } = verifiedDoc;
+            setVerifiedDoc(null);
+            openViewer(docId, docLabel, docType, up);
+          }}
+        />
       )}
 
       {/* Mismatch popup — rendered via portal to escape stacking context */}

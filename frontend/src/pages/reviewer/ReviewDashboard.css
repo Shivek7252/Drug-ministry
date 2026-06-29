@@ -484,6 +484,25 @@
 .rv-popup-btn-fwd:hover, .rv-popup-btn-rej:hover { opacity: .87; }
 .rv-popup-btn-cancel:hover { background: #e2e8f0; }
 
+/* ── Verified-popup (green) variant ──────────────────────────────── */
+.rv-popup-icon-ok {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 72px; height: 72px; border-radius: 50%;
+  background: #d1fae5; color: #047857;
+  font-size: 38px; margin: 0 auto 14px;
+}
+.rv-popup-title-ok { color: #047857; }
+.rv-popup-doc-ok {
+  background: #f0fdf4; border-color: #bbf7d0; color: #14532d;
+}
+.rv-popup-btn-open {
+  background: #16a34a; color: #fff; border: none;
+  border-radius: 10px; padding: 11px 18px;
+  font-weight: 700; font-size: 13px; cursor: pointer;
+  font-family: inherit; transition: opacity .15s;
+}
+.rv-popup-btn-open:hover { opacity: .87; }
+
 /* Status badge generic */
 .rv-status-badge {
   display: inline-flex; align-items: center;
