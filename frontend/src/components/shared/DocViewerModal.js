@@ -168,14 +168,16 @@ function getHighlightsFromOcr(query, ocrWords) {
 }
 
 /* ─── doc-type → checklist key mapping ──────────────────────────────────── */
-/* All uploaded docs are checked against the Export NOC master checklist */
+/* Each document slot is verified ONLY against the checklist for that slot's
+   document type. The reviewer clicked a specific row, so the AI focuses on
+   that document's own parameters — not all six Export-NOC master items. */
 const DOC_CHECKLISTS = {
-    mfg_license: 'export_noc',
-    product_approval: 'export_noc',
-    export_auth: 'export_noc',
-    qa_cert: 'export_noc',
-    batch_analysis: 'export_noc',
-    product_info: 'export_noc',
+    mfg_license:      'manufacturing_license',
+    product_approval: 'product_approval',
+    export_auth:      'export_authorization',
+    qa_cert:          'quality_assurance',
+    batch_analysis:   'batch_analysis',
+    product_info:     'product_info',
 };
 
 /* ─── Single PDF page ────────────────────────────────────────────────────── */
@@ -270,124 +272,13 @@ function PdfPage({ pdf, pageNum, scale, query, activeGlobal, globalOffset, onRea
     );
 }
 
-/* ─── Tampering / forensics summary block ───────────────────────────────── */
-const TAMPER_SUMMARIES = {
-    META_MOD_BEFORE_CREATE:   { tag: 'bad',  text: 'Modification date is BEFORE the creation date — impossible without tampering.' },
-    META_MOD_AFTER_CREATE:    { tag: 'info', text: 'Document was edited after first creation (often normal — signature/form fill).' },
-    META_EDIT_TOOL_PRODUCER:  { tag: 'warn', text: 'Last touched by a PDF / image editing tool.' },
-    META_ANNOTATIONS_PRESENT: { tag: 'warn', text: 'Contains annotations or overlays — check none cover real content.' },
-    REV_NO_EOF:               { tag: 'warn', text: 'PDF looks truncated or hand-edited.' },
-    REV_SINGLE:               { tag: 'info', text: 'Single-revision PDF (no edit history to inspect).' },
-    REV_INCREMENTAL_SAVES:    { tag: 'info', text: 'Document was re-saved one or more times after first creation.' },
-    REV_CONTENT_DIFF:         { tag: 'bad',  text: 'Earlier version recovered — visible text was CHANGED after that save.' },
-    REV_NO_VISIBLE_DIFF:      { tag: 'good', text: 'Earlier version recovered, text unchanged — rules out strongest edit signal.' },
-    ELA_LOCALIZED_HOTSPOT:    { tag: 'warn', text: 'A small region looks possibly edited (stamps/logos can also trigger this).' },
-    ELA_DIFFUSE_HIGH:         { tag: 'info', text: 'Whole-image compression noise high — often just a forwarded / re-saved scan.' },
-    ELA_SINGLE_HOT_BLOCK:     { tag: 'info', text: 'Single isolated compression-noise spot — very weak signal.' },
-    NOISE_BLOCK_OUTLIER:      { tag: 'warn', text: 'Part of the image has different noise statistics — possible region edit.' },
-    CLONE_SELF_MATCH:         { tag: 'info', text: 'Repeated patterns detected — usually identical text/seals/logos.' },
-    QR_DECODED:               { tag: 'good', text: 'QR / barcode decoded and matches the visible document text.' },
-    QR_PAYLOAD_DOC_MISMATCH:  { tag: 'bad',  text: "QR code's content does NOT match the document text — strong substitution signal." },
-    SIG_VALID:                { tag: 'good', text: 'Valid digital signature — strong proof unaltered since signing.' },
-    SIG_BROKEN:               { tag: 'bad',  text: 'Digital signature BROKEN — document was changed after signing.' },
-    SIG_UNTRUSTED:            { tag: 'warn', text: 'Signature intact but signed by unknown CA — verify out-of-band.' },
-    SIG_VALIDATION_ERROR:     { tag: 'info', text: 'Could not check the digital signature (library error).' },
-    ISSUER_VERIFIED:          { tag: 'good', text: "Details match the issuing authority's register." },
-    ISSUER_MISMATCH:          { tag: 'bad',  text: "Issuer's register shows DIFFERENT details — strong forgery signal." },
-    ISSUER_NOT_FOUND:         { tag: 'warn', text: "Referenced approval / licence ID not found in issuer's register." },
-    ISSUER_UNAVAILABLE:       { tag: 'info', text: 'Could not check with the issuing authority (no ID or channel down).' },
-    ISSUER_ERROR:             { tag: 'info', text: 'Issuer check failed — retry or verify manually.' },
-    FORM25_28_DETECTED:       { tag: 'info', text: 'Looks like a Form 25 / 28 — the most-tampered type. Extra checks applied.' },
-    LICENCE_FORMAT_OK:        { tag: 'good', text: 'Licence number is in the expected Gujarat FDCA format.' },
-    LICENCE_FORMAT_INVALID:   { tag: 'warn', text: "Licence number missing or doesn't match expected format for this form." },
-    SIG_MISSING_ON_FORM:      { tag: 'bad',  text: 'Form 25/28 has NO digital signature. Genuine ones are always signed by the FDCA Commissioner.' },
-    SIG_SIGNER_MISMATCH:      { tag: 'bad',  text: 'Form signed, but signer is NOT the expected FDCA Commissioner.' },
-    PREMISES_EXTRACTED:       { tag: 'info', text: 'Manufacturer & premises extracted — cross-check against registered address.' },
-};
-
-function TamperingBlock({ tampering }) {
-    if (!tampering) return null;
-
-    if (tampering.available === false) {
-        return (
-            <div className="tmp-block tmp-unavail">
-                <div className="tmp-head">
-                    <span className="tmp-dot tmp-dot-unavail" />
-                    <span className="tmp-title">Tampering check unavailable</span>
-                </div>
-                <div className="tmp-sub">
-                    Forensics service not reachable. Start it with:{' '}
-                    <code>cd tampering &amp;&amp; uvicorn app:app --port 8000</code>
-                </div>
-            </div>
-        );
-    }
-
-    const verdict = tampering.verdict || 'UNKNOWN';
-    let cls = 'tmp-warn', label = 'Needs human review', icon = '⚠️';
-    if (verdict.startsWith('TAMPERING')) { cls = 'tmp-bad'; label = 'Tampering detected'; icon = '🚨'; }
-    else if (verdict.startsWith('NO STRONG')) { cls = 'tmp-ok'; label = 'No strong tamper signal'; icon = '🛡️'; }
-
-    const seen = new Map();
-    for (const f of (tampering.findings || [])) {
-        const s = TAMPER_SUMMARIES[f.code];
-        if (s && !seen.has(f.code)) seen.set(f.code, s);
-    }
-    const bullets = [...seen.values()];
-    const hasBad  = bullets.some(b => b.tag === 'bad');
-    const hasWarn = bullets.some(b => b.tag === 'warn');
-    if (!hasBad && !hasWarn) {
-        bullets.unshift({ tag: 'good', text: 'No clear signs of tampering were found by any check.' });
-    }
-
-    const fields = tampering.extracted_fields && Object.keys(tampering.extracted_fields).length
-        ? tampering.extracted_fields : null;
-
-    return (
-        <div className={`tmp-block ${cls}`}>
-            <div className="tmp-head">
-                <span className="tmp-icon">{icon}</span>
-                <div>
-                    <div className="tmp-title">Forgery & Tampering: {label}</div>
-                    {typeof tampering.score === 'number' && (
-                        <div className="tmp-sub">Risk score: {tampering.score} / 100</div>
-                    )}
-                </div>
-            </div>
-            {bullets.length > 0 && (
-                <ul className="tmp-bullets">
-                    {bullets.map((b, i) => (
-                        <li key={i} className={`tmp-bullet tmp-${b.tag}`}>{b.text}</li>
-                    ))}
-                </ul>
-            )}
-            {fields && (
-                <div className="tmp-fields">
-                    <div className="tmp-fields-title">Extracted fields</div>
-                    {Object.entries(fields).map(([k, v]) => (
-                        <div key={k} className="tmp-field-row">
-                            <span className="tmp-field-key">{k}</span>
-                            <span className="tmp-field-val">{String(v)}</span>
-                        </div>
-                    ))}
-                </div>
-            )}
-            {tampering.ela_heatmap_b64 && (
-                <details className="tmp-ela">
-                    <summary>Show ELA heatmap</summary>
-                    <img alt="ELA heatmap" src={`data:image/png;base64,${tampering.ela_heatmap_b64}`} />
-                </details>
-            )}
-        </div>
-    );
-}
-
 /* ─── AI Checklist Panel ─────────────────────────────────────────────────── */
 function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery }) {
     const [status, setStatus] = useState('idle');
     const [results, setResults] = useState(null);
     const [summary, setSummary] = useState(null);
-    const [tampering, setTampering] = useState(null);
+    const [typeMatch, setTypeMatch] = useState(true);
+    const [typeReason, setTypeReason] = useState('');
     const [errMsg, setErrMsg] = useState('');
     const [activeItem, setActiveItem] = useState(null);
 
@@ -395,7 +286,8 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
 
     const run = async () => {
         if (!fileUrl) { setErrMsg('No file available for verification.'); setStatus('error'); return; }
-        setStatus('loading'); setResults(null); setSummary(null); setTampering(null); setErrMsg('');
+        setStatus('loading'); setResults(null); setSummary(null);
+        setTypeMatch(true); setTypeReason(''); setErrMsg('');
         setActiveItem(null);
         if (onSearch) onSearch('');
         try {
@@ -413,7 +305,8 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                 throw new Error(data.error || 'Verification failed.');
             }
             setResults(data.results); setSummary(data.summary);
-            setTampering(data.tampering || null);
+            setTypeMatch(data.documentTypeMatch !== false);
+            setTypeReason(data.documentTypeReason || '');
             setStatus('done');
         } catch (e) { setErrMsg(e.message); setStatus('error'); }
     };
@@ -503,9 +396,25 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                         <button className="cl-btn-primary" onClick={run}>Retry</button>
                     </div>
                 )}
-                {status === 'done' && summary && (
+                {status === 'done' && summary && !typeMatch && (
                     <div>
-                        <TamperingBlock tampering={tampering} />
+                        <div className="cl-absent-banner">
+                            <span className="cl-absent-icon">❌</span>
+                            <div>
+                                <div className="cl-absent-title">{docLabel} is not present</div>
+                                <div className="cl-absent-sub">
+                                    {typeReason
+                                        ? <>{typeReason} The uploaded file does not appear to be a valid <strong>{docLabel}</strong>.</>
+                                        : <>The uploaded file does not appear to be a valid <strong>{docLabel}</strong>. None of the expected identifying features were found.</>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <button className="cl-btn-secondary" onClick={run}>🔄 Re-run Verification</button>
+                    </div>
+                )}
+                {status === 'done' && summary && typeMatch && (
+                    <div>
                         <div className="cl-score" style={{ background: sb, borderColor: sc + '55' }}>
                             <div className="cl-score-num" style={{ color: sc }}>{score}%</div>
                             <div className="cl-score-label">Completeness Score</div>

@@ -3,14 +3,10 @@ const express  = require('express');
 const cors     = require('cors');
 const multer   = require('multer');
 const fetch    = require('node-fetch');
-const FormData = require('form-data');
 const pdfParse = require('pdf-parse');
 const JSZip    = require('jszip');
 const mongoose = require('mongoose');
 const { fillAllTemplates } = require('./templateFiller');
-
-/* ── Tampering / forensics service (Python FastAPI in /tampering) ───────── */
-const TAMPER_SERVICE_URL = process.env.TAMPER_SERVICE_URL || 'http://localhost:8000';
 
 /* ── MongoDB connection ──────────────────────────────────────────────────── */
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/drug_ministry';
@@ -83,6 +79,26 @@ const CHECKLISTS = {
     'Authorized signatory is present',
     'Certificate issue date is present',
   ],
+  batch_analysis: [
+    'Batch number is present',
+    'Product / drug name is mentioned',
+    'Manufacturing date is present',
+    'Expiry / retest date is present',
+    'Test parameters are listed (e.g. assay, dissolution, impurities)',
+    'Results / specifications meet acceptance criteria',
+    'Manufacturer or testing laboratory name is mentioned',
+    'Authorized signatory of QC / QA is present',
+  ],
+  product_info: [
+    'Product / brand name is mentioned',
+    'Generic / INN name is present',
+    'Dosage form and strength are mentioned',
+    'Approved indications are listed',
+    'Dosage and administration instructions are present',
+    'Contraindications / warnings / adverse reactions are listed',
+    'Storage conditions are mentioned',
+    'Manufacturer / marketing-authorisation holder is mentioned',
+  ],
   default: [
     'Document type is identifiable',
     'Organization / company name is present',
@@ -91,6 +107,48 @@ const CHECKLISTS = {
     'Authorized signature is present',
     'Purpose / subject of document is stated',
   ],
+};
+
+/* ─── Per-checklist "what this document looks like" profile ─────────────── */
+/* Used by the AI to first decide whether the upload is the right TYPE of
+   document before scoring individual items. Each entry: short identity statement
+   + must-have words/phrases that genuine examples of this document type contain. */
+const DOC_TYPE_PROFILES = {
+  manufacturing_license: {
+    identity: 'A Manufacturing License (typically Form 25, Form 28, Form 28D, Loan Licence, or DSIR / Form 29) issued by an Indian State Drug Authority under the Drugs and Cosmetics Act, 1940, authorising a company to manufacture drugs at a specified site.',
+    mustHaveAny: ['manufacturing licence', 'manufacturing license', 'licence to manufacture', 'form 25', 'form 28', 'form 28d', 'form-25', 'form-28', 'loan licence', 'state drug', 'drugs and cosmetics', 'drug controller', 'dsir', 'form 29'],
+    mustNotBe: 'It must NOT be a product approval certificate, GMP / quality assurance certificate, batch analysis report, export authorisation, product information sheet, invoice, or undertaking.',
+  },
+  product_approval: {
+    identity: 'A Product Approval Certificate / Registration Certificate issued by a regulatory authority (CDSCO, DCGI, or an importing country regulator) approving a specific drug product for marketing.',
+    mustHaveAny: ['product approval', 'approval certificate', 'registration certificate', 'marketing authorisation', 'marketing authorization', 'cdsco', 'dcgi', 'approved indications', 'permission to import', 'new drug approval', 'subsequent new drug'],
+    mustNotBe: 'It must NOT be a manufacturing licence, GMP certificate, batch analysis report, export authorisation, undertaking, or invoice.',
+  },
+  export_authorization: {
+    identity: 'An Export Authorisation Letter / Export NOC issued by the regulator allowing the export of specified drug quantities to a named destination country.',
+    mustHaveAny: ['export authorisation', 'export authorization', 'export noc', 'no objection certificate', 'permission to export', 'destination country', 'quantity to be exported', 'consignee'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, GMP / QA certificate, batch analysis report, undertaking, or invoice.',
+  },
+  quality_assurance: {
+    identity: 'A Quality Assurance / GMP / WHO-GMP Certificate or Certificate of Analysis confirming that the manufacturing or product complies with Good Manufacturing Practice standards.',
+    mustHaveAny: ['quality assurance', 'gmp certificate', 'good manufacturing practice', 'who-gmp', 'who gmp', 'cgmp', 'certificate of analysis', 'compliance certificate', 'quality management', 'iso 9001'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, export NOC, batch analysis report (single batch test), undertaking, or invoice.',
+  },
+  batch_analysis: {
+    identity: 'A Batch Analysis Report or Certificate of Analysis (CoA) for a specific manufactured batch, listing test parameters and their measured results.',
+    mustHaveAny: ['batch analysis', 'certificate of analysis', 'coa', 'batch number', 'batch no', 'batch no.', 'analytical report', 'test results', 'specification', 'limits', 'observed', 'complies'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, GMP / quality assurance certificate, export NOC, undertaking, or invoice.',
+  },
+  product_info: {
+    identity: 'A Product Information Sheet, Summary of Product Characteristics (SmPC), Package Insert, or Prescribing Information describing a drug product\'s pharmacology, indications, dosing, contraindications, and storage.',
+    mustHaveAny: ['product information', 'package insert', 'summary of product characteristics', 'smpc', 'prescribing information', 'indications', 'contraindications', 'adverse reactions', 'dosage and administration', 'pharmacology', 'storage'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval certificate, GMP / QA certificate, batch analysis report, export NOC, undertaking, or invoice.',
+  },
+  default: {
+    identity: 'A formal document related to the Indian pharmaceutical export NOC application.',
+    mustHaveAny: [],
+    mustNotBe: '',
+  },
 };
 
 /* ─── Extract combined text from PDF buffer (legacy callers) ──────────── */
@@ -172,36 +230,6 @@ async function callMistral(messages, { model = 'mistral-large-latest', maxTokens
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
-}
-
-/* ─── Tampering / forensics check (calls the Python service in /tampering) ── */
-async function checkTampering(buffer, filename) {
-  try {
-    const form = new FormData();
-    form.append('file', buffer, { filename: filename || 'document.pdf' });
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
-
-    const response = await fetch(`${TAMPER_SERVICE_URL}/analyze`, {
-      method: 'POST',
-      body: form,
-      headers: form.getHeaders(),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      console.warn(`Tampering service ${response.status}: ${text.slice(0, 200)}`);
-      return { available: false, error: `service returned ${response.status}` };
-    }
-    const data = await response.json();
-    return { available: true, ...data };
-  } catch (e) {
-    console.warn('Tampering service unreachable:', e.message);
-    return { available: false, error: e.message };
-  }
 }
 
 /* ─── Call Mistral chat completions in strict JSON mode ────────────────── */
@@ -627,9 +655,7 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
     const docType  = req.body.docType || 'default';
     const docLabel = req.body.docLabel || 'document';
     const items    = CHECKLISTS[docType] || CHECKLISTS.default;
-
-    // ── Step 0: kick off tampering / forensics check in parallel ──────────
-    const tamperingPromise = checkTampering(req.file.buffer, req.file.originalname);
+    const profile  = DOC_TYPE_PROFILES[docType] || DOC_TYPE_PROFILES.default;
 
     // ── Step 1: extract per-page text ──────────────────────────────────────
     let pages = [];
@@ -660,12 +686,12 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
         item: it, present: null, page: null, evidence: '',
         note: 'No readable text could be extracted from the PDF (text layer empty and OCR unavailable).'
       }));
-      const tamperingNoText = await tamperingPromise;
       return res.json({
         success: true, docType, docLabel, hasText: false, textSource,
+        documentTypeMatch: false,
+        documentTypeReason: 'No readable text could be extracted from the document.',
         results: blankResults,
         summary: { total: items.length, present: 0, missing: 0, unknown: items.length, score: 0 },
-        tampering: tamperingNoText,
       });
     }
 
@@ -676,19 +702,33 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
       .join('\n');
     if (pageText.length > MAX_CHARS) pageText = pageText.slice(0, MAX_CHARS) + '\n...[truncated]';
 
-    const systemPrompt = `You are a strict document verifier for the Indian pharmaceutical Export NOC process (CDSCO / Drug Ministry).
-You receive the full text of an uploaded document (with per-page markers) and a list of checklist items.
-For each checklist item decide whether it is clearly PRESENT in the document.
+    const systemPrompt = `You are a strict, evidence-only document verifier for the Indian pharmaceutical Export NOC process (CDSCO / Drug Ministry).
 
-Strict rules:
-- If the item is not clearly present, mark present=false. Do NOT guess.
-- For every present=true item you MUST quote a short verbatim "evidence" string (max 25 words) copied from the document text.
-- For every present=true item you MUST report the page number where the evidence appears.
-- Do not invent quotes. If you cannot find a quote, mark present=false.
-- Output strict JSON only, matching the schema below.
+You will be given:
+  (a) the full text of an uploaded document (with per-page markers), and
+  (b) the EXPECTED document type and its checklist of required parameters.
+
+You MUST perform TWO checks, in order:
+
+CHECK 1 — Document type identification (do this first):
+  Decide whether the uploaded document is actually the EXPECTED document type.
+  - Use the identity description and the indicative keyword set you are given.
+  - If the document is clearly a DIFFERENT type (e.g. an invoice, an undertaking, a CoA when a manufacturing licence is expected, a manufacturing licence when a product approval is expected), set "documentTypeMatch": false and explain why in "documentTypeReason".
+  - If the document type matches, set "documentTypeMatch": true.
+
+CHECK 2 — Per-parameter verification:
+  ONLY IF documentTypeMatch is true, evaluate each checklist parameter.
+  - For each parameter decide present=true / present=false.
+  - If present=true, you MUST cite a verbatim quote (<=25 words) copied directly from the document text into "evidence", and the integer "page" it appears on.
+  - If you cannot find a verbatim quote, set present=false. Do NOT guess. Do NOT paraphrase. Do NOT invent quotes.
+  - If documentTypeMatch is false, set every item's present=false, evidence="", page=null, and note="document type mismatch — parameter not applicable".
+
+Output STRICT JSON only — no preamble, no markdown fences, no commentary.
 
 JSON schema:
 {
+  "documentTypeMatch": true | false,
+  "documentTypeReason": "<one short sentence explaining the type decision>",
   "items": [
     {
       "index": <1..N>,
@@ -700,19 +740,26 @@ JSON schema:
   ]
 }`;
 
-    const userPrompt = `Document label: "${docLabel}"
-Document type key: "${docType}"
+    const userPrompt = `EXPECTED document type: "${docLabel}"
+Internal type key: "${docType}"
 Text source: ${textSource}
+
+What "${docLabel}" should look like:
+${profile.identity}
+${profile.mustNotBe || ''}
+
+Indicative keywords/phrases found in genuine "${docLabel}" documents (presence of several of these is a strong signal — but the absence of all of them is a strong signal of a WRONG document type):
+${profile.mustHaveAny.length ? profile.mustHaveAny.map(k => `  • ${k}`).join('\n') : '  (no specific keywords)'}
 
 Document text (with page markers):
 """
 ${pageText}
 """
 
-Checklist items to verify (return one entry per item, in order):
+Checklist parameters to verify (return one entry per item, in order):
 ${items.map((it, i) => `${i + 1}. ${it}`).join('\n')}
 
-Return only the JSON object — no preamble, no markdown fences.`;
+Return ONLY the JSON object described in the schema — no preamble, no markdown fences.`;
 
     // ── Step 4: call Mistral in strict JSON mode ──────────────────────────
     const raw = await callMistralJson([
@@ -733,7 +780,22 @@ Return only the JSON object — no preamble, no markdown fences.`;
       if (e && typeof e.index === 'number') byIndex.set(e.index, e);
     }
 
+    // Document-type identification result (CHECK 1 in the prompt).
+    const documentTypeMatch  = parsed.documentTypeMatch === true;
+    const documentTypeReason = typeof parsed.documentTypeReason === 'string'
+      ? parsed.documentTypeReason.trim() : '';
+
     const results = items.map((it, i) => {
+      // If the AI determined the wrong document type, force every item to false.
+      if (!documentTypeMatch) {
+        return {
+          item: it,
+          present: false,
+          page: null,
+          evidence: '',
+          note: 'Document type mismatch — parameter not applicable.',
+        };
+      }
       const m = byIndex.get(i + 1) || {};
       const present = m.present === true ? true : m.present === false ? false : null;
       const evidence = typeof m.evidence === 'string' ? m.evidence.trim() : '';
@@ -752,9 +814,6 @@ Return only the JSON object — no preamble, no markdown fences.`;
     const missingCount = results.filter(r => r.present === false).length;
     const unknownCount = results.filter(r => r.present === null).length;
 
-    // ── Step 6: await tampering / forensics result (was kicked off in Step 0) ──
-    const tampering = await tamperingPromise;
-
     res.json({
       success:    true,
       docType,
@@ -762,15 +821,16 @@ Return only the JSON object — no preamble, no markdown fences.`;
       hasText,
       textSource,
       pageCount:  pages.length,
+      documentTypeMatch,
+      documentTypeReason,
       results,
       summary: {
         total:   items.length,
         present: presentCount,
         missing: missingCount,
         unknown: unknownCount,
-        score:   Math.round((presentCount / items.length) * 100),
+        score:   documentTypeMatch ? Math.round((presentCount / items.length) * 100) : 0,
       },
-      tampering,
       rawResponse: raw,
     });
 

@@ -19,7 +19,9 @@ const DocumentSchema = new mongoose.Schema({
   size:       Number,
   type:       String,
   uploadedAt: String,
-  // stored as base64 for portability (small files ≤5MB)
+  // Large files are stored on disk (relative path under backend/uploads/).
+  // `data` (base64) is kept only for tiny legacy docs; prefer `path`.
+  path:       String,
   data:       String,
   // validation metadata
   validated:  { type: Boolean, default: false },

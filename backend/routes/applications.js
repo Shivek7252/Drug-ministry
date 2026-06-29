@@ -1,6 +1,61 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const Application = require('../models/Application');
+
+/* ── Uploads root (PDF binaries live here, NOT in MongoDB) ───────────────── */
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+/* Write each base64 doc to disk, return docs map with `path` set + `data` stripped.
+   Keeps the MongoDB document well under the 16 MiB BSON limit. */
+function persistDocsToDisk(appNumber, docs) {
+  if (!docs || typeof docs !== 'object' || !appNumber) return docs || {};
+  const appDir = path.join(UPLOADS_DIR, String(appNumber));
+  if (!fs.existsSync(appDir)) fs.mkdirSync(appDir, { recursive: true });
+
+  const out = {};
+  for (const [docId, doc] of Object.entries(docs)) {
+    if (!doc || typeof doc !== 'object') continue;
+
+    let b64 = '';
+    if (typeof doc.data === 'string' && doc.data.length > 0) {
+      b64 = doc.data.startsWith('data:')
+        ? doc.data.slice(doc.data.indexOf(',') + 1)
+        : doc.data;
+    }
+
+    if (b64) {
+      // Pick safe filename: `${docId}.<ext>`
+      const extMatch = (doc.name || '').match(/\.[a-zA-Z0-9]{1,8}$/);
+      const ext = extMatch ? extMatch[0] : '.pdf';
+      const safeId = String(docId).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `${safeId}${ext}`;
+      const filePath = path.join(appDir, fileName);
+      try {
+        fs.writeFileSync(filePath, Buffer.from(b64, 'base64'));
+        out[docId] = {
+          name:       doc.name,
+          size:       doc.size,
+          type:       doc.type,
+          uploadedAt: doc.uploadedAt,
+          path:       `${appNumber}/${fileName}`,   // relative under UPLOADS_DIR
+          validated:  doc.validated,
+          validationResult: doc.validationResult,
+        };
+        continue;
+      } catch (e) {
+        console.error(`[persistDocsToDisk] failed to write ${filePath}:`, e.message);
+        // fall through and keep base64 in Mongo as a last resort
+      }
+    }
+
+    // No usable base64 — keep whatever the client sent (path-only update, etc.)
+    out[docId] = { ...doc };
+  }
+  return out;
+}
 
 /* ── Generate unique IDs ─────────────────────────────────────────────────── */
 function generateAppNumber() {
@@ -66,7 +121,8 @@ router.post('/draft', async (req, res) => {
       // Update existing draft
       const { documents, ...rest } = formData;
       Object.assign(app, rest, { lastSavedAt: new Date() });
-      assignDocuments(app, documents);
+      const persisted = persistDocsToDisk(app.applicationNumber, documents);
+      assignDocuments(app, persisted);
       app.auditLog.push({ action: 'draft_saved', detail: 'Auto-saved draft', user });
       await app.save();
       return res.json({ success: true, applicationNumber: app.applicationNumber, referenceNumber: app.referenceNumber, message: 'Draft saved' });
@@ -85,7 +141,8 @@ router.post('/draft', async (req, res) => {
       submittedBy: user,
       auditLog: [{ action: 'draft_created', detail: 'New draft created', user }],
     });
-    assignDocuments(newApp, documents);
+    const persisted = persistDocsToDisk(applicationNumber, documents);
+    assignDocuments(newApp, persisted);
     await newApp.save();
     res.json({ success: true, applicationNumber, referenceNumber, message: 'Draft created' });
 
@@ -146,7 +203,8 @@ router.post('/submit', async (req, res) => {
         submittedBy: user,
         timeline,
       });
-      assignDocuments(app, documents);
+      const persisted = persistDocsToDisk(app.applicationNumber, documents);
+      assignDocuments(app, persisted);
       app.auditLog.push({ action: 'submitted', detail: 'Final application submitted', user, timestamp: submittedAt });
       await app.save();
       console.log(`[submit] saved ${app.applicationNumber} with ${app.documents?.size || 0} documents`);
@@ -175,7 +233,8 @@ router.post('/submit', async (req, res) => {
         { action: 'submitted', detail: 'Application created and submitted', user, timestamp: submittedAt },
       ],
     });
-    assignDocuments(newApp, documents);
+    const persisted = persistDocsToDisk(applicationNumber, documents);
+    assignDocuments(newApp, persisted);
     await newApp.save();
     console.log(`[submit] created ${applicationNumber} with ${newApp.documents?.size || 0} documents`);
     res.json({ success: true, applicationNumber, referenceNumber, message: 'Application submitted successfully' });
@@ -297,20 +356,41 @@ router.get('/:id/document/:docId', async (req, res) => {
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     const doc = app.documents?.get ? app.documents.get(docId) : app.documents?.[docId];
-    if (!doc || !doc.data) return res.status(404).json({ error: 'Document file not stored' });
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
 
-    // doc.data is a data URL ("data:<mime>;base64,...") or bare base64
-    let b64 = String(doc.data);
-    const comma = b64.indexOf(',');
-    if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
+    // Preferred: stream from disk (current architecture)
+    if (doc.path && typeof doc.path === 'string') {
+      const filePath = path.join(UPLOADS_DIR, doc.path);
+      const resolved = path.resolve(filePath);
+      // path-traversal safety
+      if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) {
+        return res.status(400).json({ error: 'Invalid document path' });
+      }
+      if (!fs.existsSync(resolved)) {
+        return res.status(404).json({ error: 'Document file missing on disk' });
+      }
+      res.set({
+        'Content-Type':        doc.type || 'application/octet-stream',
+        'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
+      });
+      return fs.createReadStream(resolved).pipe(res);
+    }
 
-    const buf = Buffer.from(b64, 'base64');
-    res.set({
-      'Content-Type':        doc.type || 'application/octet-stream',
-      'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
-      'Content-Length':      buf.length,
-    });
-    res.send(buf);
+    // Legacy: base64 stored inline in Mongo
+    if (doc.data) {
+      let b64 = String(doc.data);
+      const comma = b64.indexOf(',');
+      if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
+      const buf = Buffer.from(b64, 'base64');
+      res.set({
+        'Content-Type':        doc.type || 'application/octet-stream',
+        'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
+        'Content-Length':      buf.length,
+      });
+      return res.send(buf);
+    }
+
+    return res.status(404).json({ error: 'Document file not stored' });
   } catch (err) {
     console.error('Doc fetch error:', err.message);
     res.status(500).json({ error: err.message });
@@ -339,7 +419,7 @@ router.get('/:id', async (req, res) => {
         docsOut[k] = {
           name: v.name, size: v.size, type: v.type,
           uploadedAt: v.uploadedAt, validated: v.validated,
-          objectUrl: v.data ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
+          objectUrl: (v.path || v.data) ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
         };
       }
       obj.documents = docsOut;
@@ -417,7 +497,7 @@ router.get('/:id/full', async (req, res) => {
         docsOut[k] = {
           name: v.name, size: v.size, type: v.type,
           uploadedAt: v.uploadedAt, validated: v.validated,
-          objectUrl: v.data ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
+          objectUrl: (v.path || v.data) ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
         };
       }
       obj.documents = docsOut;
