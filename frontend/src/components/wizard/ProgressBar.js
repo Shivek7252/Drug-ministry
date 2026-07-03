@@ -6,10 +6,11 @@ const STEPS = [
   { num: 2, label: 'Consignee\nDetails' },
   { num: 3, label: 'Drug/Product\nInfo' },
   { num: 4, label: 'Manufacturer\nDetails' },
-  { num: 5, label: 'Document\nUpload' },
-  { num: 6, label: 'Declaration &\nCompliance' },
-  { num: 7, label: 'Review\nApplication' },
-  { num: 8, label: 'Submitted' }
+  { num: 5, label: 'Shipments' },
+  { num: 6, label: 'Document\nUpload' },
+  { num: 7, label: 'Declaration &\nCompliance' },
+  { num: 8, label: 'Review\nApplication' },
+  { num: 9, label: 'Submitted' }
 ];
 
 export default function ProgressBar({ currentStep }) {

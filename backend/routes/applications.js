@@ -57,6 +57,86 @@ function persistDocsToDisk(appNumber, docs) {
   return out;
 }
 
+/* ── Legacy shim: synthesise companies[]/consignees[]/shipments[] on read ─
+   For old applications saved with the single-manufacturer / single-consignee
+   fields, we generate a one-row companies[]/consignees[]/shipments[] on the
+   fly so the new reviewer UI works without a data migration. */
+function shapeMultiRows(obj) {
+  if (!obj) return obj;
+
+  // companies[]
+  if (!Array.isArray(obj.companies) || obj.companies.length === 0) {
+    if (obj.manufacturerName || obj.mfgLicenseNo || obj.factoryAddress) {
+      obj.companies = [{
+        companyRef:           'legacy-co',
+        name:                 obj.manufacturerName || '',
+        licenseNo:            obj.mfgLicenseNo || '',
+        factoryAddress:       obj.factoryAddress || '',
+        manufacturingSite:    obj.manufacturingSite || '',
+        contactPerson:        obj.mfgContactPerson || '',
+        contactNumber:        obj.mfgContactNumber || '',
+        email:                obj.mfgEmail || '',
+        signatoryName:        obj.signatoryName || '',
+        signatoryDesignation: obj.signatoryDesignation || '',
+      }];
+    } else {
+      obj.companies = [];
+    }
+  }
+
+  // consignees[]
+  if (!Array.isArray(obj.consignees) || obj.consignees.length === 0) {
+    if (obj.consigneeName || obj.consigneeCountry || obj.destinationCountry) {
+      obj.consignees = [{
+        consigneeRef:  'legacy-cn',
+        name:          obj.consigneeName || '',
+        organisation:  obj.consigneeOrg || '',
+        addressLine1:  obj.addressLine1 || '',
+        addressLine2:  obj.addressLine2 || '',
+        city:          obj.city || '',
+        state:         obj.state || '',
+        country:       obj.consigneeCountry || obj.destinationCountry || '',
+        postalCode:    obj.postalCode || '',
+        contactPerson: obj.contactPerson || '',
+        phone:         obj.consigneePhone || '',
+        email:         obj.consigneeEmail || '',
+      }];
+    } else {
+      obj.consignees = [];
+    }
+  }
+
+  // Backfill productRef on legacy products so shipments can reference them
+  if (Array.isArray(obj.products)) {
+    obj.products = obj.products.map((p, i) => ({
+      productRef: p.productRef || `legacy-p${i}`,
+      ...p,
+    }));
+  }
+
+  // shipments[] — cross product every legacy product × single legacy company × single legacy consignee
+  if (!Array.isArray(obj.shipments) || obj.shipments.length === 0) {
+    const co = obj.companies[0];
+    const cn = obj.consignees[0];
+    if (co && cn && Array.isArray(obj.products) && obj.products.length > 0) {
+      obj.shipments = obj.products.map(p => ({
+        companyRef:   co.companyRef,
+        productRef:   p.productRef,
+        consigneeRef: cn.consigneeRef,
+        quantity:     0,
+        packSize:     p.packSize || '',
+        batchNumbers: p.batchNumber ? [p.batchNumber] : [],
+        lineStatus:   'Pending',
+        lineRemarks:  [],
+      }));
+    } else {
+      obj.shipments = [];
+    }
+  }
+
+  return obj;
+}
+
 /* ── Generate unique IDs ─────────────────────────────────────────────────── */
 function generateAppNumber() {
   const year = new Date().getFullYear();
@@ -424,6 +504,7 @@ router.get('/:id', async (req, res) => {
       }
       obj.documents = docsOut;
     }
+    shapeMultiRows(obj);
     res.json({ success: true, application: obj });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -502,8 +583,73 @@ router.get('/:id/full', async (req, res) => {
       }
       obj.documents = docsOut;
     }
+    shapeMultiRows(obj);
     res.json({ success: true, application: obj });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── POST /api/applications/:id/shipments/:idx/action ────────────────────
+   Reviewer sets lineStatus + adds a lineRemarks entry on ONE shipment line,
+   then app-level status is rolled up from every line's status. */
+function rollupApplicationStatus(shipmentStatuses) {
+  if (!Array.isArray(shipmentStatuses) || shipmentStatuses.length === 0) return null;
+  const has = (s) => shipmentStatuses.includes(s);
+  const all = (s) => shipmentStatuses.every(x => x === s);
+  if (all('Approved'))                        return 'Approved';
+  if (all('Rejected'))                        return 'Rejected';
+  if (has('Query'))                           return 'Query Raised';
+  if (has('Approved') && has('Rejected'))     return 'Partially Approved';
+  if (has('Approved') || has('Verified'))     return 'Under Review';
+  return null; // no change — leave whatever's there
+}
+
+router.post('/:id/shipments/:idx/action', async (req, res) => {
+  try {
+    const { status, remarks = '', officer = 'reviewer' } = req.body;
+    const idx = Number(req.params.idx);
+    if (!Number.isFinite(idx) || idx < 0) {
+      return res.status(400).json({ error: 'Invalid shipment index' });
+    }
+    if (!['Pending', 'Verified', 'Query', 'Approved', 'Rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const app = await Application.findOne({
+      $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
+    });
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+    if (!Array.isArray(app.shipments) || !app.shipments[idx]) {
+      return res.status(404).json({ error: 'Shipment line not found' });
+    }
+
+    const line = app.shipments[idx];
+    const prev = line.lineStatus || 'Pending';
+    line.lineStatus = status;
+    line.lineRemarks = line.lineRemarks || [];
+    line.lineRemarks.push({ text: remarks, officer, status, timestamp: new Date() });
+    app.markModified('shipments');
+
+    // Roll-up application-level status
+    const rolled = rollupApplicationStatus(app.shipments.map(s => s.lineStatus || 'Pending'));
+    if (rolled) app.status = rolled;
+
+    app.auditLog.push({
+      action: 'line_action',
+      detail: `Shipment #${idx + 1}: ${prev} → ${status}. ${remarks ? '"' + remarks + '"' : ''}`,
+      user:   officer,
+      timestamp: new Date(),
+    });
+
+    await app.save();
+    res.json({
+      success: true,
+      status: app.status,
+      shipmentIdx: idx,
+      lineStatus: status,
+    });
+  } catch (err) {
+    console.error('Line action error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

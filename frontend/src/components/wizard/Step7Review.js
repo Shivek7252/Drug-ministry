@@ -40,11 +40,11 @@ export default function Step7Review() {
     const result = await submitToBackend();
     setSubmitting(false);
     if (result.success) {
-      setCurrentStep(8);
+      setCurrentStep(9);
     } else {
       // If backend offline, proceed anyway (graceful degradation)
       if (result.error && result.error.includes('fetch')) {
-        setCurrentStep(8); // allow offline submission
+        setCurrentStep(9); // allow offline submission
       } else {
         setSubmitError(result.error || 'Submission failed. Please try again.');
       }
@@ -85,16 +85,23 @@ export default function Step7Review() {
         </div>
       </ReviewSection>
 
-      {/* Consignee */}
-      <ReviewSection title="Consignee Information" icon="🏢" onEdit={() => setCurrentStep(2)}>
-        <div className="review-grid">
-          <ReviewRow label="Consignee Name" value={formData.consigneeName} />
-          <ReviewRow label="Organization" value={formData.consigneeOrg} />
-          <ReviewRow label="Address" value={[formData.addressLine1, formData.addressLine2, formData.city, formData.state, formData.postalCode, formData.consigneeCountry].filter(Boolean).join(', ')} />
-          <ReviewRow label="Contact Person" value={formData.contactPerson} />
-          <ReviewRow label="Phone" value={formData.consigneePhone} />
-          <ReviewRow label="Email" value={formData.consigneeEmail} />
-        </div>
+      {/* Consignees */}
+      <ReviewSection title={`Consignees / Destinations (${(formData.consignees || []).length})`} icon="🏢" onEdit={() => setCurrentStep(2)}>
+        {(formData.consignees || []).length === 0 ? (
+          <div className="alert alert-danger"><span>⚠️</span><span>No consignees added.</span></div>
+        ) : (
+          (formData.consignees || []).map((c, i) => (
+            <div key={c.consigneeRef} className="review-grid" style={{ marginBottom: 12, paddingBottom: 10, borderBottom: i < formData.consignees.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+              <ReviewRow label={`#${i + 1} · Country`} value={c.country} />
+              <ReviewRow label="Consignee Name" value={c.name} />
+              <ReviewRow label="Organization" value={c.organisation} />
+              <ReviewRow label="Address" value={[c.addressLine1, c.addressLine2, c.city, c.state, c.postalCode].filter(Boolean).join(', ')} />
+              <ReviewRow label="Contact" value={c.contactPerson} />
+              <ReviewRow label="Phone" value={c.phone} />
+              <ReviewRow label="Email" value={c.email} />
+            </div>
+          ))
+        )}
       </ReviewSection>
 
       {/* Products */}
@@ -133,23 +140,68 @@ export default function Step7Review() {
         )}
       </ReviewSection>
 
-      {/* Manufacturer */}
-      <ReviewSection title="Manufacturer Details" icon="🏭" onEdit={() => setCurrentStep(4)}>
-        <div className="review-grid">
-          <ReviewRow label="Manufacturer Name" value={formData.manufacturerName} />
-          <ReviewRow label="License Number" value={formData.mfgLicenseNo} />
-          <ReviewRow label="Factory Address" value={formData.factoryAddress} />
-          <ReviewRow label="Manufacturing Site" value={formData.manufacturingSite} />
-          <ReviewRow label="Contact Person" value={formData.mfgContactPerson} />
-          <ReviewRow label="Contact Number" value={formData.mfgContactNumber} />
-          <ReviewRow label="Email" value={formData.mfgEmail} />
-          <ReviewRow label="Authorized Signatory" value={formData.signatoryName} />
-          <ReviewRow label="Designation" value={formData.signatoryDesignation} />
-        </div>
+      {/* Manufacturers */}
+      <ReviewSection title={`Manufacturers (${(formData.companies || []).length})`} icon="🏭" onEdit={() => setCurrentStep(4)}>
+        {(formData.companies || []).length === 0 ? (
+          <div className="alert alert-danger"><span>⚠️</span><span>No manufacturers added.</span></div>
+        ) : (
+          (formData.companies || []).map((c, i) => (
+            <div key={c.companyRef} className="review-grid" style={{ marginBottom: 12, paddingBottom: 10, borderBottom: i < formData.companies.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+              <ReviewRow label={`#${i + 1} · Name`} value={c.name} />
+              <ReviewRow label="Licence No." value={c.licenseNo} />
+              <ReviewRow label="Factory Address" value={c.factoryAddress} />
+              <ReviewRow label="Manufacturing Site" value={c.manufacturingSite} />
+              <ReviewRow label="Contact" value={c.contactPerson} />
+              <ReviewRow label="Phone" value={c.contactNumber} />
+              <ReviewRow label="Email" value={c.email} />
+              <ReviewRow label="Signatory" value={c.signatoryName} />
+              <ReviewRow label="Designation" value={c.signatoryDesignation} />
+            </div>
+          ))
+        )}
+      </ReviewSection>
+
+      {/* Shipments */}
+      <ReviewSection title={`Shipments (${(formData.shipments || []).length} line${(formData.shipments || []).length === 1 ? '' : 's'})`} icon="🚚" onEdit={() => setCurrentStep(5)}>
+        {(formData.shipments || []).length === 0 ? (
+          <div className="alert alert-danger"><span>⚠️</span><span>No shipments defined. Go back to Step 5 and add at least one.</span></div>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Manufacturer</th>
+                  <th>Product</th>
+                  <th>Destination</th>
+                  <th>Qty</th>
+                  <th>Batches</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.shipments.map((s, i) => {
+                  const co = (formData.companies || []).find(x => x.companyRef === s.companyRef);
+                  const pr = (formData.products || []).find(x => x.productRef === s.productRef);
+                  const cn = (formData.consignees || []).find(x => x.consigneeRef === s.consigneeRef);
+                  return (
+                    <tr key={s.shipmentRef || i}>
+                      <td>{i + 1}</td>
+                      <td>{co?.name || '—'}</td>
+                      <td>{pr?.productName || '—'}{pr?.strength ? ` (${pr.strength})` : ''}</td>
+                      <td>{cn?.country || '—'}{cn?.organisation ? ` — ${cn.organisation}` : ''}</td>
+                      <td>{s.quantity || '—'}</td>
+                      <td>{Array.isArray(s.batchNumbers) ? s.batchNumbers.join(', ') : ''}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </ReviewSection>
 
       {/* Documents */}
-      <ReviewSection title="Uploaded Documents" icon="📁" onEdit={() => setCurrentStep(5)}>
+      <ReviewSection title="Uploaded Documents" icon="📁" onEdit={() => setCurrentStep(6)}>
         <div className="docs-review-grid">
           {REQUIRED_DOCUMENTS.map(doc => {
             const uploaded = formData.documents[doc.id];
@@ -177,7 +229,7 @@ export default function Step7Review() {
       )}
 
       <div className="step-actions review-actions">
-        <button className="btn btn-outline" onClick={() => setCurrentStep(6)} disabled={submitting}>← Previous</button>
+        <button className="btn btn-outline" onClick={() => setCurrentStep(7)} disabled={submitting}>← Previous</button>
         <button className="btn btn-outline btn-primary-light" onClick={handleDownloadPDF} disabled={submitting}>
           ⬇ Download PDF
         </button>

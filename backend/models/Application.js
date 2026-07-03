@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 /* ── Product sub-schema ─────────────────────────────────────────────────── */
 const ProductSchema = new mongoose.Schema({
+  productRef:   String,    // uuid used by shipments[]
   productName:  String,
   genericName:  String,
   brandName:    String,
@@ -11,6 +12,58 @@ const ProductSchema = new mongoose.Schema({
   batchNumber:  String,
   mfgDate:      String,
   expiryDate:   String,
+}, { _id: false });
+
+/* ── Company / Manufacturer sub-schema (one row per exporting site) ─────── */
+const CompanySchema = new mongoose.Schema({
+  companyRef:           String,   // uuid used by shipments[]
+  name:                 String,
+  licenseNo:            String,
+  factoryAddress:       String,
+  manufacturingSite:    String,
+  contactPerson:        String,
+  contactNumber:        String,
+  email:                String,
+  signatoryName:        String,
+  signatoryDesignation: String,
+}, { _id: false });
+
+/* ── Consignee sub-schema (one row per importing party / destination) ───── */
+const ConsigneeSchema = new mongoose.Schema({
+  consigneeRef: String,   // uuid used by shipments[]
+  name:         String,
+  organisation: String,
+  addressLine1: String,
+  addressLine2: String,
+  city:         String,
+  state:        String,
+  country:      String,
+  postalCode:   String,
+  contactPerson:String,
+  phone:        String,
+  email:        String,
+}, { _id: false });
+
+/* ── Shipment (line item) sub-schema ────────────────────────────────────── */
+const ShipmentSchema = new mongoose.Schema({
+  companyRef:   String,
+  productRef:   String,
+  consigneeRef: String,
+  quantity:     Number,
+  packSize:     String,
+  batchNumbers: [String],
+  // Per-line reviewer state
+  lineStatus:   {
+    type: String,
+    enum: ['Pending', 'Verified', 'Query', 'Approved', 'Rejected'],
+    default: 'Pending',
+  },
+  lineRemarks: [{
+    text:      String,
+    officer:   String,
+    status:    String,
+    timestamp: { type: Date, default: Date.now },
+  }],
 }, { _id: false });
 
 /* ── Document sub-schema ────────────────────────────────────────────────── */
@@ -42,10 +95,10 @@ const ApplicationSchema = new mongoose.Schema({
   applicationNumber: { type: String, unique: true, required: true, index: true },
   referenceNumber:   { type: String, unique: true, required: true, index: true },
 
-  // Status
+  // Status (rollup of shipments[].lineStatus for new-style apps)
   status: {
     type: String,
-    enum: ['Draft', 'Submitted', 'Under Review', 'Document Verification', 'Compliance Check', 'Approved', 'Rejected'],
+    enum: ['Draft', 'Submitted', 'Under Review', 'Document Verification', 'Compliance Check', 'Query Raised', 'Approved', 'Partially Approved', 'Rejected'],
     default: 'Draft',
     index: true,
   },
@@ -76,6 +129,11 @@ const ApplicationSchema = new mongoose.Schema({
 
   // Products
   products: [ProductSchema],
+
+  // NEW multi-row arrays (Phase 1 — legacy single-value fields above still populated for back-compat)
+  companies:  [CompanySchema],
+  consignees: [ConsigneeSchema],
+  shipments:  [ShipmentSchema],
 
   // Manufacturer
   manufacturerName:    String,

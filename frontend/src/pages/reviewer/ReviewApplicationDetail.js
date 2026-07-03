@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { getApplicationFull } from '../../api/applicationService';
+import { getApplicationFull, shipmentAction } from '../../api/applicationService';
 import DocViewerModal from '../../components/shared/DocViewerModal';
+import ShipmentsTab from './ShipmentsTab';
 import './ReviewDashboard.css';
 
 const REQUIRED_DOCS = [
@@ -37,6 +38,46 @@ function F({ label, value }) {
       <span className="rv-field-label">{label}</span>
       <span className="rv-field-value">{value}</span>
     </div>
+  );
+}
+
+/* ── Line-remarks prompt (Query / Reject on a shipment line requires a note) ── */
+function LineRemarksPrompt({ nextStatus, onClose, onSubmit }) {
+  const [text, setText] = useState('');
+  const isQuery = nextStatus === 'Query';
+  return createPortal(
+    <div className="rv-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="rv-popup-box" style={{ maxWidth: 460 }}>
+        <div className="rv-popup-icon">{isQuery ? '❓' : '❌'}</div>
+        <h2 className="rv-popup-title" style={{ color: isQuery ? '#b45309' : '#dc2626' }}>
+          {isQuery ? 'Raise Query on Line' : 'Reject Line Item'}
+        </h2>
+        <p className="rv-popup-body">
+          {isQuery
+            ? 'Explain what needs clarification. The applicant will see this remark.'
+            : 'Give a reason for rejecting this shipment line.'}
+        </p>
+        <textarea
+          className="rv-textarea"
+          rows={4}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="Enter remarks…"
+          autoFocus
+        />
+        <div className="rv-popup-btns" style={{ marginTop: 16 }}>
+          <button
+            className={isQuery ? 'rv-popup-btn-fwd' : 'rv-popup-btn-rej'}
+            disabled={!text.trim()}
+            onClick={() => onSubmit(text.trim())}
+          >
+            {isQuery ? '❓ Send Query' : '❌ Reject Line'}
+          </button>
+          <button className="rv-popup-btn-cancel" onClick={onClose}>✕ Cancel</button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -128,6 +169,8 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState({}); // docId → { status: 'idle'|'loading'|'done'|'error', results, summary, error }
   const [summaryDocId, setSummaryDocId] = useState(null); // which doc is expanded in summary
+  const [lineBusy, setLineBusy] = useState(null); // shipment index currently being actioned
+  const [lineRemarksPrompt, setLineRemarksPrompt] = useState(null); // { idx, nextStatus }
 
   useEffect(() => {
     setFull(null); setLoadingFull(true); setDocResult({}); setDocVerdict({}); setShowForm(false);
@@ -148,6 +191,32 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   }, [showSummary, mismatchDoc, verifiedDoc, viewerDoc]);
 
   const data = full || app;
+
+  /* Line-item action — Query/Reject prompt for remarks first */
+  const handleLineAction = (idx, nextStatus) => {
+    if (nextStatus === 'Query' || nextStatus === 'Rejected') {
+      setLineRemarksPrompt({ idx, nextStatus });
+      return;
+    }
+    submitLineAction(idx, nextStatus, '');
+  };
+
+  const submitLineAction = async (idx, nextStatus, lineRemarks) => {
+    setLineBusy(idx);
+    try {
+      const res = await shipmentAction(data.applicationNumber, idx, { status: nextStatus, remarks: lineRemarks, officer: 'reviewer' });
+      if (res.success) {
+        // Refresh full application
+        const full2 = await getApplicationFull(data.applicationNumber);
+        if (full2.success) setFull(full2.application);
+      } else {
+        alert(res.error || 'Line action failed.');
+      }
+    } finally {
+      setLineBusy(null);
+      setLineRemarksPrompt(null);
+    }
+  };
 
   /* Check doc by filename only — instant, no API call */
   const checkDocFilename = (docId, docType, up) => {
@@ -270,7 +339,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
       {/* Tabs */}
       <div className="rv-tabs">
-        {[['details', '📋 Details'], ['docs', '📁 Documents'], ['audit', '📜 Audit']].map(([k, l]) => (
+        {[['details', '📋 Details'], ['shipments', '🚚 Shipments'], ['docs', '📁 Documents'], ['audit', '📜 Audit']].map(([k, l]) => (
           <button key={k} className={`rv-tab-btn ${activeTab === k ? 'active' : ''}`} onClick={() => setActiveTab(k)}>{l}</button>
         ))}
       </div>
@@ -363,6 +432,15 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
               </Sec>
             )}
           </>
+        )}
+
+        {/* ── SHIPMENTS ── */}
+        {!loadingFull && activeTab === 'shipments' && (
+          <ShipmentsTab
+            data={data}
+            actionBusy={lineBusy}
+            onLineAction={handleLineAction}
+          />
         )}
 
         {/* ── DOCUMENTS ── */}
@@ -556,6 +634,15 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
       )}
 
       {/* Verified popup — shown when filename matches the prescribed template */}
+      {/* Line-remarks prompt */}
+      {lineRemarksPrompt && (
+        <LineRemarksPrompt
+          nextStatus={lineRemarksPrompt.nextStatus}
+          onClose={() => setLineRemarksPrompt(null)}
+          onSubmit={(text) => submitLineAction(lineRemarksPrompt.idx, lineRemarksPrompt.nextStatus, text)}
+        />
+      )}
+
       {verifiedDoc && (
         <VerifiedPopup
           docLabel={verifiedDoc.docLabel}
