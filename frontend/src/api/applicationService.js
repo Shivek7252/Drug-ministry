@@ -110,3 +110,11 @@ export async function reviewerAction(appNumber, { status, remarks, officer = 're
 export async function getApplicationFull(id) {
   return apiFetch(`${BASE}/${id}/full`);
 }
+
+/* ── Reviewer: act on a single shipment line item ──────────────────────── */
+export async function shipmentAction(appNumber, shipmentIdx, { status, remarks = '', officer = 'reviewer' }) {
+  return apiFetch(`${BASE}/${appNumber}/shipments/${shipmentIdx}/action`, {
+    method: 'POST',
+    body: JSON.stringify({ status, remarks, officer }),
+  });
+}

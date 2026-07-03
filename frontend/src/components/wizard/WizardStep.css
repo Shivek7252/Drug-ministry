@@ -382,3 +382,46 @@
   .step-actions .btn:first-child { margin-right: 0; }
   .success-ref-cards { flex-direction: column; align-items: center; }
 }
+
+/* ── Shipments step chips + mini-table ────────────────── */
+.rv-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  background: #f1f5f9;
+  color: #334155;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+}
+.rv-chip-primary {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+.rv-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rv-mini-table th,
+.rv-mini-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+.rv-mini-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.rv-mini-table tbody tr:hover { background: #f8fafc; }
+.rv-mini-table .form-control {
+  padding: 6px 8px;
+  font-size: 12.5px;
+}

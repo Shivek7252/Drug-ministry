@@ -902,7 +902,7 @@ export default function Step5DocumentUpload() {
   const handleNext = () => {
     const missing = REQUIRED_DOCUMENTS.filter(d => d.required && !formData.documents[d.id]);
     if (missing.length > 0) { setSubmitError(`Please upload: ${missing.map(d => d.label).join(', ')}`); return; }
-    setSubmitError(''); setCurrentStep(6);
+    setSubmitError(''); setCurrentStep(7);
   };
   const uploaded = Object.keys(formData.documents).length;
   const reqCount = REQUIRED_DOCUMENTS.filter(d => d.required).length;
@@ -934,7 +934,7 @@ export default function Step5DocumentUpload() {
         ))}
       </div>
       <div className="step-actions">
-        <button className="btn btn-outline" onClick={() => setCurrentStep(4)}>← Previous</button>
+        <button className="btn btn-outline" onClick={() => setCurrentStep(5)}>← Previous</button>
         <button className="btn btn-outline" onClick={saveDraft}>{draftSaved ? '✓ Draft Saved' : '💾 Save Draft'}</button>
         <button className="btn btn-primary btn-lg" onClick={handleNext}>Next: Declaration →</button>
       </div>

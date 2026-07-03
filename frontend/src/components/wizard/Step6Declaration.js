@@ -26,7 +26,7 @@ export default function Step6Declaration() {
     });
     if (!declarations.finalDeclaration) e.finalDeclaration = 'You must accept the final declaration to proceed';
     setErrors(e);
-    if (Object.keys(e).length === 0) setCurrentStep(7);
+    if (Object.keys(e).length === 0) setCurrentStep(8);
   };
 
   return (
@@ -115,7 +115,7 @@ export default function Step6Declaration() {
       </div>
 
       <div className="step-actions">
-        <button className="btn btn-outline" onClick={() => setCurrentStep(5)}>← Previous</button>
+        <button className="btn btn-outline" onClick={() => setCurrentStep(6)}>← Previous</button>
         <button className="btn btn-primary btn-lg" onClick={handleNext}>
           Next: Review Application →
         </button>

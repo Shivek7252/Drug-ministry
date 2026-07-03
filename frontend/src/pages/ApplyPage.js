@@ -5,6 +5,7 @@ import Step1ApplicationDetails from '../components/wizard/Step1ApplicationDetail
 import Step2ConsigneeDetails from '../components/wizard/Step2ConsigneeDetails';
 import Step3DrugInfo from '../components/wizard/Step3DrugInfo';
 import Step4ManufacturerDetails from '../components/wizard/Step4ManufacturerDetails';
+import Step5Shipments from '../components/wizard/Step5Shipments';
 import Step5DocumentUpload from '../components/wizard/Step5DocumentUpload';
 import Step6Declaration from '../components/wizard/Step6Declaration';
 import Step7Review from '../components/wizard/Step7Review';
@@ -12,14 +13,15 @@ import Step8Success from '../components/wizard/Step8Success';
 import './ApplyPage.css';
 
 const STEPS = [
-  Step1ApplicationDetails,
-  Step2ConsigneeDetails,
-  Step3DrugInfo,
-  Step4ManufacturerDetails,
-  Step5DocumentUpload,
-  Step6Declaration,
-  Step7Review,
-  Step8Success
+  Step1ApplicationDetails,   // 1
+  Step2ConsigneeDetails,     // 2
+  Step3DrugInfo,             // 3
+  Step4ManufacturerDetails,  // 4
+  Step5Shipments,            // 5 — NEW
+  Step5DocumentUpload,       // 6 (was 5)
+  Step6Declaration,          // 7 (was 6)
+  Step7Review,               // 8 (was 7)
+  Step8Success               // 9 (was 8)
 ];
 
 export default function ApplyPage() {
@@ -39,14 +41,14 @@ export default function ApplyPage() {
         </div>
 
         <div className="wizard-card">
-          {currentStep < 8 && <ProgressBar currentStep={currentStep} />}
+          {currentStep < 9 && <ProgressBar currentStep={currentStep} />}
           <div className="wizard-body">
             <StepComponent />
           </div>
         </div>
 
         {/* Help Box */}
-        {currentStep < 8 && (
+        {currentStep < 9 && (
           <div className="apply-help-box">
             <div className="help-box-icon">❓</div>
             <div>
