@@ -46,7 +46,7 @@ function VerifiedPopup({ docLabel, onClose, onOpen }) {
     <div className="rv-popup-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="rv-popup-box">
         <div className="rv-popup-icon rv-popup-icon-ok">✅</div>
-        <h2 className="rv-popup-title rv-popup-title-ok">Document Verified</h2>
+        <h2 className="rv-popup-title rv-popup-title-ok">Document Matched</h2>
         <p className="rv-popup-body">
           The uploaded document matches the prescribed template for this document type.
         </p>
