@@ -118,3 +118,35 @@ export async function shipmentAction(appNumber, shipmentIdx, { status, remarks =
     body: JSON.stringify({ status, remarks, officer }),
   });
 }
+
+/* ── Export NOC Check-List Query flow ────────────────────────────────── */
+export async function getChecklist(appNumber) {
+  return apiFetch(`${BASE}/${appNumber}/checklist`);
+}
+
+export async function raiseChecklistQuery(appNumber, itemId, { queryText, officer = 'reviewer' }) {
+  return apiFetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/query`, {
+    method: 'POST',
+    body: JSON.stringify({ queryText, officer }),
+  });
+}
+
+/* Applicant reply — multipart because it can include a document. */
+export async function replyChecklistQuery(appNumber, itemId, { reply, applicant = 'applicant', file = null }) {
+  try {
+    const form = new FormData();
+    form.append('reply', reply);
+    form.append('applicant', applicant);
+    if (file) form.append('replyDoc', file);
+    const res = await fetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/reply`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return { success: true, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}

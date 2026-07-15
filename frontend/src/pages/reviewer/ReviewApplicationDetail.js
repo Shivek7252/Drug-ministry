@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getApplicationFull, shipmentAction } from '../../api/applicationService';
 import DocViewerModal from '../../components/shared/DocViewerModal';
+import NocChecklistPage from '../../components/checklist/NocChecklistPage';
 import ShipmentsTab from './ShipmentsTab';
 import './ReviewDashboard.css';
 
@@ -339,7 +340,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
       {/* Tabs */}
       <div className="rv-tabs">
-        {[['details', '📋 Details'], ['shipments', '🚚 Shipments'], ['docs', '📁 Documents'], ['audit', '📜 Audit']].map(([k, l]) => (
+        {[['details', '📋 Details'], ['shipments', '🚚 Shipments'], ['docs', '📁 Documents'], ['checklist', '🔍 Checklist Query'], ['audit', '📜 Audit']].map(([k, l]) => (
           <button key={k} className={`rv-tab-btn ${activeTab === k ? 'active' : ''}`} onClick={() => setActiveTab(k)}>{l}</button>
         ))}
       </div>
@@ -486,6 +487,14 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
               );
             })}
           </div>
+        )}
+
+        {/* ── CHECKLIST QUERY (Type 1: Diff Products / Diff Companies / Diff Countries) ── */}
+        {!loadingFull && activeTab === 'checklist' && (
+          <NocChecklistPage
+            applicationNumber={data.applicationNumber}
+            role="reviewer"
+          />
         )}
 
         {/* ── AUDIT ── */}

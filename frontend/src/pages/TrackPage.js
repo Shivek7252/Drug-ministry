@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { searchApplication, getApplication, listApplications } from '../api/applicationService';
+import NocChecklistPage from '../components/checklist/NocChecklistPage';
 import './TrackPage.css';
 
 function StatusBadge({ status }) {
@@ -42,6 +43,7 @@ export default function TrackPage() {
   const [loading,  setLoading]  = useState(false);
   const [recentApps, setRecentApps] = useState([]);
   const [dbOnline,   setDbOnline]   = useState(true);
+  const [checklistAppNo, setChecklistAppNo] = useState(null); // if set, show NocChecklistPage
 
   // Load recent applications on mount — DB only, no mock fallback
   useEffect(() => {
@@ -110,6 +112,19 @@ export default function TrackPage() {
       setLoading(false);
     }
   };
+
+  if (checklistAppNo) {
+    return (
+      <div className="track-page">
+        <div className="track-container" style={{ paddingTop: 16 }}>
+          <button className="btn btn-outline btn-sm" style={{ marginBottom: 12 }} onClick={() => setChecklistAppNo(null)}>
+            ← Back to Track
+          </button>
+          <NocChecklistPage applicationNumber={checklistAppNo} role="applicant" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="track-page">
@@ -211,7 +226,16 @@ export default function TrackPage() {
         {result && (
           <div className="track-result fade-in">
             <div className="card mb-3">
-              <div className="card-header"><span>📋</span><h3>Application Summary</h3></div>
+              <div className="card-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{display:'flex',alignItems:'center',gap:8}}><span>📋</span><h3 style={{margin:0}}>Application Summary</h3></span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setChecklistAppNo(result.app.applicationNumber)}
+                  title="Open the Export NOC Check-List / query & reply page"
+                >
+                  🔍 Open Query Page
+                </button>
+              </div>
               <div className="card-body">
                 <div className="track-summary-grid">
                   {[
