@@ -2,11 +2,383 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const mongoose = require('mongoose');
 const Application = require('../models/Application');
 
 /* ── Uploads root (PDF binaries live here, NOT in MongoDB) ───────────────── */
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+/* Multer memory upload for applicant checklist replies (small doc payloads). */
+const checklistUpload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 20 * 1024 * 1024 },
+});
+
+const MAX_QUERY_ROUNDS = 5;
+
+/* Approval-section sub-items — same 2 rows for every destination country,
+   in every type. Only the display numbering changes per type. */
+const APPROVAL_SUBITEMS = [
+  { key: '1', title: 'Registration/Approval certificate from NRA of importing Country in case NRA issue the same',      docSuffix: 'nra_cert' },
+  { key: '2', title: 'Approval in India from CDSCO if approval status is not available from importing Countrys NRA',    docSuffix: 'cdsco_approval' },
+];
+
+/* Per-type layout config. Item IDs are stable across types so query history
+   survives if the type ever gets reclassified; only the display itemNo /
+   title / whether the item is included differ. */
+
+/* Types 2 & 3 share the same visual layout (items 1,2,3,4=historical,
+   5=approval-status per country, 6=justification). Only classification differs. */
+const TYPE_2_3_LAYOUT = {
+  fixedItems: [
+    { itemId: 'irf',         docId: 'irf',               title: 'System generated Integrated Registration Form (IRF)' },
+    { itemId: 'legal',       docId: 'legal_undertaking', title: 'Legal undertaking in Annexure-II(on Rs. 100 non-judicial stamp paper)' },
+    { itemId: 'mfg_license', docId: 'mfg_license',       title: 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29' },
+  ],
+  hasHistorical: true,
+  approvalSectionNo: 5,
+  justification: {
+    itemId: 'justification', docId: 'justification',
+    title: 'Justification in support of applied quantity(based on one year PO/Export NOC history)',
+  },
+};
+
+const TYPE_PROFILES = {
+  type_1: {
+    label: 'Different Products – Different Companies – Different Destination Countries',
+    fixedItems: [
+      { itemId: 'irf',         docId: 'irf',               title: 'System generated Integrated Registration Form (IRF)' },
+      { itemId: 'legal',       docId: 'legal_undertaking', title: 'Legal undertaking in Annexture-II' },
+      { itemId: 'mfg_license', docId: 'mfg_license',       title: 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29' },
+    ],
+    hasHistorical: false,
+    hasMfgLicensePerCompany: false,
+    approvalSectionNo: 4,
+    justification: {
+      itemId: 'justification', docId: 'justification',
+      title: 'Justification in support of applied quantity(based on one year PO history)',
+    },
+  },
+  type_2: {
+    label: 'Same Company – Same Product – Multiple Destination Countries',
+    ...TYPE_2_3_LAYOUT,
+    hasMfgLicensePerCompany: false,
+  },
+  type_3: {
+    label: 'Same Company – Different Products – Different Destination Countries',
+    ...TYPE_2_3_LAYOUT,
+    hasMfgLicensePerCompany: false,
+  },
+  type_4: {
+    label: 'Same Product – Multiple Companies – Multiple Destination Countries',
+    /* Items 1 & 2 only in fixedItems — item 3 (Copy of Manufacturing License)
+       becomes a parent section with one leaf per company, like section 5.
+       hasMfgLicensePerCompany drives that behavior in shape/seed. */
+    fixedItems: [
+      { itemId: 'irf',         docId: 'irf',               title: 'System generated Integrated Registration Form (IRF)' },
+      { itemId: 'legal',       docId: 'legal_undertaking', title: 'Legal undertaking in Annexure-II(on Rs. 100 non-judicial stamp paper)' },
+    ],
+    hasMfgLicensePerCompany: true,
+    hasHistorical: true,
+    approvalSectionNo: 5,
+    justification: {
+      itemId: 'justification', docId: 'justification',
+      title: 'Justification in support of applied quantity(based on one year PO/Export NOC history)',
+    },
+  },
+};
+
+const HISTORICAL_ITEM = {
+  itemId: 'historical', docId: 'historical_data',
+  title: 'Upload historical data of Export NOC for the applied product',
+};
+
+const MFG_LICENSE_SUBITEM_TITLE = 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29';
+
+/* Detect Type based on counts of unique companies/products/countries.
+   Rules:
+     Type 2: 1 company + 1 product           (any # countries)
+     Type 3: 1 company + >1 products         (any # countries)
+     Type 4: 1 product + >1 companies        (any # countries)
+     Type 1: everything else (general case: multi-company + multi-product) */
+function detectChecklistType(app) {
+  const uniq = (arr, key) => new Set((arr || []).map(x => (x?.[key] || '').trim()).filter(Boolean));
+  const co = uniq(app.companies, 'name').size || 1;
+  const pr = uniq(app.products, 'productName').size || 1;
+  if (co === 1 && pr === 1) return 'type_2';
+  if (co === 1 && pr > 1)   return 'type_3';
+  if (pr === 1 && co > 1)   return 'type_4';
+  return 'type_1';
+}
+
+/* Return unique companies from companies[] in insertion order. */
+function uniqueCompanies(app) {
+  const seen = new Set();
+  const out  = [];
+  for (const c of (app.companies || [])) {
+    const name = (c.name || '').trim();
+    if (name && !seen.has(name)) { seen.add(name); out.push(c); }
+  }
+  if (out.length === 0 && app.manufacturerName) {
+    out.push({ name: app.manufacturerName, licenseNo: app.mfgLicenseNo || '' });
+  }
+  return out;
+}
+
+/* Canonical (stable) id for a per-company manufacturing-license subitem. */
+function mfgLicenseItemId(companyName) {
+  const slug = String(companyName || '').replace(/[^a-zA-Z0-9]+/g, '_');
+  return `noc_mfg_license_${slug}`;
+}
+
+/* Return unique destination countries from consignees[] in insertion order. */
+function uniqueDestinationCountries(app) {
+  const seen = new Set();
+  const out  = [];
+  for (const c of (app.consignees || [])) {
+    const country = (c.country || '').trim();
+    if (country && !seen.has(country)) { seen.add(country); out.push(country); }
+  }
+  if (out.length === 0 && app.destinationCountry) out.push(app.destinationCountry);
+  return out;
+}
+
+/* Canonical (stable) id for a per-country approval-status subitem. */
+function approvalItemId(country, subKey) {
+  const slug = String(country || '').replace(/[^a-zA-Z0-9]+/g, '_');
+  return `noc_approval_${subKey}_${slug}`;
+}
+
+/* Compute the display numbering for every checklist item based on the type. */
+function buildItemNumbering(profile, countries, companies) {
+  const numbering = {};
+  let n = 1;
+  for (const f of profile.fixedItems) numbering[f.itemId] = String(n++);
+
+  // For Type 4: per-company manufacturing-license section slots in here
+  let mfgLicenseSectionNo = null;
+  if (profile.hasMfgLicensePerCompany) {
+    mfgLicenseSectionNo = n;
+    (companies || []).forEach((company, i) => {
+      numbering[mfgLicenseItemId(company.name)] = `${mfgLicenseSectionNo}.${i + 1}`;
+    });
+    n = mfgLicenseSectionNo + 1;
+  }
+
+  if (profile.hasHistorical) numbering[HISTORICAL_ITEM.itemId] = String(n++);
+  const approvalSecNo = n;   // approval status section
+  countries.forEach((country, i) => {
+    for (const sub of APPROVAL_SUBITEMS) {
+      numbering[approvalItemId(country, sub.key)] = `${approvalSecNo}.${i + 1}.${sub.key}`;
+    }
+  });
+  n = approvalSecNo + 1;
+  numbering[profile.justification.itemId] = String(n);
+  return {
+    numbering,
+    mfgLicenseSectionNo: mfgLicenseSectionNo === null ? null : String(mfgLicenseSectionNo),
+    approvalSectionNo:   String(approvalSecNo),
+    justificationNo:     String(n),
+  };
+}
+
+/* Idempotent seed: refresh titles + itemNo based on the current type; preserve
+   queries[] and status. Adds items for new countries; leaves obsolete items
+   (e.g. countries removed after the fact) alone so their history isn't lost. */
+function seedChecklist(app) {
+  if (!app.checklistItems) app.checklistItems = new Map();
+  const items    = app.checklistItems;
+
+  // Migration: pre-refactor keys `noc_4_<sub>_<country>` → `noc_approval_<sub>_<country>`
+  for (const key of Array.from(items.keys ? items.keys() : Object.keys(items))) {
+    if (typeof key === 'string' && key.startsWith('noc_4_')) {
+      const newKey = key.replace(/^noc_4_/, 'noc_approval_');
+      if (!items.get(newKey)) {
+        const val = items.get(key);
+        if (val) { val.itemId = newKey; items.set(newKey, val); }
+      }
+      items.delete(key);
+    }
+  }
+
+  const type      = detectChecklistType(app);
+  const profile   = TYPE_PROFILES[type] || TYPE_PROFILES.type_1;
+  const countries = uniqueDestinationCountries(app);
+  const companies = uniqueCompanies(app);
+  const { numbering } = buildItemNumbering(profile, countries, companies);
+
+  const upsert = (itemId, seed) => {
+    const existing = items.get ? items.get(itemId) : items?.[itemId];
+    if (existing) {
+      // Preserve queries + status; refresh display fields + doc pointers.
+      existing.itemNo = seed.itemNo || existing.itemNo;
+      existing.title  = seed.title  || existing.title;
+      if (seed.country)      existing.country     = seed.country;
+      if (seed.company)      existing.company     = seed.company;
+      if (seed.parentGroup)  existing.parentGroup = seed.parentGroup;
+      if (seed.submissionRemark !== undefined)  existing.submissionRemark  = seed.submissionRemark;
+      if (seed.submissionDocName !== undefined) existing.submissionDocName = seed.submissionDocName;
+      if (seed.submissionDocPath !== undefined) existing.submissionDocPath = seed.submissionDocPath;
+      items.set(itemId, existing);
+    } else {
+      items.set(itemId, { itemId, status: 'OK', queries: [], ...seed });
+    }
+  };
+
+  const getDoc = (docId) =>
+    (app.documents?.get ? app.documents.get(docId) : app.documents?.[docId]) || null;
+
+  const seedRow = (row) => {
+    const uploaded = getDoc(row.docId);
+    upsert(row.itemId, {
+      itemNo: numbering[row.itemId],
+      title:  row.title,
+      submissionRemark:  uploaded ? `${row.title.split('(')[0].trim()} has been submitted` : '',
+      submissionDocName: uploaded?.name || '',
+      submissionDocPath: uploaded?.path || '',
+    });
+  };
+
+  for (const r of profile.fixedItems) seedRow(r);
+
+  // Type 4: per-company manufacturing-license leaves
+  if (profile.hasMfgLicensePerCompany) {
+    companies.forEach((company) => {
+      const itemId = mfgLicenseItemId(company.name);
+      const docId  = `mfg_license_${String(company.name || '').replace(/[^a-zA-Z0-9]+/g, '_')}`;
+      const uploaded = getDoc(docId) || getDoc('mfg_license'); // fall back to shared upload if per-company doc absent
+      upsert(itemId, {
+        itemNo: numbering[itemId],
+        title:  MFG_LICENSE_SUBITEM_TITLE,
+        parentGroup: 'mfg_license',
+        company: company.name,
+        submissionRemark:  uploaded ? `Copy of Manufacturing License has been submitted for ${company.name}` : '',
+        submissionDocName: uploaded?.name || '',
+        submissionDocPath: uploaded?.path || '',
+      });
+    });
+  }
+
+  if (profile.hasHistorical) seedRow(HISTORICAL_ITEM);
+
+  countries.forEach((country) => {
+    for (const sub of APPROVAL_SUBITEMS) {
+      const itemId = approvalItemId(country, sub.key);
+      const docId  = `${sub.docSuffix}_${country.replace(/[^a-zA-Z0-9]+/g, '_')}`;
+      const uploaded = getDoc(docId);
+      upsert(itemId, {
+        itemNo: numbering[itemId],
+        title:  sub.title,
+        country,
+        parentGroup: 'approval_status',
+        submissionRemark:  uploaded ? `${sub.title.split(' of ')[0].trim()} has been submitted` : '',
+        submissionDocName: uploaded?.name || '',
+        submissionDocPath: uploaded?.path || '',
+      });
+    }
+  });
+
+  seedRow(profile.justification);
+
+  app.markModified('checklistItems');
+}
+
+/* Shape the checklistItems Map into an ordered tree the UI can render. */
+function shapeChecklist(app, baseUrl) {
+  const items    = app.checklistItems;
+  const type     = detectChecklistType(app);
+  const profile  = TYPE_PROFILES[type] || TYPE_PROFILES.type_1;
+  const countries = uniqueDestinationCountries(app);
+  const companies = uniqueCompanies(app);
+  const { approvalSectionNo, mfgLicenseSectionNo } = buildItemNumbering(profile, countries, companies);
+  const get = (id) => items?.get ? items.get(id) : items?.[id];
+
+  const withDocUrl = (raw) => {
+    if (!raw) return null;
+    const item = raw.toObject ? raw.toObject() : { ...raw };
+    if (item.submissionDocPath) {
+      item.submissionDocUrl = `${baseUrl}/api/applications/${app.applicationNumber}/checklist/${encodeURIComponent(item.itemId)}/submission-file`;
+    }
+    item.queries = (item.queries || []).map((q, i) => ({
+      ...(q.toObject ? q.toObject() : q),
+      version: q.version || (i + 1),
+      replyDocUrl: q.replyDocPath
+        ? `${baseUrl}/api/applications/${app.applicationNumber}/checklist/${encodeURIComponent(item.itemId)}/reply-file/${q.version || (i + 1)}`
+        : '',
+    }));
+    return item;
+  };
+
+  const preItems = profile.fixedItems.map(f => withDocUrl(get(f.itemId))).filter(Boolean);
+
+  // Type 4: per-company manufacturing-license section (parent + per-company leaves)
+  let mfgLicenseSection = null;
+  if (profile.hasMfgLicensePerCompany && mfgLicenseSectionNo) {
+    mfgLicenseSection = {
+      itemNo: mfgLicenseSectionNo,
+      title:  'Copy of Manufacturing License',
+      companies: companies.map((company, i) => {
+        const leaf = withDocUrl(get(mfgLicenseItemId(company.name)));
+        if (leaf) leaf.itemNo = leaf.itemNo || `${mfgLicenseSectionNo}.${i + 1}`;
+        return leaf;
+      }).filter(Boolean),
+    };
+  }
+
+  // Historical-data item stays a separate node so the frontend can slot it
+  // AFTER mfgLicenseSection in Type 4 (or after preItems in Types 2/3).
+  const historicalItem = profile.hasHistorical
+    ? withDocUrl(get(HISTORICAL_ITEM.itemId))
+    : null;
+
+  // Back-compat: older frontend code reads historical from preItems for
+  // Types 2/3 where there is no mfg-license section.
+  if (historicalItem && !profile.hasMfgLicensePerCompany) preItems.push(historicalItem);
+
+  const approvalSection = {
+    itemNo: approvalSectionNo,
+    title:  'Approval Status in importing Country',
+    countries: countries.map((country, i) => ({
+      itemNo:  `${approvalSectionNo}.${i + 1}`,
+      country,
+      subItems: APPROVAL_SUBITEMS.map(sub => withDocUrl(get(approvalItemId(country, sub.key)))).filter(Boolean),
+    })),
+  };
+
+  const postItems = [withDocUrl(get(profile.justification.itemId))].filter(Boolean);
+
+  return {
+    type,
+    typeLabel: profile.label,
+    // Back-compat aliases so old field names still work:
+    preSection4:  preItems,
+    section4:     approvalSection,
+    postSection4: postItems,
+    // New canonical names:
+    mfgLicenseSection,
+    historicalItem,
+    preItems,
+    approvalSection,
+    postItems,
+    maxRounds: MAX_QUERY_ROUNDS,
+  };
+}
+
+/* Path-safe writer for applicant reply doc bytes; returns relative path. */
+function persistReplyFile(appNumber, itemId, version, file) {
+  if (!file) return null;
+  const dir = path.join(UPLOADS_DIR, String(appNumber), 'checklist_replies');
+  fs.mkdirSync(dir, { recursive: true });
+  const safeItem = String(itemId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const extMatch = (file.originalname || '').match(/\.[a-zA-Z0-9]{1,8}$/);
+  const ext = extMatch ? extMatch[0] : '.pdf';
+  const fileName = `${safeItem}_v${version}${ext}`;
+  const filePath = path.join(dir, fileName);
+  fs.writeFileSync(filePath, file.buffer);
+  return `${appNumber}/checklist_replies/${fileName}`;
+}
 
 /* Write each base64 doc to disk, return docs map with `path` set + `data` stripped.
    Keeps the MongoDB document well under the 16 MiB BSON limit. */
@@ -672,7 +1044,190 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
-// Need mongoose for ObjectId check above
-const mongoose = require('mongoose');
+/* ═══════════════════════════════════════════════════════════════════════
+   Export NOC Check-List Query flow (Type 1: multi-country)
+   ─────────────────────────────────────────────────────────────────────── */
+
+async function loadAppOr404(idOrRef, res) {
+  const app = await Application.findOne({
+    $or: [
+      { applicationNumber: idOrRef },
+      { referenceNumber:   idOrRef },
+      { _id: mongoose.isValidObjectId(idOrRef) ? idOrRef : null },
+    ],
+  });
+  if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
+  return app;
+}
+
+/* ── GET /:id/checklist — full checklist tree for reviewer + applicant ── */
+router.get('/:id/checklist', async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    seedChecklist(app);
+    await app.save();
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json({
+      success: true,
+      applicationNumber: app.applicationNumber,
+      referenceNumber:   app.referenceNumber,
+      status:            app.status,
+      checklist:         shapeChecklist(app, baseUrl),
+    });
+  } catch (err) {
+    console.error('checklist load error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── POST /:id/checklist/:itemId/query — reviewer raises a query ────── */
+router.post('/:id/checklist/:itemId/query', async (req, res) => {
+  try {
+    const { queryText, officer = 'reviewer' } = req.body;
+    if (!queryText || !String(queryText).trim()) {
+      return res.status(400).json({ error: 'queryText is required' });
+    }
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    seedChecklist(app);
+
+    const item = app.checklistItems.get(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Checklist item not found' });
+
+    // Enforce: reviewer can only raise a query if there's no open (unreplied) query
+    const openRound = (item.queries || []).find(q => !q.reply);
+    if (openRound) {
+      return res.status(409).json({ error: 'An open query already exists for this item. Wait for applicant reply.' });
+    }
+    if ((item.queries || []).length >= MAX_QUERY_ROUNDS) {
+      return res.status(409).json({ error: `Query limit reached (${MAX_QUERY_ROUNDS} rounds per item).` });
+    }
+
+    const version = (item.queries || []).length + 1;
+    item.queries = item.queries || [];
+    item.queries.push({
+      version,
+      queryText: String(queryText).trim(),
+      queryDate: new Date(),
+      queryBy:   officer,
+    });
+    if (version === 1) item.baseQuery = String(queryText).trim();
+    item.status = 'Query';
+
+    app.status = 'Query Raised';
+    app.checklistItems.set(req.params.itemId, item);
+    app.markModified('checklistItems');
+    app.auditLog.push({
+      action: 'checklist_query',
+      detail: `Item ${item.itemNo} (${item.title}) — v${version} query raised: "${item.queries[version - 1].queryText}"`,
+      user:   officer,
+    });
+    await app.save();
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json({ success: true, checklist: shapeChecklist(app, baseUrl) });
+  } catch (err) {
+    console.error('checklist query error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── POST /:id/checklist/:itemId/reply — applicant replies to latest query ── */
+router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), async (req, res) => {
+  try {
+    const reply     = (req.body.reply || '').trim();
+    const applicant = req.body.applicant || 'applicant';
+    if (!reply) return res.status(400).json({ error: 'reply text is required' });
+
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    seedChecklist(app);
+
+    const item = app.checklistItems.get(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Checklist item not found' });
+
+    const openIdx = (item.queries || []).findIndex(q => !q.reply);
+    if (openIdx === -1) return res.status(409).json({ error: 'No open query to reply to.' });
+
+    const round = item.queries[openIdx];
+    round.reply     = reply;
+    round.replyDate = new Date();
+
+    if (req.file) {
+      const relPath = persistReplyFile(app.applicationNumber, req.params.itemId, round.version, req.file);
+      round.replyDocName = req.file.originalname;
+      round.replyDocPath = relPath;
+      round.replyDocType = req.file.mimetype;
+      round.replyDocSize = req.file.size;
+    }
+
+    item.previousQuery = round.queryText;
+    item.status = 'Query Replied OK';
+
+    app.checklistItems.set(req.params.itemId, item);
+    app.markModified('checklistItems');
+
+    // Roll application status back to Under Review if no other items still open
+    const anyOpen = [...app.checklistItems.values()].some(it => (it.queries || []).some(q => !q.reply));
+    if (!anyOpen && app.status === 'Query Raised') app.status = 'Under Review';
+
+    app.auditLog.push({
+      action: 'checklist_reply',
+      detail: `Item ${item.itemNo} (${item.title}) — v${round.version} reply: "${reply}"${req.file ? ' [file attached]' : ''}`,
+      user:   applicant,
+    });
+    await app.save();
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json({ success: true, checklist: shapeChecklist(app, baseUrl) });
+  } catch (err) {
+    console.error('checklist reply error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── GET /:id/checklist/:itemId/submission-file — stream at-submission doc ── */
+router.get('/:id/checklist/:itemId/submission-file', async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    const item = app.checklistItems?.get(req.params.itemId);
+    if (!item?.submissionDocPath) return res.status(404).json({ error: 'File not found' });
+    const resolved = path.resolve(path.join(UPLOADS_DIR, item.submissionDocPath));
+    if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) return res.status(400).json({ error: 'Invalid path' });
+    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
+    res.set({
+      'Content-Type':        'application/octet-stream',
+      'Content-Disposition': `inline; filename="${item.submissionDocName || 'document'}"`,
+    });
+    fs.createReadStream(resolved).pipe(res);
+  } catch (err) {
+    console.error('submission-file error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── GET /:id/checklist/:itemId/reply-file/:version — stream applicant reply doc ── */
+router.get('/:id/checklist/:itemId/reply-file/:version', async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    const item  = app.checklistItems?.get(req.params.itemId);
+    const round = item?.queries?.find(q => String(q.version) === String(req.params.version));
+    if (!round?.replyDocPath) return res.status(404).json({ error: 'File not found' });
+    const resolved = path.resolve(path.join(UPLOADS_DIR, round.replyDocPath));
+    if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) return res.status(400).json({ error: 'Invalid path' });
+    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
+    res.set({
+      'Content-Type':        round.replyDocType || 'application/octet-stream',
+      'Content-Disposition': `inline; filename="${round.replyDocName || 'reply-document'}"`,
+    });
+    fs.createReadStream(resolved).pipe(res);
+  } catch (err) {
+    console.error('reply-file error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

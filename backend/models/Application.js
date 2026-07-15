@@ -89,6 +89,41 @@ const AuditSchema = new mongoose.Schema({
   user:      String,
 }, { _id: false });
 
+/* ── Checklist query round (one entry per version, max 5) ──────────────── */
+const ChecklistQuerySchema = new mongoose.Schema({
+  version:      Number,          // 1..5
+  queryText:    String,
+  queryDate:    { type: Date, default: Date.now },
+  queryBy:      String,          // reviewer/officer name
+  reply:        String,          // applicant reply text
+  replyDate:    Date,
+  replyDocName: String,          // original filename of applicant's uploaded doc, if any
+  replyDocPath: String,          // relative path under uploads/, if any
+  replyDocType: String,
+  replyDocSize: Number,
+}, { _id: false });
+
+/* ── Checklist item state (per checklist row shown to reviewer/applicant) ── */
+const ChecklistItemSchema = new mongoose.Schema({
+  itemId:         String,        // canonical id, e.g. 'irf', 'legal', 'mfg_license', 'noc_approval_1_Benin', 'noc_mfg_license_CompanyA'
+  itemNo:         String,        // display number, e.g. '1', '3.1', '5.1.1'
+  title:          String,        // display label
+  country:        String,        // populated for approval-status country rows (Type 1/2/3/4)
+  company:        String,        // populated for Type-4 per-company manufacturing-license rows
+  parentGroup:    String,        // e.g. 'approval_status', 'mfg_license'
+  submissionRemark: String,      // "At Time Of Submission" remark from applicant
+  submissionDocName: String,
+  submissionDocPath: String,     // usually mirrors the existing document upload path
+  baseQuery:      String,        // "Base Query/Remarks" — the very first query text
+  previousQuery:  String,        // "Previous Query/Remarks" — last-1 exchange snapshot
+  status: {
+    type: String,
+    enum: ['OK', 'Query', 'Query Replied OK'],
+    default: 'OK',
+  },
+  queries: [ChecklistQuerySchema],
+}, { _id: false });
+
 /* ── Main Application schema ────────────────────────────────────────────── */
 const ApplicationSchema = new mongoose.Schema({
   // Generated identifiers
@@ -178,6 +213,13 @@ const ApplicationSchema = new mongoose.Schema({
     status:    String,
     timestamp: { type: Date, default: Date.now },
   }],
+
+  // Export NOC Check-List Query state (per item; section 4 has one item per destination country)
+  checklistItems: {
+    type:    Map,
+    of:      ChecklistItemSchema,
+    default: {},
+  },
 
 }, {
   timestamps: true,   // adds createdAt + updatedAt
