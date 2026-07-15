@@ -619,6 +619,45 @@ router.post('/:id/shipments/:idx/action', async (req, res) => {
       $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
     });
     if (!app) return res.status(404).json({ error: 'Application not found' });
+
+    // ── Legacy synthesis: if shipments[] is empty, build from products × companies × consignees ──
+    if (!Array.isArray(app.shipments) || app.shipments.length === 0) {
+      // Ensure companies[]
+      let companies = Array.isArray(app.companies) && app.companies.length > 0
+        ? app.companies
+        : (app.manufacturerName || app.mfgLicenseNo || app.factoryAddress)
+          ? [{ companyRef: 'legacy-co', name: app.manufacturerName || '', licenseNo: app.mfgLicenseNo || '', factoryAddress: app.factoryAddress || '' }]
+          : [];
+
+      // Ensure consignees[]
+      let consignees = Array.isArray(app.consignees) && app.consignees.length > 0
+        ? app.consignees
+        : (app.consigneeName || app.consigneeCountry || app.destinationCountry)
+          ? [{ consigneeRef: 'legacy-cn', name: app.consigneeName || '', country: app.consigneeCountry || app.destinationCountry || '' }]
+          : [];
+
+      // Ensure products have productRef
+      const products = Array.isArray(app.products)
+        ? app.products.map((p, i) => ({ productRef: p.productRef || `legacy-p${i}`, ...p.toObject ? p.toObject() : p }))
+        : [];
+
+      const co = companies[0];
+      const cn = consignees[0];
+      if (co && cn && products.length > 0) {
+        app.shipments = products.map(p => ({
+          companyRef:   co.companyRef,
+          productRef:   p.productRef,
+          consigneeRef: cn.consigneeRef,
+          quantity:     0,
+          packSize:     p.packSize || '',
+          batchNumbers: p.batchNumber ? [p.batchNumber] : [],
+          lineStatus:   'Pending',
+          lineRemarks:  [],
+        }));
+        app.markModified('shipments');
+      }
+    }
+
     if (!Array.isArray(app.shipments) || !app.shipments[idx]) {
       return res.status(404).json({ error: 'Shipment line not found' });
     }
