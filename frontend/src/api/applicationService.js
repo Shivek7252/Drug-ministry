@@ -150,3 +150,47 @@ export async function replyChecklistQuery(appNumber, itemId, { reply, applicant 
     return { success: false, error: err.message };
   }
 }
+
+/* Map a checklist item's canonical id to the AI-verifier docType key. */
+export function checklistItemToDocType(itemId) {
+  if (!itemId) return 'default';
+  if (itemId === 'irf')                             return 'irf';
+  if (itemId === 'legal')                           return 'legal_undertaking';
+  if (itemId === 'mfg_license')                     return 'mfg_license';
+  if (itemId === 'historical')                      return 'historical_data';
+  if (itemId === 'justification')                   return 'justification';
+  if (itemId.startsWith('noc_mfg_license_'))        return 'mfg_license';
+  if (itemId.startsWith('noc_approval_1_'))         return 'nra_cert';
+  if (itemId.startsWith('noc_approval_2_'))         return 'cdsco_approval';
+  return 'default';
+}
+
+/* Verify a checklist item's file with the AI verifier.
+   Fetches the file from `fileUrl` (submissionDocUrl or replyDocUrl),
+   sends it multipart to /api/verify with the mapped docType, returns the
+   verifier's structured response. */
+export async function verifyChecklistFile({ fileUrl, itemId, docLabel = 'document', fileName = 'file.pdf' }) {
+  try {
+    if (!fileUrl) return { success: false, error: 'No file URL provided.' };
+    const fileResp = await fetch(fileUrl);
+    if (!fileResp.ok) throw new Error(`Could not download file (HTTP ${fileResp.status}).`);
+    const blob = await fileResp.blob();
+
+    const docType = checklistItemToDocType(itemId);
+    const form = new FormData();
+    form.append('file', blob, fileName);
+    form.append('docType',  docType);
+    form.append('docLabel', docLabel);
+
+    const apiResp = await fetch('http://localhost:5001/api/verify', {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = await apiResp.json();
+    if (!apiResp.ok) throw new Error(data.error || `HTTP ${apiResp.status}`);
+    return { success: true, docType, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}

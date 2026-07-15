@@ -386,6 +386,180 @@
 }
 .cl-file-input input { font-size: 12px; }
 
+/* ═══════════════════════════════════════════════════════════
+   AI Verify panel (inside QueryHistoryModal)
+   ═══════════════════════════════════════════════════════════ */
+.cl-verify {
+  margin-top: 14px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cl-verify-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #e0e7ff;
+  border-bottom: 1px solid #c7d2fe;
+}
+.cl-verify-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #3730a3;
+  font-size: 13px;
+}
+.cl-verify-body {
+  padding: 12px;
+}
+.cl-verify-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.cl-verify-controls label {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+}
+.cl-verify-select {
+  flex: 1;
+  min-width: 220px;
+  padding: 5px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 12.5px;
+  background: #ffffff;
+  color: #0f172a;
+}
+.cl-verify-loading {
+  padding: 12px;
+  color: #3b82f6;
+  font-size: 12.5px;
+  font-style: italic;
+  text-align: center;
+}
+.cl-verify-error {
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+.cl-verify-hint {
+  padding: 10px 4px;
+  color: #64748b;
+  font-size: 11.5px;
+  font-style: italic;
+}
+
+/* Score summary row */
+.cl-verify-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+.cl-verify-score-badge {
+  min-width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+.cl-verify-score-badge.ok   { background: #16a34a; }
+.cl-verify-score-badge.warn { background: #d97706; }
+.cl-verify-score-badge.bad  { background: #dc2626; }
+.cl-verify-summary-text { flex: 1; min-width: 0; }
+.cl-verify-summary-line { font-size: 13px; color: #0f172a; margin-bottom: 3px; }
+.cl-verify-summary-sub  { font-size: 11px; color: #64748b; }
+.cl-verify-summary-sub code {
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+.cl-verify-mismatch {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  color: #b91c1c;
+  font-size: 11.5px;
+}
+.cl-verify-collapse-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+/* Per-parameter list */
+.cl-verify-items {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cl-verify-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 5px;
+}
+.cl-verify-item.yes { border-color: #bbf7d0; background: #f0fdf4; }
+.cl-verify-item.no  { border-color: #fecaca; background: #fef2f2; }
+.cl-verify-item.unk { border-color: #fde68a; background: #fefce8; }
+.cl-verify-item-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.cl-verify-item-body { flex: 1; min-width: 0; font-size: 12.5px; }
+.cl-verify-item-label { font-weight: 600; color: #0f172a; }
+.cl-verify-item-evidence {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: #475569;
+  font-style: italic;
+  word-break: break-word;
+}
+.cl-verify-item-note {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Small YES/NO/? pill */
+.cl-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  letter-spacing: .4px;
+}
+.cl-badge-yes { background: #dcfce7; color: #15803d; }
+.cl-badge-no  { background: #fee2e2; color: #b91c1c; }
+.cl-badge-unk { background: #fef3c7; color: #92400e; }
+
 /* Rounds counter */
 .cl-rounds-badge {
   display: inline-flex;
