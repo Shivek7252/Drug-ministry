@@ -107,7 +107,70 @@ const CHECKLISTS = {
     'Authorized signature is present',
     'Purpose / subject of document is stated',
   ],
+
+  /* ─── Checklist-item-specific profiles (Export NOC Check-List Query Page) ── */
+  irf: [
+    'Applicant name / firm is mentioned',
+    'Application number or Reference number is present',
+    'Product name / generic name is listed',
+    'Manufacturer name is mentioned',
+    'Destination country is specified',
+    'Applied quantity is mentioned',
+    'Application date is present',
+    'Authorized signature is visible',
+  ],
+  legal_undertaking: [
+    'Executed on Rs. 100 non-judicial stamp paper is indicated',
+    'Annexure-II heading is present',
+    'Applicant / firm name is mentioned',
+    'Product name and destination country are listed',
+    'Undertaking language ("we hereby undertake" / "we undertake") is present',
+    'Signatory name and designation are present',
+    'Date and place are mentioned',
+    'Notary attestation or seal is visible',
+  ],
+  historical_data: [
+    'Applied product name is mentioned',
+    'Past Export NOC file numbers are listed',
+    'Past export quantities (last year or previous years) are given',
+    'Destination countries in past exports are listed',
+    'Export dates or year values are present',
+    'Applicant / manufacturer name is mentioned',
+  ],
+  nra_cert: [
+    'Foreign National Regulatory Authority (NRA) / Ministry of Health name is present',
+    'Product / drug name is mentioned',
+    'Registration or approval certificate number is present',
+    'Approval or registration date is mentioned',
+    'Marketing authorisation holder / applicant name is present',
+    'Country of registration is mentioned',
+    'Validity or expiry date is present (if applicable)',
+    'Regulator seal or authorized signature is visible',
+  ],
+  cdsco_approval: [
+    'CDSCO / DCGI reference is present',
+    'Product / drug name is mentioned',
+    'Approval / permission number is present',
+    'Approval date is present',
+    'Applicant / manufacturer name is mentioned',
+    'Approved indications or drug composition / strength are listed',
+    'Authorised signatory of CDSCO / DCGI is present',
+  ],
+  justification: [
+    'Applied quantity is mentioned',
+    'One-year Purchase Order (PO) history / values are given',
+    'Past Export NOC references are listed (if available)',
+    'Product name is mentioned',
+    'Applicant / firm name is present',
+    'Narrative supporting the applied quantity is present',
+    'Signatory name and date are present',
+  ],
 };
+
+/* Aliases so the checklist page's docIds map cleanly to server.js keys. */
+CHECKLISTS.mfg_license   = CHECKLISTS.manufacturing_license;
+CHECKLISTS.export_auth   = CHECKLISTS.export_authorization;
+CHECKLISTS.qa_cert       = CHECKLISTS.quality_assurance;
 
 /* ─── Per-checklist "what this document looks like" profile ─────────────── */
 /* Used by the AI to first decide whether the upload is the right TYPE of
@@ -149,7 +212,44 @@ const DOC_TYPE_PROFILES = {
     mustHaveAny: [],
     mustNotBe: '',
   },
+
+  /* ─── Checklist-item-specific identity profiles ─────────────────────────── */
+  irf: {
+    identity: 'A system-generated Integrated Registration Form (IRF) for the Indian pharmaceutical Export NOC application, listing applicant, product, manufacturer, destination country, and applied quantity.',
+    mustHaveAny: ['integrated registration form', 'irf', 'application no', 'application number', 'file number', 'ref no', 'reference no', 'applied for export', 'export noc', 'no objection certificate', 'applicant details'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, GMP / QA certificate, batch analysis report, legal undertaking, invoice, or NRA registration certificate.',
+  },
+  legal_undertaking: {
+    identity: 'A Legal Undertaking (Annexure-II) executed by the applicant on Rs. 100 non-judicial stamp paper for the Indian Export NOC process, undertaking regulatory compliance for the exported drug product.',
+    mustHaveAny: ['legal undertaking', 'undertaking', 'annexure-ii', 'annexure ii', 'annexure-2', 'annexure 2', 'stamp paper', 'non-judicial', 'we hereby undertake', 'we undertake', 'i / we undertake', 'i/we hereby'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, GMP / QA certificate, batch analysis report, IRF, invoice, or NRA certificate.',
+  },
+  historical_data: {
+    identity: 'A historical data record listing past Export NOC file numbers, quantities, dates, and destination countries for the applied drug product.',
+    mustHaveAny: ['historical data', 'past export', 'previous noc', 'previous export', 'export noc history', 'export history', 'past year', 'year-wise', 'previously exported', 'past shipments'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, GMP / QA certificate, batch analysis report, undertaking, IRF, invoice, or NRA certificate.',
+  },
+  nra_cert: {
+    identity: 'A Registration or Approval Certificate issued by the National Regulatory Authority (NRA) of the destination importing country, authorising the applied drug product for that market.',
+    mustHaveAny: ['ministry of health', 'moh', 'national regulatory', 'nra', 'registration certificate', 'marketing authorisation', 'marketing authorization', 'import permit', 'approval certificate', 'certificate of registration', 'health authority', 'directorate of pharmacy', 'medicines authority', 'drug agency'],
+    mustNotBe: 'It must NOT be an Indian regulator document (CDSCO / DCGI / State Drug Authority), manufacturing licence, GMP / QA certificate, batch analysis report, undertaking, IRF, or invoice.',
+  },
+  cdsco_approval: {
+    identity: 'An approval / permission letter from CDSCO or DCGI (India) for a drug product, used when the destination importing country regulator does not issue its own approval.',
+    mustHaveAny: ['cdsco', 'dcgi', 'drug controller general of india', 'central drugs standard control organization', 'permission letter', 'approval letter', 'no objection', 'approved product', 'directorate general of health services', 'permission for import', 'permission for manufacture'],
+    mustNotBe: 'It must NOT be a foreign-country NRA / Ministry-of-Health certificate, manufacturing licence, GMP / QA certificate, batch analysis report, undertaking, IRF, or invoice.',
+  },
+  justification: {
+    identity: 'A justification note supporting the applied export quantity, typically referencing past Purchase Orders (POs) or one-year Export NOC history for the drug product.',
+    mustHaveAny: ['justification', 'applied quantity', 'requested quantity', 'purchase order', 'po history', 'po. no', 'po no', 'one year', 'past year', 'annual requirement', 'quantity requested', 'basis of quantity'],
+    mustNotBe: 'It must NOT be a manufacturing licence, product approval, GMP / QA certificate, batch analysis report, undertaking, IRF, invoice, or NRA certificate.',
+  },
 };
+
+/* Aliases so the checklist page's docIds map cleanly to server.js keys. */
+DOC_TYPE_PROFILES.mfg_license = DOC_TYPE_PROFILES.manufacturing_license;
+DOC_TYPE_PROFILES.export_auth = DOC_TYPE_PROFILES.export_authorization;
+DOC_TYPE_PROFILES.qa_cert     = DOC_TYPE_PROFILES.quality_assurance;
 
 /* ─── Extract combined text from PDF buffer (legacy callers) ──────────── */
 async function extractTextFromPdf(buffer) {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { verifyChecklistFile } from '../../api/applicationService';
 
 /**
  * QueryHistoryModal
@@ -31,6 +32,13 @@ export default function QueryHistoryModal({
   const [showAction, setShowAction] = useState(false);
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
+
+  // AI verify state — keyed by 'submission' or `reply-<version>`
+  const [verifyOpen, setVerifyOpen]   = useState(false);
+  const [verifyTarget, setVerifyTarget] = useState('submission');
+  const [verifyBusy, setVerifyBusy]   = useState(false);
+  const [verifyData, setVerifyData]   = useState({}); // { [key]: { status, results, summary, error } }
+  const [expandedItems, setExpandedItems] = useState(true);
 
   if (!item) return null;
 
@@ -65,6 +73,60 @@ export default function QueryHistoryModal({
   };
 
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { year:'numeric', month:'2-digit', day:'2-digit' }) : '';
+
+  /* AI verify targets available for this item — always at least "submission"
+     if a file exists; each replied round with an attached doc is another target. */
+  const verifyTargets = [];
+  if (item.submissionDocUrl) {
+    verifyTargets.push({
+      key: 'submission',
+      label: `At submission — ${item.submissionDocName || 'file'}`,
+      fileUrl: item.submissionDocUrl,
+      fileName: item.submissionDocName || 'submission.pdf',
+    });
+  }
+  for (const q of queries) {
+    if (q.replyDocUrl) {
+      verifyTargets.push({
+        key: `reply-${q.version}`,
+        label: `Reply v${q.version} — ${q.replyDocName || 'file'}`,
+        fileUrl: q.replyDocUrl,
+        fileName: q.replyDocName || `reply-v${q.version}.pdf`,
+      });
+    }
+  }
+
+  const runVerify = async () => {
+    const tgt = verifyTargets.find(t => t.key === verifyTarget) || verifyTargets[0];
+    if (!tgt) return;
+    setVerifyBusy(true);
+    setVerifyData(prev => ({ ...prev, [tgt.key]: { status: 'loading' } }));
+    const res = await verifyChecklistFile({
+      fileUrl:  tgt.fileUrl,
+      itemId:   item.itemId,
+      docLabel: item.title,
+      fileName: tgt.fileName,
+    });
+    setVerifyBusy(false);
+    if (res.success) {
+      setVerifyData(prev => ({
+        ...prev,
+        [tgt.key]: {
+          status:              'done',
+          docType:             res.docType,
+          results:             res.results || [],
+          summary:             res.summary || null,
+          documentTypeMatch:   res.documentTypeMatch,
+          documentTypeReason:  res.documentTypeReason || '',
+          textSource:          res.textSource || 'unknown',
+        },
+      }));
+    } else {
+      setVerifyData(prev => ({ ...prev, [tgt.key]: { status: 'error', error: res.error || 'Verification failed.' } }));
+    }
+  };
+
+  const currentVerify = verifyData[verifyTarget];
 
   return createPortal(
     <div className="cl-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -169,6 +231,128 @@ export default function QueryHistoryModal({
               />
             </div>
           </div>
+
+          {/* AI Verify panel */}
+          {verifyTargets.length > 0 && (
+            <div className="cl-verify">
+              <div className="cl-verify-header">
+                <div className="cl-verify-title">
+                  <span>🤖</span>
+                  <span>AI Document Verifier</span>
+                </div>
+                <button
+                  className="cl-btn cl-btn-cancel"
+                  style={{ padding: '3px 10px', fontSize: 12 }}
+                  onClick={() => setVerifyOpen(o => !o)}
+                >
+                  {verifyOpen ? '▲ Hide' : '▼ Show'}
+                </button>
+              </div>
+              {verifyOpen && (
+                <div className="cl-verify-body">
+                  <div className="cl-verify-controls">
+                    <label>Verify:&nbsp;</label>
+                    <select
+                      className="cl-verify-select"
+                      value={verifyTarget}
+                      onChange={e => setVerifyTarget(e.target.value)}
+                      disabled={verifyBusy}
+                    >
+                      {verifyTargets.map(t => (
+                        <option key={t.key} value={t.key}>{t.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="cl-btn cl-btn-primary"
+                      style={{ padding: '4px 12px', fontSize: 12 }}
+                      onClick={runVerify}
+                      disabled={verifyBusy}
+                    >
+                      {verifyBusy ? '⏳ Analysing…' : (currentVerify?.status === 'done' ? '↻ Re-verify' : '🔍 Verify')}
+                    </button>
+                  </div>
+
+                  {currentVerify?.status === 'loading' && (
+                    <div className="cl-verify-loading">Extracting text + running AI checklist…</div>
+                  )}
+                  {currentVerify?.status === 'error' && (
+                    <div className="cl-verify-error">⚠️ {currentVerify.error}</div>
+                  )}
+                  {currentVerify?.status === 'done' && (
+                    <>
+                      {/* Score summary */}
+                      <div className="cl-verify-summary">
+                        <div className={`cl-verify-score-badge ${
+                          (currentVerify.summary?.score ?? 0) >= 75 ? 'ok'
+                          : (currentVerify.summary?.score ?? 0) >= 50 ? 'warn'
+                          : 'bad'}`}>
+                          {currentVerify.summary?.score ?? 0}%
+                        </div>
+                        <div className="cl-verify-summary-text">
+                          <div className="cl-verify-summary-line">
+                            ✓ <strong>{currentVerify.summary?.present ?? 0}</strong> found
+                            &nbsp;·&nbsp;
+                            ✗ <strong>{currentVerify.summary?.missing ?? 0}</strong> missing
+                            {(currentVerify.summary?.unknown ?? 0) > 0 && (
+                              <>&nbsp;·&nbsp; ? <strong>{currentVerify.summary.unknown}</strong> unknown</>
+                            )}
+                          </div>
+                          <div className="cl-verify-summary-sub">
+                            docType: <code>{currentVerify.docType}</code>
+                            {currentVerify.textSource && (
+                              <>&nbsp;·&nbsp;text source: <code>{currentVerify.textSource}</code></>
+                            )}
+                          </div>
+                          {currentVerify.documentTypeMatch === false && (
+                            <div className="cl-verify-mismatch">
+                              🚫 Document-type mismatch: {currentVerify.documentTypeReason || 'The uploaded file does not look like the expected type.'}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className="cl-verify-collapse-btn"
+                          onClick={() => setExpandedItems(v => !v)}
+                          title={expandedItems ? 'Collapse details' : 'Expand details'}
+                        >{expandedItems ? '▲' : '▼'}</button>
+                      </div>
+
+                      {/* Per-parameter list */}
+                      {expandedItems && (
+                        <div className="cl-verify-items">
+                          {currentVerify.results.map((r, i) => {
+                            const yes = r.present === true;
+                            const no  = r.present === false;
+                            return (
+                              <div key={i} className={`cl-verify-item ${yes ? 'yes' : no ? 'no' : 'unk'}`}>
+                                <span className="cl-verify-item-icon">{yes ? '✅' : no ? '❌' : '❓'}</span>
+                                <div className="cl-verify-item-body">
+                                  <div className="cl-verify-item-label">{r.item}</div>
+                                  {yes && r.evidence && (
+                                    <div className="cl-verify-item-evidence">
+                                      📍 {typeof r.page === 'number' ? `Page ${r.page}: ` : ''}"{r.evidence}"
+                                    </div>
+                                  )}
+                                  {r.note && <div className="cl-verify-item-note">{r.note}</div>}
+                                </div>
+                                <span className={`cl-badge ${yes ? 'cl-badge-yes' : no ? 'cl-badge-no' : 'cl-badge-unk'}`}>
+                                  {yes ? 'YES' : no ? 'NO' : '?'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {!currentVerify && (
+                    <div className="cl-verify-hint">
+                      Runs the CDSCO AI verifier against this document — will report which required parameters are present, with page + evidence for each. Uses text extraction + OCR fallback.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Compose panel */}
           {showAction && (
