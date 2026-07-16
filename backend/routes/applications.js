@@ -509,6 +509,15 @@ function shapeMultiRows(obj) {
   return obj;
 }
 
+/* ── Infer MIME type from filename or stored type ────────────────────────── */
+function inferMimeType(fileName, storedType) {
+  if (storedType && storedType !== 'application/octet-stream') return storedType;
+  if (!fileName) return 'application/pdf';
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+  const map = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+  return map[ext] || 'application/pdf'; // default to PDF for unknown extensions
+}
+
 /* ── Generate unique IDs ─────────────────────────────────────────────────── */
 function generateAppNumber() {
   const year = new Date().getFullYear();
@@ -822,7 +831,7 @@ router.get('/:id/document/:docId', async (req, res) => {
         return res.status(404).json({ error: 'Document file missing on disk' });
       }
       res.set({
-        'Content-Type':        doc.type || 'application/octet-stream',
+        'Content-Type':        inferMimeType(doc.name, doc.type),
         'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
       });
       return fs.createReadStream(resolved).pipe(res);
@@ -835,7 +844,7 @@ router.get('/:id/document/:docId', async (req, res) => {
       if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
       const buf = Buffer.from(b64, 'base64');
       res.set({
-        'Content-Type':        doc.type || 'application/octet-stream',
+        'Content-Type':        inferMimeType(doc.name, doc.type),
         'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
         'Content-Length':      buf.length,
       });
@@ -1236,8 +1245,9 @@ router.get('/:id/checklist/:itemId/submission-file', async (req, res) => {
     const resolved = path.resolve(path.join(UPLOADS_DIR, item.submissionDocPath));
     if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) return res.status(400).json({ error: 'Invalid path' });
     if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
+    const mimeType = inferMimeType(item.submissionDocName, item.submissionDocType);
     res.set({
-      'Content-Type':        'application/octet-stream',
+      'Content-Type':        mimeType,
       'Content-Disposition': `inline; filename="${item.submissionDocName || 'document'}"`,
     });
     fs.createReadStream(resolved).pipe(res);
@@ -1258,8 +1268,9 @@ router.get('/:id/checklist/:itemId/reply-file/:version', async (req, res) => {
     const resolved = path.resolve(path.join(UPLOADS_DIR, round.replyDocPath));
     if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) return res.status(400).json({ error: 'Invalid path' });
     if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
+    const mimeType = inferMimeType(round.replyDocName, round.replyDocType);
     res.set({
-      'Content-Type':        round.replyDocType || 'application/octet-stream',
+      'Content-Type':        mimeType,
       'Content-Disposition': `inline; filename="${round.replyDocName || 'reply-document'}"`,
     });
     fs.createReadStream(resolved).pipe(res);

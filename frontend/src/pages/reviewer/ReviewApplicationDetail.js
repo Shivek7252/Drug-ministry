@@ -274,32 +274,60 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
     if (!up) return;
     setSummaryData(p => ({ ...p, [docId]: { status: 'loading', results: null, summary: null, error: '' } }));
     try {
-      const resp = await fetch(up.objectUrl || '');
-      if (!resp.ok) throw new Error('Could not read document file.');
+      // objectUrl may be missing — try to construct it from applicationNumber
+      const fileUrl = up.objectUrl || `http://localhost:5001/api/applications/${data.applicationNumber}/document/${docId}`;
+      if (!fileUrl) throw new Error('Document URL not available.');
+
+      const resp = await fetch(fileUrl);
+      if (!resp.ok) throw new Error(`Could not fetch document (${resp.status}).`);
       const blob = await resp.blob();
+
       const form = new FormData();
-      form.append('file', blob, docLabel + '.pdf');
-      form.append('docType', 'export_noc');
+      // Use correct docType per document, fallback to docId
+      const mappedDocType = docType || docId || 'default';
+      form.append('file', blob, (up.name || docLabel) + (up.name ? '' : '.pdf'));
+      form.append('docType', mappedDocType);
       form.append('docLabel', docLabel);
+
       const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
-      const data = await apiResp.json();
-      if (!apiResp.ok) throw new Error(data.error || 'Verification failed.');
-      setSummaryData(p => ({ ...p, [docId]: { status: 'done', results: data.results, summary: data.summary, error: '' } }));
+      const respData = await apiResp.json();
+      if (!apiResp.ok) throw new Error(respData.error || 'Verification failed.');
+
+      // Compute summary inline if backend didn't return one
+      const results = respData.results || [];
+      const summary = respData.summary || {
+        total:   results.length,
+        present: results.filter(r => r.present === true).length,
+        missing: results.filter(r => r.present === false).length,
+        unknown: results.filter(r => r.present === null).length,
+        score:   results.length > 0
+          ? Math.round((results.filter(r => r.present === true).length / results.length) * 100)
+          : 0,
+      };
+
+      setSummaryData(p => ({ ...p, [docId]: { status: 'done', results, summary, documentTypeMatch: respData.documentTypeMatch, documentTypeReason: respData.documentTypeReason, error: '' } }));
     } catch (e) {
       setSummaryData(p => ({ ...p, [docId]: { status: 'error', results: null, summary: null, error: e.message } }));
     }
   };
 
-  /* Trigger summary panel: load all uploaded docs */
-  const handleOpenSummary = () => {
+  /* Trigger summary panel: load all uploaded docs — sequentially to avoid rate limiting */
+  const handleOpenSummary = async () => {
     setShowSummary(true);
     const docs = data.documents || {};
-    REQUIRED_DOCS.forEach(doc => {
-      const up = docs[doc.id];
-      if (up && !summaryData[doc.id]) {
-        fetchDocSummary(doc.id, doc.label, doc.docType, up);
-      }
+    const toFetch = REQUIRED_DOCS.filter(doc => {
+      if (!docs[doc.id]) return false;                       // not uploaded
+      const sd = summaryData[doc.id];
+      if (!sd) return true;                                  // never fetched
+      if (sd.status === 'error') return false;               // let user retry manually
+      if (sd.status === 'done') return false;                // already done
+      return false;                                          // loading in progress
     });
+    for (const doc of toFetch) {
+      await fetchDocSummary(doc.id, doc.label, doc.docType, docs[doc.id]);
+      // Small delay between calls to avoid rate limiting
+      await new Promise(r => setTimeout(r, 800));
+    }
   };
 
   const handleSubmit = () => {
@@ -364,7 +392,13 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                 <F label="Application Type" value={data.applicationType} />
                 <F label="Export Purpose" value={data.exportPurpose} />
                 <F label="Export Category" value={data.exportCategory} />
-                <F label="Destination" value={data.destinationCountry} />
+                <F label="Destination"
+                  value={
+                    Array.isArray(data.consignees) && data.consignees.length > 0
+                      ? [...new Set(data.consignees.map(c => c.country).filter(Boolean))].join(', ')
+                      : data.destinationCountry
+                  }
+                />
                 <F label="Application Date" value={data.applicationDate} />
                 <F label="Submitted At" value={data.submittedAt ? new Date(data.submittedAt).toLocaleString('en-IN') : '—'} />
               </div>
@@ -377,16 +411,41 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                 <F label="Email" value={data.email} />
               </div>
             </Sec>
-            <Sec title="Consignee / Importer" icon="🏢" defaultOpen={false}>
-              <div className="rv-grid-2">
-                <F label="Consignee" value={data.consigneeName} />
-                <F label="Org" value={data.consigneeOrg} />
-                <F label="Country" value={data.consigneeCountry} />
-                <F label="Contact" value={data.contactPerson} />
-                <F label="Phone" value={data.consigneePhone} />
-                <F label="Email" value={data.consigneeEmail} />
-                <F label="Address" value={[data.addressLine1, data.city, data.state, data.postalCode].filter(Boolean).join(', ')} />
-              </div>
+            <Sec title={`Consignee / Importer${Array.isArray(data.consignees) && data.consignees.length > 1 ? ` (${data.consignees.length})` : ''}`} icon="🏢" defaultOpen={false}>
+              {Array.isArray(data.consignees) && data.consignees.length > 0
+                ? data.consignees.map((c, i) => (
+                    <div key={c.consigneeRef || i} style={{
+                      border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px',
+                      marginBottom: i < data.consignees.length - 1 ? 12 : 0,
+                      background: '#f8fafc',
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: '#1e40af', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        🏢 Consignee #{i + 1}
+                        {c.country && <span style={{ background: '#dbeafe', color: '#1d4ed8', borderRadius: 12, padding: '1px 8px', fontSize: 11 }}>{c.country}</span>}
+                      </div>
+                      <div className="rv-grid-2">
+                        <F label="Consignee Name" value={c.name} />
+                        <F label="Organization" value={c.organisation} />
+                        <F label="Country" value={c.country} />
+                        <F label="Contact Person" value={c.contactPerson} />
+                        <F label="Phone" value={c.phone} />
+                        <F label="Email" value={c.email} />
+                        <F label="Address" value={[c.addressLine1, c.addressLine2, c.city, c.state, c.postalCode].filter(Boolean).join(', ')} />
+                      </div>
+                    </div>
+                  ))
+                : (
+                    <div className="rv-grid-2">
+                      <F label="Consignee" value={data.consigneeName} />
+                      <F label="Org" value={data.consigneeOrg} />
+                      <F label="Country" value={data.consigneeCountry} />
+                      <F label="Contact" value={data.contactPerson} />
+                      <F label="Phone" value={data.consigneePhone} />
+                      <F label="Email" value={data.consigneeEmail} />
+                      <F label="Address" value={[data.addressLine1, data.city, data.state, data.postalCode].filter(Boolean).join(', ')} />
+                    </div>
+                  )
+              }
             </Sec>
             {data.products?.length > 0 && (
               <Sec title={`Products (${data.products.length})`} icon="💊" defaultOpen={false}>
@@ -576,16 +635,25 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                   <div key={doc.id} className="rv-summary-doc-card">
                     <div className="rv-summary-doc-header" onClick={() => setSummaryDocId(summaryDocId === doc.id ? null : doc.id)}>
                       <span className="rv-doc-icon-big" style={{ fontSize: 16 }}>
-                        {!up ? '❌' : sd?.status === 'done' ? (sd.summary?.score >= 75 ? '✅' : sd.summary?.score >= 50 ? '⚠️' : '🔴') : '📄'}
+                        {!up ? '❌' : sd?.status === 'done'
+                          ? (sd.documentTypeMatch === false ? '🚫'
+                            : sd.summary?.score >= 75 ? '✅'
+                            : sd.summary?.score >= 50 ? '⚠️' : '🔴')
+                          : '📄'}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 12.5, color: '#1e293b' }}>{doc.label}</div>
                         {!up && <div style={{ fontSize: 10.5, color: '#dc2626', fontStyle: 'italic' }}>Not uploaded</div>}
                         {up && sd?.status === 'done' && (
                           <div style={{ fontSize: 10.5, color: '#64748b' }}>
-                            Score: <strong style={{ color: sd.summary.score >= 75 ? '#16a34a' : sd.summary.score >= 50 ? '#d97706' : '#dc2626' }}>{sd.summary.score}%</strong>
-                            &nbsp;·&nbsp;✓ {sd.summary.present} found &nbsp;·&nbsp; ✗ {sd.summary.missing} missing
-                            {sd.summary.unknown > 0 && <>&nbsp;·&nbsp; ? {sd.summary.unknown} unknown</>}
+                            {sd.documentTypeMatch === false
+                              ? <span style={{ color: '#b91c1c', fontStyle: 'italic' }}>⚠️ Wrong document type — {sd.documentTypeReason || 'document does not match expected type'}</span>
+                              : <>
+                                  Score: <strong style={{ color: sd.summary.score >= 75 ? '#16a34a' : sd.summary.score >= 50 ? '#d97706' : '#dc2626' }}>{sd.summary.score}%</strong>
+                                  &nbsp;·&nbsp;✓ {sd.summary.present} found &nbsp;·&nbsp; ✗ {sd.summary.missing} missing
+                                  {sd.summary.unknown > 0 && <>&nbsp;·&nbsp; ? {sd.summary.unknown} unknown</>}
+                                </>
+                            }
                           </div>
                         )}
                         {up && sd?.status === 'loading' && <div style={{ fontSize: 10.5, color: '#3b82f6' }}>⏳ Analyzing…</div>}

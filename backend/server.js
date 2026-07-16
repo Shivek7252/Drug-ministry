@@ -293,7 +293,7 @@ async function ocrPdfWithMistral(buffer) {
     throw new Error('MISTRAL_API_KEY is not configured');
   }
   const b64 = buffer.toString('base64');
-  const response = await fetch('https://api.mistral.ai/v1/ocr', {
+  const response = await fetchWithRetry('https://api.mistral.ai/v1/ocr', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -310,6 +310,24 @@ async function ocrPdfWithMistral(buffer) {
   return (data.pages || []).map(p => p.markdown || p.text || '');
 }
 
+/* ─── Sleep helper ──────────────────────────────────────────────────────── */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/* ─── Mistral API call with exponential backoff on 429 ─────────────────── */
+async function fetchWithRetry(url, options, maxRetries = 4) {
+  let delay = 2000; // start with 2 seconds
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    if (response.status !== 429) return response;
+    if (attempt === maxRetries) return response; // return 429 on final attempt
+    const retryAfter = response.headers.get('retry-after');
+    const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : delay;
+    console.warn(`[Mistral] 429 rate limit — waiting ${waitMs}ms before retry ${attempt + 1}/${maxRetries}...`);
+    await sleep(waitMs);
+    delay = Math.min(delay * 2, 30000); // cap at 30s
+  }
+}
+
 /* ─── Call Mistral chat completions (plain text response) ──────────────── */
 async function callMistral(messages, { model = 'mistral-large-latest', maxTokens = 2000 } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
@@ -317,7 +335,7 @@ async function callMistral(messages, { model = 'mistral-large-latest', maxTokens
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
   }
 
-  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+  const response = await fetchWithRetry('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({ model, messages, temperature: 0.1, max_tokens: maxTokens }),
@@ -338,7 +356,7 @@ async function callMistralJson(messages, { model = 'mistral-large-latest', maxTo
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
   }
-  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+  const response = await fetchWithRetry('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
