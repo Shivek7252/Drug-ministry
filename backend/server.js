@@ -313,11 +313,37 @@ async function ocrPdfWithMistral(buffer) {
 /* ─── Sleep helper ──────────────────────────────────────────────────────── */
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+/* ─── Detect network-level errors (DNS, connection refused, timeout) ─────── */
+function isNetworkError(err) {
+  const code = err?.code || '';
+  return (
+    code === 'ENOTFOUND' ||     // DNS resolution failed
+    code === 'ECONNREFUSED' ||  // connection refused
+    code === 'ECONNRESET' ||    // connection reset
+    code === 'ETIMEDOUT' ||     // connection timed out
+    code === 'ENETUNREACH' ||   // network unreachable
+    code === 'EAI_AGAIN'        // DNS temporary failure
+  );
+}
+
 /* ─── Mistral API call with exponential backoff on 429 ─────────────────── */
 async function fetchWithRetry(url, options, maxRetries = 4) {
   let delay = 2000; // start with 2 seconds
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const response = await fetch(url, options);
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (networkErr) {
+      if (isNetworkError(networkErr)) {
+        // No point retrying DNS/network failures — fail fast with a clear message
+        throw new Error(
+          `Mistral API is unreachable (${networkErr.code}). ` +
+          `Please check your internet connection or network/firewall settings. ` +
+          `Original: ${networkErr.message}`
+        );
+      }
+      throw networkErr; // re-throw unexpected errors
+    }
     if (response.status !== 429) return response;
     if (attempt === maxRetries) return response; // return 429 on final attempt
     const retryAfter = response.headers.get('retry-after');
@@ -632,7 +658,11 @@ ${textForAI}
           aiReason = 'AI determined document does not match expected template type';
         }
       } catch (e) {
-        console.error('AI validation error:', e.message);
+        if (e.message.includes('ENOTFOUND') || e.message.includes('unreachable')) {
+          console.warn('[AI Validate] Mistral API unreachable (network/DNS) — falling back to keyword-only validation.');
+        } else {
+          console.error('[AI Validate] error:', e.message);
+        }
         // AI failed → fall back to keyword logic
       }
     }
@@ -793,7 +823,12 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
           textSource = 'mistral-ocr';
         }
       } catch (e) {
-        console.warn('OCR fallback failed:', e.message);
+        if (e.message.includes('ENOTFOUND') || e.message.includes('unreachable')) {
+          console.warn('[OCR] Mistral API unreachable (network/DNS issue) — skipping OCR, continuing with text extraction only.');
+        } else {
+          console.warn('[OCR] fallback failed:', e.message);
+        }
+        // Non-fatal: continue without OCR; hasText check below will handle it
       }
     }
 
@@ -953,8 +988,13 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
     });
 
   } catch (err) {
+    const isNetwork = err.message.includes('ENOTFOUND') || err.message.includes('unreachable');
     console.error('Verify error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(isNetwork ? 503 : 500).json({
+      error: isNetwork
+        ? 'Mistral AI service is unreachable. Please check your internet connection and try again.'
+        : err.message,
+    });
   }
 });
 

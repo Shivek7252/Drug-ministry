@@ -6,6 +6,13 @@ import './WizardStep.css';
 const APP_NO = 'EXP-2026-000145';
 const REF_NO = 'REF-789654';
 
+/* compute 1-year NOC expiry date string */
+function nocExpiryDate() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
 export default function Step8Success() {
   const navigate = useNavigate();
   const { resetForm, formData, submittedAppNo, submittedRefNo } = useApp();
@@ -89,6 +96,38 @@ Helpdesk: 1800-11-4477 | helpdesk-cdsco@nic.in
           </div>
         </div>
 
+        {/* NOC Validity Info — per guidance document */}
+        <div style={{
+          margin: '20px auto', maxWidth: 560,
+          background: '#f0f7ff', border: '1.5px solid #bfdbfe',
+          borderRadius: 12, padding: '16px 20px', textAlign: 'left',
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1e3a8a', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            📜 Export NOC — Validity &amp; Process Summary
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 12.5 }}>
+            {[
+              ['Step I Status',     '✅ Registered with Zonal Office'],
+              ['NOC Validity',      '1 Year from date of issue'],
+              ['Estimated Issue',   'Within 7 working days'],
+              ['Estimated Expiry',  nocExpiryDate()],
+              ['Sanctioned Qty',    'As per approved application'],
+              ['NDPS / Banned',     'PO-specific NOC issued separately'],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{k}</div>
+                <div style={{ color: '#0f172a', fontWeight: 600, marginTop: 2 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 11.5, color: '#1e40af', background: '#e0f2fe', borderRadius: 7, padding: '8px 12px', lineHeight: 1.6 }}>
+            <strong>Step II (Reconciliation):</strong> After NOC approval, log each export consignment
+            using the <strong>Reconciliation Module</strong> on the Track page.
+            The module remains open throughout the NOC validity period.
+            Formulations with &lt;60% residual shelf life must be destroyed in presence of SLA.
+          </div>
+        </div>
+
         {/* What's Next */}
         <div className="success-next-steps">
           <h3>What happens next?</h3>
@@ -124,6 +163,14 @@ Helpdesk: 1800-11-4477 | helpdesk-cdsco@nic.in
           </button>
           <button className="btn btn-secondary btn-lg" onClick={() => navigate('/track')}>
             🔍 Track Application
+          </button>
+          <button
+            className="btn btn-secondary btn-lg"
+            style={{ background: '#003580', color: '#fff', border: 'none' }}
+            onClick={() => navigate('/track')}
+            title="Track your application and open Step II Reconciliation"
+          >
+            🚢 Step II Reconciliation
           </button>
           <button className="btn btn-outline btn-lg" onClick={() => { resetForm(); navigate('/'); }}>
             ⊞ Go to Dashboard

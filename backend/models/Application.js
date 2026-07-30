@@ -81,6 +81,77 @@ const DocumentSchema = new mongoose.Schema({
   validationResult: mongoose.Schema.Types.Mixed,
 }, { _id: false });
 
+/* ── Reconciliation entry (Step II — one row per export consignment) ──────
+   Matches the official CDSCO reconciliation table:
+   NOC Qty | Batch Qty Manufactured | Packed & Exported Qty |
+   Left/Unpacked Qty | Country Exported | Customer Details |
+   PO/EI/SB Details | Uploaded docs
+   ─────────────────────────────────────────────────────────────────────── */
+const ReconciliationSchema = new mongoose.Schema({
+  entryId:             { type: String, required: true },  // uuid
+  // Quantities
+  nocQty:              String,     // NOC-sanctioned quantity (filled by system)
+  batchQtyManufactured:String,     // batch quantity manufactured
+  packedExportedQty:   String,     // actually packed and exported
+  leftUnpackedQty:     String,     // auto-computed remainder
+  // Destination
+  countryExported:     String,
+  customerName:        String,
+  customerAddress:     String,
+  // Trade documents
+  poNumber:            String,     // Purchase Order number
+  eiNumber:            String,     // Export Invoice number
+  sbNumber:            String,     // Shipping Bill number
+  poDate:              String,
+  eiDate:              String,
+  sbDate:              String,
+  // Optional: product reference for multi-product NOCs
+  productRef:          String,
+  productName:         String,
+  batchNumber:         String,
+  // Shelf-life tracking (guidance doc: formulation 60%, API 3 months)
+  productType:         { type: String, enum: ['formulation', 'api'], default: 'formulation' },
+  mfgDate:             String,
+  expiryDate:          String,
+  residualShelfLifePct:Number,     // computed % at time of entry
+  shelfLifeStatus: {
+    type: String,
+    enum: ['ok', 'warning', 'destroy'],  // ok ≥60%, warning <60%, destroy <3months(api)
+    default: 'ok',
+  },
+  // Supporting document (COA or export invoice)
+  docName:   String,
+  docPath:   String,
+  docType:   String,
+  docSize:   Number,
+  // Status
+  status: {
+    type: String,
+    enum: ['Draft', 'Submitted', 'Port Verified', 'Released'],
+    default: 'Draft',
+  },
+  portOfficerRemarks: String,
+  submittedBy:   String,
+  submittedAt:   { type: Date, default: Date.now },
+  verifiedBy:    String,
+  verifiedAt:    Date,
+}, { _id: false });
+
+/* ── Export NOC metadata (set after NOC approval) ────────────────────────── */
+const NocMetaSchema = new mongoose.Schema({
+  nocIssuedDate:   Date,
+  nocExpiryDate:   Date,       // 1 year from issue
+  sanctionedQty:   String,     // total quantity approved in NOC
+  qtyUnit:         String,     // kg / units / litres etc.
+  qtyExported:     String,     // running total exported so far
+  qtyRemaining:    String,     // auto-computed remainder
+  nocStatus: {
+    type: String,
+    enum: ['Active', 'Expired', 'Exhausted', 'Cancelled'],
+    default: 'Active',
+  },
+}, { _id: false });
+
 /* ── Audit log entry ────────────────────────────────────────────────────── */
 const AuditSchema = new mongoose.Schema({
   action:    { type: String, required: true },
@@ -220,6 +291,12 @@ const ApplicationSchema = new mongoose.Schema({
     of:      ChecklistItemSchema,
     default: {},
   },
+
+  // ── Step II: Reconciliation entries (one per export consignment) ─────────
+  reconciliations: [ReconciliationSchema],
+
+  // ── NOC Metadata (populated when status → Approved) ──────────────────────
+  nocMeta: { type: NocMetaSchema, default: null },
 
 }, {
   timestamps: true,   // adds createdAt + updatedAt

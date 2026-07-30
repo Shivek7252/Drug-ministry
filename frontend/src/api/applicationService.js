@@ -151,6 +151,75 @@ export async function replyChecklistQuery(appNumber, itemId, { reply, applicant 
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   STEP II — RECONCILIATION API CALLS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Fetch all reconciliation entries for an application. */
+export async function getReconciliation(appNumber) {
+  return apiFetch(`${BASE}/${appNumber}/reconciliation`);
+}
+
+/**
+ * Add a new reconciliation entry (with optional doc attachment).
+ * `entry` is a plain object; `docFile` is an optional File object.
+ */
+export async function addReconciliationEntry(appNumber, entry, docFile = null) {
+  try {
+    const form = new FormData();
+    Object.entries(entry).forEach(([k, v]) => {
+      if (v !== null && v !== undefined) form.append(k, String(v));
+    });
+    if (docFile) form.append('doc', docFile);
+    const res = await fetch(`${BASE}/${appNumber}/reconciliation`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return { success: true, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Update / submit an existing reconciliation entry.
+ */
+export async function updateReconciliationEntry(appNumber, entryId, patch, docFile = null) {
+  try {
+    const form = new FormData();
+    Object.entries(patch).forEach(([k, v]) => {
+      if (v !== null && v !== undefined) form.append(k, String(v));
+    });
+    if (docFile) form.append('doc', docFile);
+    const res = await fetch(`${BASE}/${appNumber}/reconciliation/${entryId}`, {
+      method: 'PATCH',
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return { success: true, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/** Delete a draft reconciliation entry. */
+export async function deleteReconciliationEntry(appNumber, entryId) {
+  return apiFetch(`${BASE}/${appNumber}/reconciliation/${entryId}`, { method: 'DELETE' });
+}
+
+/** Set NOC metadata (reviewer action after approval). */
+export async function setNocMeta(appNumber, meta) {
+  return apiFetch(`${BASE}/${appNumber}/noc-meta`, {
+    method: 'POST',
+    body: JSON.stringify(meta),
+  });
+}
+
 /* Map a checklist item's canonical id to the AI-verifier docType key. */
 export function checklistItemToDocType(itemId) {
   if (!itemId) return 'default';

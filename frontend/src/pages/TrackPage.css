@@ -136,3 +136,52 @@
 .tl-rejected .tl-line   { background: #FFCDD2; }
 .tl-rejected .tl-step-name { color: #B71C1C; }
 .tl-rejected .tl-date   { color: #C62828; }
+
+
+/* ─── Tab navigation (Track page result) ───────────────────────────────── */
+.track-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 0 16px;
+  background: #f8fafc;
+  overflow-x: auto;
+}
+.track-tab-btn {
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color .15s, border-color .15s;
+  margin-bottom: -2px;
+}
+.track-tab-btn:hover { color: #003580; }
+.track-tab-active {
+  color: #003580 !important;
+  border-bottom-color: #003580 !important;
+  font-weight: 700;
+}
+.track-tab-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  background: #003580;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+/* ─── pulse animation used by in-progress timeline step ─────────────────── */
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(2,119,189,.35); }
+  50%       { box-shadow: 0 0 0 6px rgba(2,119,189,0); }
+}

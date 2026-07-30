@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { getApplicationFull, shipmentAction } from '../../api/applicationService';
+import { getApplicationFull, shipmentAction, setNocMeta } from '../../api/applicationService';
+import { useApp } from '../../context/AppContext';
 import DocViewerModal from '../../components/shared/DocViewerModal';
 import NocChecklistPage from '../../components/checklist/NocChecklistPage';
 import ShipmentsTab from './ShipmentsTab';
@@ -155,7 +156,202 @@ function filenameMatchesDocType(fileName, docType) {
   return false;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   NocSetupPanel — Reviewer sets NOC validity + sanctioned quantity
+   after the application is Approved. This triggers Step II (reconciliation)
+   to become active for the applicant.
+   ══════════════════════════════════════════════════════════════════════════ */
+function NocSetupPanel({ app, currentUser, onSaved }) {
+  const existingMeta = app.nocMeta || null;
+
+  /* Pre-fill with today + 1 year if not yet set */
+  const todayStr = new Date().toISOString().split('T')[0];
+  const nextYearStr = (() => {
+    const d = new Date(); d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString().split('T')[0];
+  })();
+
+  const [sanctionedQty,  setSanctionedQty]  = useState(existingMeta?.sanctionedQty  || '');
+  const [qtyUnit,        setQtyUnit]        = useState(existingMeta?.qtyUnit         || 'units');
+  const [nocIssuedDate,  setNocIssuedDate]  = useState(
+    existingMeta?.nocIssuedDate
+      ? new Date(existingMeta.nocIssuedDate).toISOString().split('T')[0]
+      : todayStr
+  );
+  const [nocExpiryDate,  setNocExpiryDate]  = useState(
+    existingMeta?.nocExpiryDate
+      ? new Date(existingMeta.nocExpiryDate).toISOString().split('T')[0]
+      : nextYearStr
+  );
+  const [busy,  setBusy]  = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  /* auto-set expiry to 1 year from issued date */
+  const handleIssuedChange = (val) => {
+    setNocIssuedDate(val);
+    if (val) {
+      const d = new Date(val);
+      d.setFullYear(d.getFullYear() + 1);
+      setNocExpiryDate(d.toISOString().split('T')[0]);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!sanctionedQty.trim()) { setError('Sanctioned Quantity is required.'); return; }
+    setBusy(true); setError(''); setSaved(false);
+    const res = await setNocMeta(app.applicationNumber, {
+      sanctionedQty: sanctionedQty.trim(),
+      qtyUnit,
+      nocIssuedDate,
+      nocExpiryDate,
+      officer: currentUser || 'reviewer',
+    });
+    setBusy(false);
+    if (res.success) { setSaved(true); onSaved && onSaved(); }
+    else setError(res.error || 'Failed to save NOC metadata.');
+  };
+
+  const isApproved = app.status === 'Approved';
+
+  return (
+    <div>
+      {/* Info banner */}
+      <div style={{
+        background: '#f0f7ff', border: '1.5px solid #bfdbfe',
+        borderRadius: 10, padding: '14px 16px', marginBottom: 20,
+      }}>
+        <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1e3a8a', marginBottom: 6 }}>
+          🏷 Export NOC Metadata — Step I Completion
+        </div>
+        <div style={{ fontSize: 12.5, color: '#1e40af', lineHeight: 1.6 }}>
+          Per the CDSCO Guidance Document, once the NOC is issued it carries a <strong>1-year validity</strong>
+          (or until the sanctioned quantity is exhausted, whichever is earlier). Set these values to
+          activate the applicant's <strong>Step II Reconciliation module</strong>.
+        </div>
+        {!isApproved && (
+          <div style={{
+            marginTop: 10, padding: '8px 12px',
+            background: '#fffbeb', border: '1px solid #fde68a',
+            borderRadius: 7, fontSize: 12, color: '#92400e',
+          }}>
+            ⚠️ The application status is currently <strong>{app.status}</strong>.
+            You can pre-fill NOC details, but they will only become active for the applicant
+            once the status is set to <strong>Approved</strong>.
+          </div>
+        )}
+      </div>
+
+      {/* Current meta (if already set) */}
+      {existingMeta && (
+        <div style={{
+          background: '#f0fdf4', border: '1.5px solid #86efac',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 12.5, color: '#15803d', marginBottom: 8 }}>
+            ✅ NOC Already Issued — Current Values
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 16px', fontSize: 12.5 }}>
+            {[
+              ['Issued Date',     existingMeta.nocIssuedDate  ? new Date(existingMeta.nocIssuedDate).toLocaleDateString('en-IN')  : '—'],
+              ['Expiry Date',     existingMeta.nocExpiryDate  ? new Date(existingMeta.nocExpiryDate).toLocaleDateString('en-IN')  : '—'],
+              ['Sanctioned Qty',  `${existingMeta.sanctionedQty || '—'} ${existingMeta.qtyUnit || ''}`],
+              ['Qty Exported',    `${existingMeta.qtyExported  || '0'} ${existingMeta.qtyUnit || ''}`],
+              ['Qty Remaining',   `${existingMeta.qtyRemaining || '—'} ${existingMeta.qtyUnit || ''}`],
+              ['NOC Status',      existingMeta.nocStatus || '—'],
+            ].map(([l, v]) => (
+              <div key={l}>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{l}</div>
+                <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600, marginTop: 2 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Form */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {[
+          { label: 'NOC Issued Date', type: 'date', val: nocIssuedDate,
+            onChange: (e) => handleIssuedChange(e.target.value) },
+          { label: 'NOC Expiry Date (auto: issued + 1 year)', type: 'date', val: nocExpiryDate,
+            onChange: (e) => setNocExpiryDate(e.target.value) },
+        ].map(({ label, type, val, onChange }) => (
+          <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>{label}</label>
+            <input type={type} value={val} onChange={onChange}
+              style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 13, outline: 'none' }} />
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>
+            Sanctioned Quantity <span style={{ color: '#dc2626' }}>*</span>
+          </label>
+          <input type="text" value={sanctionedQty}
+            onChange={e => setSanctionedQty(e.target.value)}
+            placeholder="e.g. 50000"
+            style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 13, outline: 'none' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>Quantity Unit</label>
+          <select value={qtyUnit} onChange={e => setQtyUnit(e.target.value)}
+            style={{ padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 13, outline: 'none', background: '#fff' }}>
+            {['units', 'kg', 'litres', 'boxes', 'vials', 'tablets', 'capsules', 'ampoules'].map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Guidance rule reminder */}
+      <div style={{
+        marginTop: 16, padding: '10px 14px',
+        background: '#fefce8', border: '1px solid #fde68a',
+        borderRadius: 8, fontSize: 12, color: '#713f12', lineHeight: 1.6,
+      }}>
+        <strong>📌 Key Rules (Guidance Document):</strong>
+        <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+          <li>NOC validity: <strong>1 year</strong> from date of issue OR exhaustion of sanctioned quantity — whichever is earlier.</li>
+          <li>Qty/PO-specific NOC is <strong>discontinued</strong> except for NDPS and banned drugs.</li>
+          <li>Formulations with &lt;60% residual shelf life must be <strong>destroyed in presence of SLA</strong>.</li>
+          <li>APIs with &lt;3 months residual shelf life must be <strong>destroyed in presence of SLA</strong>.</li>
+          <li>Timeline: Step I — 5 working days; Step II — 2 working days.</li>
+        </ul>
+      </div>
+
+      {/* Error / saved */}
+      {error && (
+        <div style={{ marginTop: 12, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 7, fontSize: 12.5, color: '#dc2626' }}>
+          ⚠️ {error}
+        </div>
+      )}
+      {saved && (
+        <div style={{ marginTop: 12, padding: '8px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 7, fontSize: 12.5, color: '#15803d', fontWeight: 600 }}>
+          ✅ NOC metadata saved successfully. The applicant's Reconciliation module is now active.
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <button
+          onClick={handleSave}
+          disabled={busy}
+          style={{
+            padding: '10px 22px', background: '#003580', color: '#fff',
+            border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13,
+            cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1,
+          }}
+        >
+          {busy ? '⏳ Saving…' : existingMeta ? '🔄 Update NOC Metadata' : '🏷 Issue NOC & Activate Step II'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ReviewApplicationDetail({ app, onClose, onAction, actionLoading }) {
+  const { currentUser } = useApp();
   const [full, setFull] = useState(null);
   const [loadingFull, setLoadingFull] = useState(true);
   const [actionStatus, setActionStatus] = useState('');
@@ -368,8 +564,22 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
       {/* Tabs */}
       <div className="rv-tabs">
-        {[['details', '📋 Details'], ['shipments', '🚚 Shipments'], ['docs', '📁 Documents'], ['checklist', '🔍 Checklist Query'], ['audit', '📜 Audit']].map(([k, l]) => (
-          <button key={k} className={`rv-tab-btn ${activeTab === k ? 'active' : ''}`} onClick={() => setActiveTab(k)}>{l}</button>
+        {[
+          ['details',   '📋', 'Details'],
+          ['shipments', '🚚', 'Shipments'],
+          ['docs',      '📁', 'Documents'],
+          ['checklist', '🔍', 'Checklist\nQuery'],
+          ['noc',       '🏷', 'NOC\nSetup'],
+          ['audit',     '📜', 'Audit'],
+        ].map(([k, icon, label]) => (
+          <button
+            key={k}
+            className={`rv-tab-btn ${activeTab === k ? 'active' : ''}`}
+            onClick={() => setActiveTab(k)}
+          >
+            <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, lineHeight: 1.2, textAlign: 'center', whiteSpace: 'pre' }}>{label}</span>
+          </button>
         ))}
       </div>
 
@@ -554,6 +764,20 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
             applicationNumber={data.applicationNumber}
             role="reviewer"
           />
+        )}
+
+        {/* ── NOC SETUP (reviewer sets validity + sanctioned qty after approval) ── */}
+        {!loadingFull && activeTab === 'noc' && (
+          <div style={{ padding: '14px' }}>
+            <NocSetupPanel
+              app={data}
+              currentUser={currentUser}
+              onSaved={async () => {
+                const res = await getApplicationFull(data.applicationNumber);
+                if (res.success) setFull(res.application);
+              }}
+            />
+          </div>
         )}
 
         {/* ── AUDIT ── */}

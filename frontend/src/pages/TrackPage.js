@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { searchApplication, getApplication, listApplications } from '../api/applicationService';
 import NocChecklistPage from '../components/checklist/NocChecklistPage';
+import ReconciliationPage from '../components/reconciliation/ReconciliationPage';
 import './TrackPage.css';
 
 function StatusBadge({ status }) {
@@ -44,6 +45,7 @@ export default function TrackPage() {
   const [recentApps, setRecentApps] = useState([]);
   const [dbOnline,   setDbOnline]   = useState(true);
   const [checklistAppNo, setChecklistAppNo] = useState(null); // if set, show NocChecklistPage
+  const [activeTab,  setActiveTab]  = useState('summary');    // 'summary' | 'checklist' | 'reconciliation'
 
   // Load recent applications on mount — DB only, no mock fallback
   useEffect(() => {
@@ -71,22 +73,19 @@ export default function TrackPage() {
   };
 
   const handleSearch = async () => {
-    setError(''); setResult(null);
+    setError(''); setResult(null); setActiveTab('summary');
     if (!appNo.trim() && !refNo.trim()) {
       setError('Please enter an Application Number or Reference Number to search.');
       return;
     }
     setLoading(true); setSearched(true);
     try {
-      // Try live DB first
       const res = await searchApplication(appNo.trim() || null, refNo.trim() || null);
       if (res.success && res.results?.length > 0) {
-        // Get full details for the first match
         const detail = await getApplication(res.results[0].applicationNumber);
         const fullApp = detail.success ? detail.application : res.results[0];
         setResult(buildResult(fullApp));
       } else {
-        // Not found in DB
         setResult(null);
       }
       if (!res.success) {
@@ -103,6 +102,7 @@ export default function TrackPage() {
     setError('');
     setSearched(true);
     setLoading(true);
+    setActiveTab('summary');
     try {
       const id = app.applicationNumber || app.id;
       const detail = await getApplication(id);
@@ -112,19 +112,6 @@ export default function TrackPage() {
       setLoading(false);
     }
   };
-
-  if (checklistAppNo) {
-    return (
-      <div className="track-page">
-        <div className="track-container" style={{ paddingTop: 16 }}>
-          <button className="btn btn-outline btn-sm" style={{ marginBottom: 12 }} onClick={() => setChecklistAppNo(null)}>
-            ← Back to Track
-          </button>
-          <NocChecklistPage applicationNumber={checklistAppNo} role="applicant" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="track-page">
@@ -225,130 +212,166 @@ export default function TrackPage() {
         {/* Result */}
         {result && (
           <div className="track-result fade-in">
+            {/* ── Application header card ── */}
             <div className="card mb-3">
               <div className="card-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{display:'flex',alignItems:'center',gap:8}}><span>📋</span><h3 style={{margin:0}}>Application Summary</h3></span>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setChecklistAppNo(result.app.applicationNumber)}
-                  title="Open the Export NOC Check-List / query & reply page"
-                >
-                  🔍 Open Query Page
-                </button>
-              </div>
-              <div className="card-body">
-                <div className="track-summary-grid">
-                  {[
-                    ['Application Number', result.app.applicationNumber],
-                    ['Reference Number',   result.app.referenceNumber],
-                    ['Applicant Name',     result.app.applicantName],
-                    ['Organization',       result.app.applicantOrganization],
-                    ['Destination Country',result.app.destinationCountry],
-                    ['Export Category',    result.app.exportCategory],
-                    ['Application Date',   result.app.applicationDate],
-                    ['Application Type',   result.app.applicationType],
-                    ['Contact Email',      result.app.email],
-                    ['Products',           result.app.products ? `${result.app.products.length} product(s)` : '—'],
-                    ['Submitted At',       result.app.submittedAt ? new Date(result.app.submittedAt).toLocaleString('en-IN') : '—'],
-                    ['Current Status',     null],
-                  ].map(([label, value]) => (
-                    <div key={label} className="track-summary-item">
-                      <span className="ts-label">{label}</span>
-                      <span className="ts-value">
-                        {label === 'Current Status'
-                          ? <StatusBadge status={result.app.status} />
-                          : label === 'Application Number'
-                            ? <strong style={{color:'#003580'}}>{value}</strong>
-                            : value || '—'}
-                      </span>
-                    </div>
-                  ))}
+                <span style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span>📋</span>
+                  <h3 style={{margin:0}}>Application Summary</h3>
+                </span>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <StatusBadge status={result.app.status} />
                 </div>
+              </div>
 
-                {/* Manufacturer details */}
-                {result.app.manufacturerName && (
-                  <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0'}}>
-                    <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:8}}>🏭 Manufacturer</div>
-                    <div className="track-summary-grid">
-                      {[
-                        ['Manufacturer',    result.app.manufacturerName],
-                        ['License No.',     result.app.mfgLicenseNo],
-                        ['Signatory',       result.app.signatoryName],
-                        ['Designation',     result.app.signatoryDesignation],
-                      ].filter(([,v])=>v).map(([l,v]) => (
-                        <div key={l} className="track-summary-item">
-                          <span className="ts-label">{l}</span>
-                          <span className="ts-value">{v}</span>
-                        </div>
-                      ))}
-                    </div>
+              {/* ── Tab navigation ── */}
+              <div className="track-tabs">
+                {[
+                  ['summary',       '📋 Details & Timeline'],
+                  ['checklist',     '🔍 Query Page'],
+                  ['reconciliation','🚢 Step II Reconciliation'],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    className={`track-tab-btn ${activeTab === key ? 'track-tab-active' : ''}`}
+                    onClick={() => setActiveTab(key)}
+                  >
+                    {label}
+                    {key === 'reconciliation' && (
+                      <span className="track-tab-badge">NEW</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Tab: Summary ── */}
+              {activeTab === 'summary' && (
+                <div className="card-body">
+                  <div className="track-summary-grid">
+                    {[
+                      ['Application Number', result.app.applicationNumber],
+                      ['Reference Number',   result.app.referenceNumber],
+                      ['Applicant Name',     result.app.applicantName],
+                      ['Organization',       result.app.applicantOrganization],
+                      ['Destination Country',result.app.destinationCountry],
+                      ['Export Category',    result.app.exportCategory],
+                      ['Application Date',   result.app.applicationDate],
+                      ['Application Type',   result.app.applicationType],
+                      ['Contact Email',      result.app.email],
+                      ['Products',           result.app.products ? `${result.app.products.length} product(s)` : '—'],
+                      ['Submitted At',       result.app.submittedAt ? new Date(result.app.submittedAt).toLocaleString('en-IN') : '—'],
+                      ['Current Status',     null],
+                    ].map(([label, value]) => (
+                      <div key={label} className="track-summary-item">
+                        <span className="ts-label">{label}</span>
+                        <span className="ts-value">
+                          {label === 'Current Status'
+                            ? <StatusBadge status={result.app.status} />
+                            : label === 'Application Number'
+                              ? <strong style={{color:'#003580'}}>{value}</strong>
+                              : value || '—'}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                )}
 
-                {/* Products table */}
-                {result.app.products?.length > 0 && result.app.products[0]?.productName && (
-                  <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0'}}>
-                    <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:8}}>💊 Products</div>
-                    <div className="table-wrapper">
-                      <table>
-                        <thead>
-                          <tr><th>#</th><th>Product</th><th>Generic</th><th>Form</th><th>Strength</th><th>Batch</th></tr>
-                        </thead>
-                        <tbody>
-                          {result.app.products.map((p, i) => (
-                            <tr key={i}>
-                              <td>{i+1}</td>
-                              <td><strong>{p.productName}</strong></td>
-                              <td>{p.genericName}</td>
-                              <td><span className="badge badge-info">{p.dosageForm}</span></td>
-                              <td>{p.strength}</td>
-                              <td><code>{p.batchNumber}</code></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Documents */}
-                {result.app.documents && Object.keys(result.app.documents).length > 0 && (
-                  <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0'}}>
-                    <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:8}}>📁 Uploaded Documents</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                      {Object.entries(result.app.documents).map(([id, doc]) => (
-                        <div key={id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:7}}>
-                          <span style={{fontSize:18}}>✅</span>
-                          <div>
-                            <div style={{fontSize:12.5,fontWeight:600,color:'#15803d'}}>{doc.name}</div>
-                            <div style={{fontSize:11,color:'#64748b'}}>{doc.uploadedAt}</div>
+                  {/* Manufacturer */}
+                  {result.app.manufacturerName && (
+                    <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0'}}>
+                      <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:8}}>🏭 Manufacturer</div>
+                      <div className="track-summary-grid">
+                        {[
+                          ['Manufacturer', result.app.manufacturerName],
+                          ['License No.',  result.app.mfgLicenseNo],
+                          ['Signatory',    result.app.signatoryName],
+                          ['Designation',  result.app.signatoryDesignation],
+                        ].filter(([,v])=>v).map(([l,v]) => (
+                          <div key={l} className="track-summary-item">
+                            <span className="ts-label">{l}</span>
+                            <span className="ts-value">{v}</span>
                           </div>
-                        </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Products */}
+                  {result.app.products?.length > 0 && result.app.products[0]?.productName && (
+                    <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0'}}>
+                      <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:8}}>💊 Products</div>
+                      <div className="table-wrapper">
+                        <table>
+                          <thead>
+                            <tr><th>#</th><th>Product</th><th>Generic</th><th>Form</th><th>Strength</th><th>Batch</th></tr>
+                          </thead>
+                          <tbody>
+                            {result.app.products.map((p, i) => (
+                              <tr key={i}>
+                                <td>{i+1}</td>
+                                <td><strong>{p.productName}</strong></td>
+                                <td>{p.genericName}</td>
+                                <td><span className="badge badge-info">{p.dosageForm}</span></td>
+                                <td>{p.strength}</td>
+                                <td><code>{p.batchNumber}</code></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Uploaded Documents */}
+                  {result.app.documents && Object.keys(result.app.documents).length > 0 && (
+                    <div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #e2e8f0'}}>
+                      <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:8}}>📁 Uploaded Documents</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                        {Object.entries(result.app.documents).map(([id, doc]) => (
+                          <div key={id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:7}}>
+                            <span style={{fontSize:18}}>✅</span>
+                            <div>
+                              <div style={{fontSize:12.5,fontWeight:600,color:'#15803d'}}>{doc.name}</div>
+                              <div style={{fontSize:11,color:'#64748b'}}>{doc.uploadedAt}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timeline */}
+                  <div style={{marginTop:20,paddingTop:16,borderTop:'1px solid #e2e8f0'}}>
+                    <div style={{fontWeight:700,fontSize:13,color:'#475569',marginBottom:12}}>📅 Application Timeline</div>
+                    <div className="timeline-legend">
+                      <span className="tl-legend-item"><span className="tl-dot tl-dot-completed"/>Completed</span>
+                      <span className="tl-legend-item"><span className="tl-dot tl-dot-inprogress"/>In Progress</span>
+                      <span className="tl-legend-item"><span className="tl-dot tl-dot-pending"/>Pending</span>
+                    </div>
+                    <div className="timeline">
+                      {result.timeline.map((step, i) => (
+                        <TimelineStep key={i} step={step} isLast={i === result.timeline.length - 1} />
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              )}
 
-            {/* Timeline */}
-            <div className="card">
-              <div className="card-header"><span>📅</span><h3>Application Status Timeline</h3></div>
-              <div className="card-body">
-                <div className="timeline-legend">
-                  <span className="tl-legend-item"><span className="tl-dot tl-dot-completed"/>Completed</span>
-                  <span className="tl-legend-item"><span className="tl-dot tl-dot-inprogress"/>In Progress</span>
-                  <span className="tl-legend-item"><span className="tl-dot tl-dot-pending"/>Pending</span>
+              {/* ── Tab: Checklist ── */}
+              {activeTab === 'checklist' && (
+                <div className="card-body">
+                  <NocChecklistPage
+                    applicationNumber={result.app.applicationNumber}
+                    role="applicant"
+                  />
                 </div>
-                <div className="timeline">
-                  {result.timeline.length > 0
-                    ? result.timeline.map((step, i) => (
-                        <TimelineStep key={i} step={step} isLast={i === result.timeline.length - 1} />
-                      ))
-                    : <div className="alert alert-info"><span>ℹ️</span><span>Timeline not available.</span></div>
-                  }
+              )}
+
+              {/* ── Tab: Reconciliation (Step II) ── */}
+              {activeTab === 'reconciliation' && (
+                <div className="card-body">
+                  <ReconciliationPage applicationNumber={result.app.applicationNumber} />
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

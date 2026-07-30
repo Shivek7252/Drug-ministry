@@ -224,11 +224,32 @@
 .rv-detail-close:hover { background: rgba(255,255,255,.28); }
 
 /* Tabs */
-.rv-tabs { display: flex; border-bottom: 2px solid #e2e8f0; flex-shrink: 0; }
+.rv-tabs {
+  display: flex;
+  border-bottom: 2px solid #e2e8f0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  background: #f8fafc;
+}
 .rv-tab-btn {
-  flex: 1; padding: 10px 6px; border: none; background: #f8fafc; cursor: pointer;
-  font-size: 11.5px; font-weight: 700; color: #64748b; font-family: inherit;
-  border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .15s;
+  flex: none;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  font-family: inherit;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all .15s;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 60px;
 }
 .rv-tab-btn:hover { color: #1a56a0; background: #fff; }
 .rv-tab-btn.active { color: #1a56a0; border-bottom-color: #1a56a0; background: #fff; }
@@ -240,23 +261,45 @@
 .rv-section { border-bottom: 1px solid #f1f5f9; }
 .rv-section-hdr {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 14px; background: #f8fafc; border: none; width: 100%;
-  cursor: pointer; font-size: 12.5px; font-weight: 700; color: #334155;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: none; width: 100%;
+  cursor: pointer;
+  font-size: 13px; font-weight: 700; color: #334155;
   font-family: inherit; transition: background .15s;
+  text-align: left;
 }
 .rv-section-hdr:hover { background: #f0f4f8; }
-.rv-section-body { padding: 10px 14px 12px; }
+.rv-section-body { padding: 10px 14px 14px; }
 
-.rv-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.rv-field { display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; background: #f8fafc; border-radius: 6px; }
-.rv-field-label { font-size: 9px; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: .05em; }
-.rv-field-value { font-size: 12px; color: #1e293b; font-weight: 600; word-break: break-word; }
+.rv-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rv-field {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.rv-field-label {
+  font-size: 9.5px; text-transform: uppercase; color: #94a3b8;
+  font-weight: 700; letter-spacing: .06em;
+}
+.rv-field-value { font-size: 12.5px; color: #0f172a; font-weight: 600; word-break: break-word; }
 
 /* Products mini table */
 .rv-mini-table-wrap { overflow-x: auto; }
-.rv-mini-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-.rv-mini-table th { background: #f0f4f8; padding: 6px 8px; font-size: 10px; font-weight: 700; color: #64748b; text-align: left; }
-.rv-mini-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
+.rv-mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rv-mini-table th {
+  background: #f0f4f8; padding: 8px 10px;
+  font-size: 10px; font-weight: 700; color: #64748b; text-align: left;
+  text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 1.5px solid #e2e8f0;
+}
+.rv-mini-table td {
+  padding: 8px 10px; border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.rv-mini-table tbody tr:hover { background: #f8fafc; }
 .rv-mini-table tr:last-child td { border-bottom: none; }
 
 /* Documents */
@@ -373,7 +416,42 @@
 .cl-badge-no  { background: #fee2e2; color: #dc2626; }
 .cl-badge-unk { background: #f1f5f9; color: #94a3b8; }
 
-/* Audit log */
+/* Shipments tab group-by switcher */
+.rv-shipments-tab .rv-tab-btn {
+  flex-direction: row;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  min-width: unset;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  border-radius: 0;
+  margin-bottom: -2px;
+  color: #64748b;
+}
+.rv-shipments-tab .rv-tab-btn:hover {
+  background: #f0f4f8;
+  color: #1a56a0;
+  border-radius: 0;
+}
+.rv-shipments-tab .rv-tab-btn.active {
+  background: transparent;
+  color: #1a56a0;
+  border-bottom: 2px solid #1a56a0;
+  border-radius: 0;
+}
+.rv-shipments-tab { padding: 0; }
+.rv-shipments-groupby {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 0 14px;
+  flex-wrap: wrap;
+  background: #f8fafc;
+}
+
+/* ── Audit log panel ─────────────────────────────────────── */
 .rv-audit-panel { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
 .rv-audit-entry { display: flex; gap: 10px; }
 .rv-audit-dot-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
@@ -397,19 +475,19 @@
   padding: 12px 14px; border-top: 2px solid #e2e8f0;
   background: #fafbfc; flex-shrink: 0;
 }
-.rv-action-btns { display: flex; gap: 7px; flex-wrap: wrap; }
+.rv-action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .rv-act-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 7px 13px; border-radius: 7px; border: 1.5px solid;
-  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
-  transition: all .15s; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 24px; border: 1.5px solid;
+  font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: all .15s; white-space: nowrap; background: #fff;
 }
-.rv-act-btn:hover { filter: brightness(.93); }
-.rv-act-btn-review { background:#fefce8; color:#a16207; border-color:#fde68a; }
-.rv-act-btn-approve{ background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
-.rv-act-btn-query  { background:#fff7ed; color:#c2410c; border-color:#fdba74; }
-.rv-act-btn-reject { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
-.rv-act-btn-summary{ background:#f0f9ff; color:#0369a1; border-color:#bae6fd; }
+.rv-act-btn:hover { filter: brightness(.93); transform: translateY(-1px); }
+.rv-act-btn-review  { color: #b45309;  border-color: #fde68a; background: #fffbeb; }
+.rv-act-btn-approve { color: #15803d;  border-color: #86efac; background: #f0fdf4; }
+.rv-act-btn-query   { color: #c2410c;  border-color: #fdba74; background: #fff7ed; }
+.rv-act-btn-reject  { color: #dc2626;  border-color: #fca5a5; background: #fef2f2; }
+.rv-act-btn-summary { color: #0369a1;  border-color: #7dd3fc; background: #f0f9ff; }
 
 .rv-action-form { display: flex; flex-direction: column; gap: 8px; }
 .rv-action-form-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

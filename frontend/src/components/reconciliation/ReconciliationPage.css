@@ -1,0 +1,485 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   ReconciliationPage.css — Step II Export NOC Reconciliation Module
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.recon-page {
+  padding: 4px 0 32px;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+.recon-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.recon-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f2d5e;
+  margin: 0 0 4px;
+}
+.recon-sub {
+  font-size: 12.5px;
+  color: #64748b;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.recon-btn-add {
+  padding: 9px 18px;
+  background: #003580;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.recon-btn-add:hover { background: #0055cc; }
+
+.recon-btn-draft {
+  padding: 9px 18px;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.recon-btn-draft:hover { background: #e2e8f0; }
+
+.recon-btn-submit {
+  padding: 9px 18px;
+  background: #15803d;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.recon-btn-submit:hover { background: #166534; }
+
+.recon-btn-ghost {
+  padding: 9px 14px;
+  background: transparent;
+  color: #64748b;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.recon-btn-ghost:hover { background: #f8fafc; }
+
+.recon-btn-edit {
+  padding: 4px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.recon-btn-del {
+  padding: 4px 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.recon-btn-del-confirm {
+  padding: 9px 18px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.recon-retry-btn {
+  margin-left: 12px;
+  padding: 4px 10px;
+  background: #fff;
+  border: 1px solid #fca5a5;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #dc2626;
+}
+
+/* ── NOC Banner ──────────────────────────────────────────────────────────── */
+.recon-noc-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1.5px solid;
+  margin-bottom: 14px;
+}
+.recon-noc-active  { background: #f0fdf4; border-color: #86efac; }
+.recon-noc-warning { background: #fffbeb; border-color: #fde68a; }
+.recon-noc-expired { background: #fef2f2; border-color: #fecaca; }
+.recon-noc-pending { background: #f8fafc; border-color: #e2e8f0; }
+
+.recon-noc-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+.recon-noc-body { flex: 1; min-width: 0; }
+.recon-noc-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
+}
+.recon-noc-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 5px;
+}
+.recon-noc-meta-row strong { color: #0f172a; }
+.recon-noc-rule {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #64748b;
+  background: rgba(0,0,0,.03);
+  padding: 6px 10px;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+/* ── Summary bar ─────────────────────────────────────────────────────────── */
+.recon-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.recon-sum-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+  gap: 2px;
+}
+.recon-sum-divider { width: 1px; height: 36px; background: #e2e8f0; }
+.recon-sum-num   { font-size: 20px; font-weight: 800; color: #003580; }
+.recon-sum-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.recon-sum-draft     { color: #64748b; }
+.recon-sum-submitted { color: #d97706; }
+.recon-sum-released  { color: #15803d; }
+.recon-sum-exported  { color: #003580; }
+
+/* ── Table card ──────────────────────────────────────────────────────────── */
+.recon-table-card {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.recon-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.recon-table-title { font-size: 13.5px; font-weight: 700; color: #0f2d5e; }
+.recon-table-hint  { font-size: 11px; color: #94a3b8; }
+
+.recon-table-scroll { overflow-x: auto; }
+.recon-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 900px;
+}
+.recon-table th {
+  background: #f8fafc;
+  padding: 9px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1.5px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: left;
+}
+.recon-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  vertical-align: middle;
+}
+.recon-table tbody tr:hover { background: #f8fafc; }
+
+.recon-td-idx     { color: #94a3b8; font-size: 12px; text-align: center; }
+.recon-td-num     { font-family: monospace; font-size: 12.5px; text-align: right; }
+.recon-td-exported { font-weight: 700; color: #003580; }
+.recon-td-product { font-weight: 600; color: #0f172a; }
+.recon-td-batch   { font-size: 11px; color: #64748b; font-family: monospace; }
+.recon-td-trade   { font-size: 11px; color: #64748b; font-family: monospace; }
+
+.recon-doc-link { color: #1d4ed8; font-size: 12px; text-decoration: none; }
+.recon-doc-link:hover { text-decoration: underline; }
+.recon-no-doc { color: #94a3b8; font-size: 12px; }
+
+.recon-row-actions { display: flex; gap: 4px; }
+
+/* ── Status chips ────────────────────────────────────────────────────────── */
+.recon-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.recon-chip-draft     { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.recon-chip-submitted { background: #fffbeb; color: #a16207; border: 1px solid #fde68a; }
+.recon-chip-verified  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.recon-chip-released  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+/* ── Shelf life badges ───────────────────────────────────────────────────── */
+.recon-shelf {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.recon-shelf-ok      { background: #f0fdf4; color: #15803d; }
+.recon-shelf-warn    { background: #fffbeb; color: #a16207; }
+.recon-shelf-destroy { background: #fef2f2; color: #dc2626; font-weight: 700; }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.recon-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  text-align: center;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────── */
+.recon-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  color: #64748b;
+  font-size: 13px;
+}
+.recon-spinner {
+  width: 20px; height: 20px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #003580;
+  border-radius: 50%;
+  animation: recon-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes recon-spin { to { transform: rotate(360deg); } }
+
+/* ── Alert ───────────────────────────────────────────────────────────────── */
+.recon-alert-err {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── Modal overlay ───────────────────────────────────────────────────────── */
+.recon-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.recon-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 780px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.recon-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+.recon-modal-header h3 { font-size: 15px; font-weight: 800; color: #0f2d5e; margin: 0; }
+.recon-modal-close {
+  background: none; border: none; font-size: 18px;
+  cursor: pointer; color: #94a3b8; line-height: 1;
+  padding: 4px 6px; border-radius: 4px;
+}
+.recon-modal-close:hover { background: #f1f5f9; color: #334155; }
+.recon-modal-body {
+  overflow-y: auto;
+  padding: 18px 20px;
+  flex: 1;
+}
+.recon-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+
+/* ── Form grid ───────────────────────────────────────────────────────────── */
+.recon-section-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #003580;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 18px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid #e2e8f0;
+}
+.recon-section-label:first-child { margin-top: 0; }
+
+.recon-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 600px) { .recon-form-grid { grid-template-columns: 1fr; } }
+
+.recon-field { display: flex; flex-direction: column; gap: 4px; }
+.recon-field-full { grid-column: 1 / -1; }
+.recon-field label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+}
+.recon-req { color: #dc2626; margin-left: 2px; }
+.recon-field input,
+.recon-field select {
+  padding: 8px 10px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  background: #fff;
+  transition: border-color .15s;
+}
+.recon-field input:focus,
+.recon-field select:focus { border-color: #003580; }
+.recon-input-readonly {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  cursor: not-allowed;
+}
+
+/* ── Shelf life note ─────────────────────────────────────────────────────── */
+.recon-shelf-note {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 7px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.6;
+}
+
+/* ── File drop zone ──────────────────────────────────────────────────────── */
+.recon-file-zone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #64748b;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  margin-top: 4px;
+}
+.recon-file-zone:hover {
+  border-color: #003580;
+  background: #f0f7ff;
+  color: #003580;
+}
+
+/* ── Confirm box ─────────────────────────────────────────────────────────── */
+.recon-confirm-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.recon-confirm-box h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+.recon-confirm-box p {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+.recon-confirm-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* ── Guidance footer note ────────────────────────────────────────────────── */
+.recon-guidance-note {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #1e40af;
+  line-height: 1.6;
+}
+.recon-guidance-note strong { color: #1e3a8a; }

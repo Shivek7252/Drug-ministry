@@ -97,27 +97,29 @@ export default function ShipmentsTab({ data, onLineAction, actionBusy }) {
   return (
     <div className="rv-shipments-tab">
 
-      {/* Grouping switcher */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Group by:</span>
+      {/* Grouping switcher — matches screenshot blue-underline style */}
+      <div className="rv-shipments-groupby">
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', padding: '6px 12px 6px 0', whiteSpace: 'nowrap' }}>Group by:</span>
         {[['country', '🌐 Country'], ['product', '💊 Product'], ['company', '🏭 Company']].map(([k, l]) => (
           <button
             key={k}
             className={`rv-tab-btn ${groupBy === k ? 'active' : ''}`}
-            style={{ padding: '5px 12px', fontSize: 12 }}
             onClick={() => setGroupBy(k)}
           >
             {l}
           </button>
         ))}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: '#64748b' }}>{shipments.length} line{shipments.length === 1 ? '' : 's'}</span>
+        <div style={{ marginLeft: 'auto', padding: '6px 0', fontSize: 12, color: '#94a3b8' }}>
+          {shipments.length} line{shipments.length === 1 ? '' : 's'}
         </div>
       </div>
 
+      {/* Content padded area */}
+      <div style={{ padding: '12px 0' }}>
+
       {/* Summary matrix */}
       {matrix && (
-        <div className="card mb-3" style={{ marginBottom: 16, overflowX: 'auto' }}>
+        <div style={{ marginBottom: 14, overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', padding: '0' }}>
           <table className="rv-mini-table" style={{ minWidth: 600 }}>
             <thead>
               <tr>
@@ -162,13 +164,13 @@ export default function ShipmentsTab({ data, onLineAction, actionBusy }) {
       )}
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12, fontSize: 10.5, color: '#64748b' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '12px 0', fontSize: 11, color: '#94a3b8', padding: '0 2px' }}>
         <span>Cell counts: {STATUS_META.Approved.icon} approved · {STATUS_META.Query.icon} query · {STATUS_META.Rejected.icon} rejected · {STATUS_META.Pending.icon} pending</span>
       </div>
 
       {/* Line-item table */}
-      <div className="card mb-3">
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+      <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', overflow: 'hidden' }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: 13, color: '#0f172a', background: '#f8fafc' }}>
           Shipment line items
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -270,6 +272,7 @@ export default function ShipmentsTab({ data, onLineAction, actionBusy }) {
           </table>
         </div>
       </div>
+      </div>{/* end padded area */}
     </div>
   );
 }
