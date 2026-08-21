@@ -6,6 +6,7 @@ const multer = require('multer');
 const mongoose = require('mongoose');
 const Application = require('../models/Application');
 const { v4: uuidv4 } = require('uuid');
+const { validateProductsApproval } = require('../approvedDrugs');
 
 /* ── Uploads root (PDF binaries live here, NOT in MongoDB) ───────────────── */
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -640,6 +641,20 @@ router.post('/submit', async (req, res) => {
       return res.status(400).json({ error: 'At least one product is required.' });
     }
 
+    // ── CDSCO drug approval validation ──────────────────────────────────────
+    // We run this on every submit. Policy: warn-not-block — applications with
+    // unapproved drugs are still saved and submitted, but:
+    //   • The `drugApprovalCheck` field is persisted on the application document
+    //     so reviewers can see exactly which products need extra scrutiny.
+    //   • The response includes `drugWarnings` so the frontend surfaces them.
+    const drugApprovalCheck = validateProductsApproval(formData.products);
+    if (!drugApprovalCheck.valid) {
+      console.warn(
+        `[submit] Drug approval warnings for ${formData.applicantOrganization || 'applicant'}:`,
+        drugApprovalCheck.unapprovedProducts
+      );
+    }
+
     // Find existing draft or create new
     let app = null;
     if (formData.email) {
@@ -664,6 +679,7 @@ router.post('/submit', async (req, res) => {
         lastSavedAt: submittedAt,
         submittedBy: user,
         timeline,
+        drugApprovalCheck,
       });
       const persisted = persistDocsToDisk(app.applicationNumber, documents);
       assignDocuments(app, persisted);
@@ -675,6 +691,8 @@ router.post('/submit', async (req, res) => {
         applicationNumber: app.applicationNumber,
         referenceNumber: app.referenceNumber,
         message: 'Application submitted successfully',
+        drugWarnings: drugApprovalCheck.warnings,
+        allDrugsApproved: drugApprovalCheck.valid,
       });
     }
 
@@ -691,6 +709,7 @@ router.post('/submit', async (req, res) => {
       submittedAt,
       submittedBy: user,
       timeline,
+      drugApprovalCheck,
       auditLog: [
         { action: 'submitted', detail: 'Application created and submitted', user, timestamp: submittedAt },
       ],
@@ -699,7 +718,14 @@ router.post('/submit', async (req, res) => {
     assignDocuments(newApp, persisted);
     await newApp.save();
     console.log(`[submit] created ${applicationNumber} with ${newApp.documents?.size || 0} documents`);
-    res.json({ success: true, applicationNumber, referenceNumber, message: 'Application submitted successfully' });
+    res.json({
+      success: true,
+      applicationNumber,
+      referenceNumber,
+      message: 'Application submitted successfully',
+      drugWarnings: drugApprovalCheck.warnings,
+      allDrugsApproved: drugApprovalCheck.valid,
+    });
 
   } catch (err) {
     console.error('Submit error:', err.message);

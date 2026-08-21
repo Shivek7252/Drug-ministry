@@ -99,8 +99,10 @@ export function AppProvider({ children }) {
   const [submitted, setSubmitted]       = useState(false);
   const [draftSaved, setDraftSaved]     = useState(false);
   const [notifOpen, setNotifOpen]       = useState(false);
-  const [submittedAppNo, setSubmittedAppNo] = useState('');
-  const [submittedRefNo, setSubmittedRefNo] = useState('');
+  const [submittedAppNo, setSubmittedAppNo]   = useState('');
+  const [submittedRefNo, setSubmittedRefNo]   = useState('');
+  const [drugWarnings, setDrugWarnings]       = useState([]);   // warnings from CDSCO approval check
+  const [allDrugsApproved, setAllDrugsApproved] = useState(true);
   const autoSaveTimer = useRef(null);
 
   // ── Auth ──────────────────────────────────────────────
@@ -279,6 +281,8 @@ export function AppProvider({ children }) {
     if (result.success) {
       setSubmittedAppNo(result.applicationNumber);
       setSubmittedRefNo(result.referenceNumber);
+      setDrugWarnings(result.drugWarnings || []);
+      setAllDrugsApproved(result.allDrugsApproved !== false);
       setSubmitted(true);
     }
     return result;
@@ -290,6 +294,8 @@ export function AppProvider({ children }) {
     setSubmitted(false);
     setSubmittedAppNo('');
     setSubmittedRefNo('');
+    setDrugWarnings([]);
+    setAllDrugsApproved(true);
   };
 
   return (
@@ -305,6 +311,7 @@ export function AppProvider({ children }) {
       submitted, setSubmitted,
       draftSaved, saveDraft: saveDraftManual,
       submittedAppNo, submittedRefNo,
+      drugWarnings, allDrugsApproved,
       submitToBackend,
       notifOpen, setNotifOpen,
       resetForm,

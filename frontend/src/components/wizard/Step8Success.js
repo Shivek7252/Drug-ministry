@@ -15,7 +15,7 @@ function nocExpiryDate() {
 
 export default function Step8Success() {
   const navigate = useNavigate();
-  const { resetForm, formData, submittedAppNo, submittedRefNo } = useApp();
+  const { resetForm, formData, submittedAppNo, submittedRefNo, drugWarnings, allDrugsApproved } = useApp();
   const [show, setShow] = useState(false);
 
   // Use real submitted numbers if available, else fallback
@@ -81,6 +81,54 @@ Helpdesk: 1800-11-4477 | helpdesk-cdsco@nic.in
         <p className="success-subtitle">
           Your Export NOC application has been received and is now under review by CDSCO.
         </p>
+
+        {/* ── CDSCO Drug Approval Warnings ─────────────────────────────── */}
+        {drugWarnings && drugWarnings.length > 0 && (
+          <div style={{
+            margin: '0 auto 20px',
+            maxWidth: 620,
+            background: '#FFF8E1',
+            border: '1.5px solid #FFD54F',
+            borderRadius: 10,
+            padding: '14px 18px',
+            textAlign: 'left',
+          }}>
+            <div style={{ fontWeight: 800, fontSize: 13.5, color: '#E65100', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              ⚠️ CDSCO Drug Approval Notice
+            </div>
+            <p style={{ fontSize: 12.5, color: '#5D4037', marginBottom: 8, lineHeight: 1.6 }}>
+              The following product(s) were <strong>not found in the CDSCO approved drugs list</strong>.
+              Your application has been submitted but reviewers will flag these for additional documentation.
+              Please ensure valid approval certificates are attached.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {drugWarnings.map((w, i) => (
+                <li key={i} style={{ fontSize: 12.5, color: '#5D4037', marginBottom: 4 }}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* All drugs approved — positive confirmation ─────────────────── */}
+        {allDrugsApproved && (!drugWarnings || drugWarnings.length === 0) && (
+          <div style={{
+            margin: '0 auto 20px',
+            maxWidth: 620,
+            background: '#E8F5E9',
+            border: '1.5px solid #A5D6A7',
+            borderRadius: 10,
+            padding: '12px 18px',
+            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <span style={{ fontSize: 22 }}>✅</span>
+            <span style={{ fontSize: 12.5, color: '#1B5E20', fontWeight: 600 }}>
+              All submitted products are verified against the CDSCO approved drugs list.
+            </span>
+          </div>
+        )}
 
         {/* Reference Numbers */}
         <div className="success-ref-cards">
