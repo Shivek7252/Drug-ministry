@@ -10,9 +10,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 /* ─── module-level stores ───────────────────────────────────────────────── */
 const FILE_STORE = new Map();
-const URL_CACHE  = new Map();
+const URL_CACHE = new Map();
 // OCR cache: blobUrl+pageNum → { words: [{text, bbox}] }
-const OCR_CACHE  = new Map();
+const OCR_CACHE = new Map();
 
 function getStableUrl(docId, fallback) {
   if (!URL_CACHE.has(docId) && FILE_STORE.has(docId))
@@ -35,7 +35,7 @@ function fmtSize(b) {
   return (b / 1048576).toFixed(2) + ' MB';
 }
 function fileIcon(t = '') {
-  if (t.includes('pdf'))   return '📄';
+  if (t.includes('pdf')) return '📄';
   if (t.includes('image')) return '🖼️';
   if (t.includes('word') || t.includes('docx')) return '📝';
   return '📎';
@@ -112,7 +112,7 @@ function toRect(item, s, e, vp) {
 // Returns array of word objects: { text: string, bbox: {x0,y0,x1,y1} }
 // bbox is in canvas pixels at the scale we rendered at.
 let tesseractWorker = null;
-let tesseractReady  = false;
+let tesseractReady = false;
 let tesseractLoading = false;
 const tesseractCallbacks = [];
 
@@ -128,21 +128,21 @@ async function getTesseractWorker() {
     await new Promise((res, rej) => {
       const s = document.createElement('script');
       s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      s.onload  = res;
+      s.onload = res;
       s.onerror = rej;
       document.head.appendChild(s);
     });
   }
 
   const worker = await window.Tesseract.createWorker('eng', 1, {
-    workerPath:  'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-    corePath:    'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
-    langPath:    'https://tessdata.projectnaptha.com/4.0.0',
-    logger:      () => {}, // silence progress logs
+    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
+    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+    logger: () => { }, // silence progress logs
   });
 
   tesseractWorker = worker;
-  tesseractReady  = true;
+  tesseractReady = true;
   tesseractLoading = false;
   tesseractCallbacks.forEach(cb => cb(worker));
   tesseractCallbacks.length = 0;
@@ -186,16 +186,16 @@ function getHighlightsFromOcr(query, ocrWords) {
     if (wi < ocrWords.length - 1) { wordMap.push({ wi, ci: -1, sep: true }); joined += ' '; }
   });
 
-  const q   = query.replace(/\s+/g, ' ').trim();
-  const re  = new RegExp(escRx(q), 'gi');
+  const q = query.replace(/\s+/g, ' ').trim();
+  const re = new RegExp(escRx(q), 'gi');
   const rects = [];
   let m;
 
   while ((m = re.exec(joined)) !== null) {
     // Find which words are spanned by this match
     const spanStart = m.index;
-    const spanEnd   = m.index + m[0].length - 1;
-    const spanned   = new Set();
+    const spanEnd = m.index + m[0].length - 1;
+    const spanned = new Set();
     for (let i = spanStart; i <= spanEnd && i < wordMap.length; i++) {
       if (!wordMap[i].sep) spanned.add(wordMap[i].wi);
     }
@@ -203,9 +203,9 @@ function getHighlightsFromOcr(query, ocrWords) {
     for (const wi of spanned) {
       const { bbox } = ocrWords[wi];
       rects.push({
-        left:   bbox.x0,
-        top:    bbox.y0,
-        width:  bbox.x1 - bbox.x0,
+        left: bbox.x0,
+        top: bbox.y0,
+        width: bbox.x1 - bbox.x0,
         height: bbox.y1 - bbox.y0,
       });
     }
@@ -222,11 +222,11 @@ function PdfPage({
 }) {
   const canvasRef = useRef();
   const renderRef = useRef(null);
-  const dataRef   = useRef({ items: [], vp: null, loaded: false, usable: false });
+  const dataRef = useRef({ items: [], vp: null, loaded: false, usable: false });
 
-  const [hl,        setHl]    = useState([]);
+  const [hl, setHl] = useState([]);
   const [textItems, setItems] = useState([]);
-  const [vp,        setVp]    = useState(null);
+  const [vp, setVp] = useState(null);
 
   // ── Render page + extract text ──────────────────────────────────────────
   useEffect(() => {
@@ -235,21 +235,21 @@ function PdfPage({
 
     (async () => {
       try {
-        if (renderRef.current) { try { renderRef.current.cancel(); } catch (_) {} }
-        const page   = await pdf.getPage(pageNum);
+        if (renderRef.current) { try { renderRef.current.cancel(); } catch (_) { } }
+        const page = await pdf.getPage(pageNum);
         if (dead) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const viewport = page.getViewport({ scale });
-        canvas.width  = viewport.width;
+        canvas.width = viewport.width;
         canvas.height = viewport.height;
         renderRef.current = page.render({ canvasContext: canvas.getContext('2d'), viewport });
         try { await renderRef.current.promise; }
         catch (e) { if (e?.name === 'RenderingCancelledException') return; }
         if (dead) return;
 
-        const tc     = await page.getTextContent({ includeMarkedContent: true, disableNormalization: false });
-        const items  = tc.items.filter(i => i.str !== undefined);
+        const tc = await page.getTextContent({ includeMarkedContent: true, disableNormalization: false });
+        const items = tc.items.filter(i => i.str !== undefined);
         const usable = isTextLayerUsable(items);
 
         dataRef.current = { items, vp: viewport, loaded: true, usable };
@@ -306,10 +306,10 @@ function PdfPage({
       {vp && textItems.map((item, i) => {
         if (!item.str) return null;
         const [, , , scY, tx, ty] = item.transform;
-        const fs  = Math.abs(scY) * vp.scale;
-        const iw  = item.width * vp.scale;
+        const fs = Math.abs(scY) * vp.scale;
+        const iw = item.width * vp.scale;
         const ang = Math.atan2(item.transform[1], item.transform[0]) * (180 / Math.PI);
-        const sX  = fs > 0 && iw > 0 ? iw / (item.str.length * fs * 0.6) : 1;
+        const sX = fs > 0 && iw > 0 ? iw / (item.str.length * fs * 0.6) : 1;
         return (
           <span key={i} style={{
             position: 'absolute', left: tx * vp.scale,
@@ -331,8 +331,8 @@ function PdfPage({
           <div key={i} style={{
             position: 'absolute',
             left: r.left, top: r.top, width: r.width, height: r.height,
-            background:   active ? 'rgba(251,191,36,.9)' : 'rgba(254,240,138,.6)',
-            border:       '1.5px solid ' + (active ? '#d97706' : '#f59e0b'),
+            background: active ? 'rgba(251,191,36,.9)' : 'rgba(254,240,138,.6)',
+            border: '1.5px solid ' + (active ? '#d97706' : '#f59e0b'),
             borderRadius: 2, pointerEvents: 'none', zIndex: 10,
             mixBlendMode: 'multiply',
           }} />
@@ -345,20 +345,20 @@ function PdfPage({
 /* ─── PDF Viewer Modal ──────────────────────────────────────────────────── */
 /* ─── doc-type checklist mapping ───────────────────────────────────────── */
 const DOC_CHECKLISTS = {
-  mfg_license:     'manufacturing_license',
-  product_approval:'product_approval',
-  export_auth:     'export_authorization',
-  qa_cert:         'quality_assurance',
-  batch_analysis:  'quality_assurance',
-  product_info:    'default',
+  mfg_license: 'manufacturing_license',
+  product_approval: 'product_approval',
+  export_auth: 'export_authorization',
+  qa_cert: 'quality_assurance',
+  batch_analysis: 'quality_assurance',
+  product_info: 'default',
 };
 
 /* ─── ChecklistPanel ────────────────────────────────────────────────────── */
 function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
-  const [status,  setStatus]  = React.useState('idle');
+  const [status, setStatus] = React.useState('idle');
   const [results, setResults] = React.useState(null);
   const [summary, setSummary] = React.useState(null);
-  const [errMsg,  setErrMsg]  = React.useState('');
+  const [errMsg, setErrMsg] = React.useState('');
   const [activeItem, setActiveItem] = React.useState(null);
 
   const run = async () => {
@@ -372,16 +372,15 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
       const blob = await resp.blob();
       const form = new FormData();
       form.append('file', blob, docLabel + '.pdf');
-      form.append('docType',  DOC_CHECKLISTS[docId] || 'default');
+      form.append('docType', DOC_CHECKLISTS[docId] || 'default');
       form.append('docLabel', docLabel);
-      const apiResp = await fetch('http://localhost:5001/api/verify', { method:'POST', body:form });
+      const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
       const data = await apiResp.json();
       if (!apiResp.ok) {
-        if (data.error?.includes('MISTRAL_API_KEY')) { setStatus('no-key'); setErrMsg(data.error); return; }
-        throw new Error(data.error || 'Verification failed.');
+        throw new Error('Anuvadini AI analysis is temporarily unavailable. Please try again shortly.');
       }
       setResults(data.results); setSummary(data.summary); setStatus('done');
-    } catch(e) { setErrMsg(e.message); setStatus('error'); }
+    } catch (e) { setErrMsg(e.message); setStatus('error'); }
   };
 
   // Extract the most meaningful search term from a checklist item label
@@ -415,8 +414,8 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
   };
 
   const score = summary?.score ?? 0;
-  const sc = score>=75 ? '#16a34a' : score>=50 ? '#d97706' : '#dc2626';
-  const sb = score>=75 ? '#f0fdf4' : score>=50 ? '#fffbeb' : '#fef2f2';
+  const sc = score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626';
+  const sb = score >= 75 ? '#f0fdf4' : score >= 50 ? '#fffbeb' : '#fef2f2';
 
   return (
     <div className="cl-panel">
@@ -428,11 +427,11 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
         </div>
       </div>
       <div className="cl-body">
-        {status==='idle' && (
+        {status === 'idle' && (
           <div className="cl-idle">
-            <div style={{fontSize:40,marginBottom:12}}>📋</div>
-            <p style={{fontWeight:700,color:'#1e293b',marginBottom:6}}>Verify Document Completeness</p>
-            <p style={{fontSize:12,color:'#64748b',marginBottom:16,lineHeight:1.6}}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+            <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>Verify Document Completeness</p>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
               Check if this {docLabel} contains all required information for the Export NOC application.
             </p>
             <button className="cl-btn-primary" onClick={run}>
@@ -440,69 +439,66 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
             </button>
           </div>
         )}
-        {status==='loading' && (
+        {status === 'loading' && (
           <div className="cl-loading">
-            <div className="cl-spin"/>
-            <p style={{fontWeight:600,color:'#1e293b',margin:'12px 0 4px'}}>Analyzing document…</p>
-            <p style={{fontSize:11,color:'#64748b'}}>Sending to ANUVADINI AI (5–15 sec)</p>
+            <div className="cl-spin" />
+            <p style={{ fontWeight: 600, color: '#1e293b', margin: '12px 0 4px' }}>Analyzing document…</p>
+            <p style={{ fontSize: 11, color: '#64748b' }}>Sending to ANUVADINI AI (5–15 sec)</p>
           </div>
         )}
-        {status==='no-key' && (
+        {status === 'no-key' && (
           <div className="cl-error-state">
-            <div style={{fontSize:36,marginBottom:8}}>🔑</div>
-            <p style={{fontWeight:700,color:'#dc2626',marginBottom:8}}>API Key Missing</p>
-            <p style={{fontSize:11,color:'#64748b',lineHeight:1.6,marginBottom:8}}>
-              Set your Mistral key in <code style={{background:'#f1f5f9',padding:'1px 4px',borderRadius:3}}>backend/.env</code>:
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
+            <p style={{ fontWeight: 700, color: '#d97706', marginBottom: 8 }}>Analysis Temporarily Unavailable</p>
+            <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+              The Anuvadini AI analysis service is currently unavailable.
+              Please try again later.
             </p>
-            <code style={{display:'block',background:'#0f172a',color:'#86efac',padding:'8px',borderRadius:6,fontSize:10,fontFamily:'monospace',wordBreak:'break-all'}}>
-              MISTRAL_API_KEY=your_key_here
-            </code>
-            <a href="https://console.mistral.ai/" target="_blank" rel="noreferrer"
-              style={{display:'block',marginTop:10,fontSize:11,color:'#3b82f6',textAlign:'center'}}>
-              Get API key →
-            </a>
-          </div>
-        )}
-        {status==='error' && (
-          <div className="cl-error-state">
-            <div style={{fontSize:36,marginBottom:8}}>⚠️</div>
-            <p style={{fontWeight:700,color:'#dc2626',marginBottom:6}}>Verification Failed</p>
-            <p style={{fontSize:11,color:'#64748b',marginBottom:8}}>{errMsg}</p>
-            <p style={{fontSize:10,color:'#94a3b8',marginBottom:12}}>Ensure backend is running:<br/><code>cd backend && npm start</code></p>
             <button className="cl-btn-primary" onClick={run}>Retry</button>
           </div>
         )}
-        {status==='done' && summary && (
+        {status === 'error' && (
+          <div className="cl-error-state">
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
+            <p style={{ fontWeight: 700, color: '#d97706', marginBottom: 6 }}>Analysis Temporarily Unavailable</p>
+            <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+              The Anuvadini AI analysis service encountered a network issue.
+              Please ensure the backend is running and try again.
+            </p>
+            <button className="cl-btn-primary" onClick={run}>Retry</button>
+          </div>
+        )}
+        {status === 'done' && summary && (
           <div>
-            <div className="cl-score" style={{background:sb,borderColor:sc+'55'}}>
-              <div className="cl-score-num" style={{color:sc}}>{score}%</div>
+            <div className="cl-score" style={{ background: sb, borderColor: sc + '55' }}>
+              <div className="cl-score-num" style={{ color: sc }}>{score}%</div>
               <div className="cl-score-label">Completeness Score</div>
-              <div className="cl-score-bar-wrap"><div className="cl-score-bar-fill" style={{width:`${score}%`,background:sc}}/></div>
+              <div className="cl-score-bar-wrap"><div className="cl-score-bar-fill" style={{ width: `${score}%`, background: sc }} /></div>
               <div className="cl-score-row">
                 <span className="cl-cnt yes">✓ {summary.present}</span>
                 <span className="cl-cnt no">✗ {summary.missing}</span>
-                {summary.unknown>0&&<span className="cl-cnt unk">? {summary.unknown}</span>}
+                {summary.unknown > 0 && <span className="cl-cnt unk">? {summary.unknown}</span>}
               </div>
             </div>
 
             {/* Click-to-locate hint */}
             <div className="cl-locate-hint">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               Click a ✅ item to locate it in the document
             </div>
 
             <div className="cl-items-list">
-              {results.map((r,i) => {
-                const isActive   = activeItem === i;
-                const isPresent  = r.present === true;
-                const isMissing  = r.present === false;
-                const isSearching= isActive && activeQuery;
+              {results.map((r, i) => {
+                const isActive = activeItem === i;
+                const isPresent = r.present === true;
+                const isMissing = r.present === false;
+                const isSearching = isActive && activeQuery;
                 return (
                   <div
                     key={i}
-                    className={`cl-item ${isMissing?'cl-item-no':isPresent?'cl-item-yes':'cl-item-unk'} ${isPresent?'cl-item-clickable':''} ${isActive?'cl-item-active':''}`}
+                    className={`cl-item ${isMissing ? 'cl-item-no' : isPresent ? 'cl-item-yes' : 'cl-item-unk'} ${isPresent ? 'cl-item-clickable' : ''} ${isActive ? 'cl-item-active' : ''}`}
                     onClick={() => handleItemClick(r, i)}
                     title={isPresent ? `Click to find "${getSearchTerm(r.item, r.note)}" in document` : isMissing ? 'Not found in document' : ''}
                   >
@@ -514,15 +510,15 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
                       {isPresent && (
                         <div className="cl-locate-tag">
                           {isActive && activeQuery
-                            ? <><span className="cl-locate-dot active"/>Searching: <em>{activeQuery}</em></>
-                            : <><span className="cl-locate-dot"/>Click to locate in PDF</>
+                            ? <><span className="cl-locate-dot active" />Searching: <em>{activeQuery}</em></>
+                            : <><span className="cl-locate-dot" />Click to locate in PDF</>
                           }
                         </div>
                       )}
                       {r.note && <div className="cl-item-note">{r.note}</div>}
                     </div>
-                    <span className={`cl-badge ${isMissing?'cl-badge-no':isPresent?'cl-badge-yes':'cl-badge-unk'}`}>
-                      {isMissing?'NO':isPresent?'YES':'?'}
+                    <span className={`cl-badge ${isMissing ? 'cl-badge-no' : isPresent ? 'cl-badge-yes' : 'cl-badge-unk'}`}>
+                      {isMissing ? 'NO' : isPresent ? 'YES' : '?'}
                     </span>
                   </div>
                 );
@@ -531,7 +527,7 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
 
             {/* Clear search button */}
             {activeQuery && (
-              <button className="cl-btn-secondary" style={{marginBottom:6}} onClick={() => { setActiveItem(null); if(onSearch) onSearch(''); }}>
+              <button className="cl-btn-secondary" style={{ marginBottom: 6 }} onClick={() => { setActiveItem(null); if (onSearch) onSearch(''); }}>
                 ✕ Clear Location Search
               </button>
             )}
@@ -545,20 +541,20 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
 
 /* ─── PDF Viewer Modal (split screen) ───────────────────────────────────── */
 function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onClose }) {
-  const [pdf,       setPdf]     = useState(null);
-  const [numPages,  setPages]   = useState(0);
-  const [fitScale,  setFit]     = useState(null);
-  const [zoom,      setZoom]    = useState(1.0);
-  const [query,     setQuery]   = useState('');
-  const [pageHl,    setPageHl]  = useState({});
-  const [activeIdx, setActive]  = useState(0);
+  const [pdf, setPdf] = useState(null);
+  const [numPages, setPages] = useState(0);
+  const [fitScale, setFit] = useState(null);
+  const [zoom, setZoom] = useState(1.0);
+  const [query, setQuery] = useState('');
+  const [pageHl, setPageHl] = useState({});
+  const [activeIdx, setActive] = useState(0);
   const [ocrStatus, setOcrStatus] = useState({});
-  const [ocrWords,  setOcrWords]  = useState({});
+  const [ocrWords, setOcrWords] = useState({});
   const scrollRef = useRef();
-  const pageRefs  = useRef({});
-  const inputRef  = useRef();
-  const totalRef  = useRef(0);
-  const viewUrl   = getStableUrl(docId, fallbackUrl);
+  const pageRefs = useRef({});
+  const inputRef = useRef();
+  const totalRef = useRef(0);
+  const viewUrl = getStableUrl(docId, fallbackUrl);
 
   useEffect(() => {
     if (!viewUrl) return;
@@ -589,7 +585,7 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
 
   const onReady = useCallback((pn, rects) => setPageHl(prev => ({ ...prev, [pn]: rects })), []);
   const onNeedsOcr = useCallback((pn, canvas) => {
-    const key = (viewUrl||docId)+':'+pn;
+    const key = (viewUrl || docId) + ':' + pn;
     if (OCR_CACHE.has(key)) {
       setOcrWords(p => ({ ...p, [pn]: OCR_CACHE.get(key) }));
       setOcrStatus(p => ({ ...p, [pn]: 'done' }));
@@ -608,26 +604,26 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
   let off = 0;
   for (let p = 1; p <= numPages; p++) {
     offsets[p] = off;
-    (pageHl[p]||[]).forEach((_, i) => allMatches.push({ pageNum:p, rectIdx:i }));
-    off += (pageHl[p]||[]).length;
+    (pageHl[p] || []).forEach((_, i) => allMatches.push({ pageNum: p, rectIdx: i }));
+    off += (pageHl[p] || []).length;
   }
-  const total   = allMatches.length;
+  const total = allMatches.length;
   totalRef.current = total;
-  const safeIdx = total > 0 ? ((activeIdx%total)+total)%total : 0;
-  const cur     = allMatches[safeIdx];
+  const safeIdx = total > 0 ? ((activeIdx % total) + total) % total : 0;
+  const cur = allMatches[safeIdx];
 
   useEffect(() => {
     if (!cur || !scrollRef.current) return;
     const wrap = pageRefs.current[cur.pageNum];
     if (!wrap) return;
-    const rect = (pageHl[cur.pageNum]||[])[cur.rectIdx];
-    if (rect) scrollRef.current.scrollTo({ top: wrap.offsetTop+rect.top-80, behavior:'smooth' });
+    const rect = (pageHl[cur.pageNum] || [])[cur.rectIdx];
+    if (rect) scrollRef.current.scrollTo({ top: wrap.offsetTop + rect.top - 80, behavior: 'smooth' });
   }, [safeIdx, total]); // eslint-disable-line
 
-  const ocrRunning = Object.values(ocrStatus).some(s => s==='running');
+  const ocrRunning = Object.values(ocrStatus).some(s => s === 'running');
 
   return (
-    <div className="dv-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+    <div className="dv-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="dv-modal dv-modal-split" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -637,21 +633,21 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
             <div>
               <div className="dv-file-name" title={fileName}>{fileName}</div>
               <div className="dv-file-meta">
-                {fmtSize(fileSize)} · {numPages||'…'} page{numPages!==1?'s':''}
-                {ocrRunning && <span style={{color:'#60a5fa',marginLeft:6,fontSize:10}}>· OCR…</span>}
+                {fmtSize(fileSize)} · {numPages || '…'} page{numPages !== 1 ? 's' : ''}
+                {ocrRunning && <span style={{ color: '#60a5fa', marginLeft: 6, fontSize: 10 }}>· OCR…</span>}
               </div>
             </div>
           </div>
           <div className="dv-toolbar">
-            <button className="dv-tool-btn" onClick={()=>setZoom(z=>Math.max(.5,+(z-.25).toFixed(2)))} title="Zoom out">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <button className="dv-tool-btn" onClick={() => setZoom(z => Math.max(.5, +(z - .25).toFixed(2)))} title="Zoom out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="13" height="13"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
             </button>
-            <span className="dv-zoom-badge">{Math.round(zoom*100)}%</span>
-            <button className="dv-tool-btn" onClick={()=>setZoom(z=>Math.min(3,+(z+.25).toFixed(2)))} title="Zoom in">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <span className="dv-zoom-badge">{Math.round(zoom * 100)}%</span>
+            <button className="dv-tool-btn" onClick={() => setZoom(z => Math.min(3, +(z + .25).toFixed(2)))} title="Zoom in">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="13" height="13"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
             </button>
             <button className="dv-close-btn" onClick={onClose}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
           </div>
         </div>
@@ -659,14 +655,14 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
         {/* PDF body (preview only) */}
         <div className="dv-split-body">
           <div ref={scrollRef} className="dv-split-left">
-            {!viewUrl && <div className="dv-no-preview"><div style={{fontSize:52}}>📄</div><p>Preview unavailable</p></div>}
-            {viewUrl && !pdf && <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:12,color:'#94a3b8'}}><div className="dv-spinner"/><span style={{fontSize:13}}>Loading…</span></div>}
-            {pdf && numPages>0 && scale>0 && Array.from({length:numPages},(_,i)=>i+1).map(n=>(
-              <PdfPage key={fileName+'-p'+n} pdf={pdf} pageNum={n} scale={scale}
-                query={query} activeGlobal={safeIdx} globalOffset={offsets[n]??0}
+            {!viewUrl && <div className="dv-no-preview"><div style={{ fontSize: 52 }}>📄</div><p>Preview unavailable</p></div>}
+            {viewUrl && !pdf && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#94a3b8' }}><div className="dv-spinner" /><span style={{ fontSize: 13 }}>Loading…</span></div>}
+            {pdf && numPages > 0 && scale > 0 && Array.from({ length: numPages }, (_, i) => i + 1).map(n => (
+              <PdfPage key={fileName + '-p' + n} pdf={pdf} pageNum={n} scale={scale}
+                query={query} activeGlobal={safeIdx} globalOffset={offsets[n] ?? 0}
                 onReady={onReady} onOcrDone={onNeedsOcr}
-                wrapRef={el=>{ pageRefs.current[n]=el; }}
-                ocrWords={ocrWords[n]||null}/>
+                wrapRef={el => { pageRefs.current[n] = el; }}
+                ocrWords={ocrWords[n] || null} />
             ))}
           </div>
         </div>
@@ -679,15 +675,15 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
 
 /* ─── Image Viewer Modal ────────────────────────────────────────────────── */
 function ImageViewerModal({ docId, fallbackUrl, fileName, fileSize, onClose }) {
-  const [zoom, setZoom]         = useState(1);
+  const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const viewUrl = getStableUrl(docId, fallbackUrl);
   useEffect(() => {
     const fn = (e) => {
-      if (e.key === 'Escape')             onClose();
+      if (e.key === 'Escape') onClose();
       if (e.key === '+' || e.key === '=') setZoom(z => Math.min(+(z + .25).toFixed(2), 5));
-      if (e.key === '-')                  setZoom(z => Math.max(+(z - .25).toFixed(2), .1));
-      if (e.key === '0')                  setZoom(1);
+      if (e.key === '-') setZoom(z => Math.max(+(z - .25).toFixed(2), .1));
+      if (e.key === '0') setZoom(1);
       if (e.key === 'r' || e.key === 'R') setRotation(r => (r + 90) % 360);
     };
     window.addEventListener('keydown', fn);
@@ -707,40 +703,40 @@ function ImageViewerModal({ docId, fallbackUrl, fileName, fileSize, onClose }) {
           <div className="dv-toolbar">
             <button className="dv-tool-btn" onClick={() => setZoom(z => Math.min(+(z + .25).toFixed(2), 5))}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="14" height="14">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
               </svg>
             </button>
             <button className="dv-tool-btn" onClick={() => setZoom(z => Math.max(+(z - .25).toFixed(2), .1))}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="14" height="14">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                <line x1="8" y1="11" x2="14" y2="11"/>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="8" y1="11" x2="14" y2="11" />
               </svg>
             </button>
             <button className="dv-tool-btn" onClick={() => { setZoom(1); setRotation(0); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="14" height="14">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
               </svg>
             </button>
             <button className="dv-tool-btn" onClick={() => setRotation(r => (r + 90) % 360)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="14" height="14">
-                <polyline points="23 4 23 10 17 10"/>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
               </svg>
             </button>
             <span className="dv-zoom-badge">{Math.round(zoom * 100)}%</span>
-            <div className="dv-sep"/>
+            <div className="dv-sep" />
             {viewUrl && (
               <a className="dv-tool-btn" href={viewUrl} download={fileName}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
               </a>
             )}
             <button className="dv-close-btn" onClick={onClose}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" width="15" height="15">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
@@ -748,7 +744,7 @@ function ImageViewerModal({ docId, fallbackUrl, fileName, fileSize, onClose }) {
         <div className="dv-body dv-img-body">
           <div className="dv-scroll-area">
             <div className="dv-img-stage" style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}>
-              {viewUrl && <img src={viewUrl} alt={fileName} className="dv-img" draggable={false}/>}
+              {viewUrl && <img src={viewUrl} alt={fileName} className="dv-img" draggable={false} />}
             </div>
           </div>
         </div>
@@ -764,10 +760,10 @@ function ImageViewerModal({ docId, fallbackUrl, fileName, fileSize, onClose }) {
 
 /* ─── Upload Card ───────────────────────────────────────────────────────── */
 function UploadCard({ doc, uploaded, onUpload, onRemove }) {
-  const [dragging,   setDragging]  = useState(false);
-  const [uploading,  setUploading] = useState(false);
-  const [progress,   setProgress]  = useState(0);
-  const [viewerOpen, setViewerOpen]= useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const inputRef = useRef();
   const isPDF = uploaded?.type === 'application/pdf';
   const isImg = uploaded?.type?.startsWith('image/');
@@ -780,7 +776,7 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
 
     const reader = new FileReader();
     reader.onerror = () => { setUploading(false); alert('Could not read file.'); };
-    reader.onload  = () => {
+    reader.onload = () => {
       const base64 = reader.result; // data:<mime>;base64,...
       let p = 0;
       const iv = setInterval(() => {
@@ -831,7 +827,7 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
             <div className="uc-file-btns">
               <button className="uc-preview-btn" onClick={() => setViewerOpen(true)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
                 </svg>
                 Preview
               </button>
@@ -843,7 +839,7 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
           <div className="upload-progress-wrap">
             <div className="upload-progress-label">Uploading... {progress}%</div>
             <div className="upload-progress-bar">
-              <div className="upload-progress-fill" style={{ width: `${progress}%` }}/>
+              <div className="upload-progress-fill" style={{ width: `${progress}%` }} />
             </div>
           </div>
         ) : (
@@ -857,18 +853,18 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
             </div>
             <div className="drop-zone-hint">PDF, JPG, PNG, DOCX · Max 5MB</div>
             <input ref={inputRef} type="file" accept={ACCEPTED} style={{ display: 'none' }}
-              onChange={e => handleFile(e.target.files[0])}/>
+              onChange={e => handleFile(e.target.files[0])} />
           </div>
         )}
       </div>
 
       {viewerOpen && uploaded && isPDF && (
         <PdfViewerModal docId={doc.id} docLabel={doc.label} fallbackUrl={uploaded.objectUrl}
-          fileName={uploaded.name} fileSize={uploaded.size} onClose={() => setViewerOpen(false)}/>
+          fileName={uploaded.name} fileSize={uploaded.size} onClose={() => setViewerOpen(false)} />
       )}
       {viewerOpen && uploaded && isImg && (
         <ImageViewerModal docId={doc.id} fallbackUrl={uploaded.objectUrl}
-          fileName={uploaded.name} fileSize={uploaded.size} onClose={() => setViewerOpen(false)}/>
+          fileName={uploaded.name} fileSize={uploaded.size} onClose={() => setViewerOpen(false)} />
       )}
       {viewerOpen && uploaded && !isPDF && !isImg && (
         <div className="dv-overlay" onClick={() => setViewerOpen(false)}>
@@ -880,7 +876,7 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
               </div>
               <button className="dv-close-btn" onClick={() => setViewerOpen(false)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" width="15" height="15">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
@@ -906,7 +902,7 @@ export default function Step5DocumentUpload() {
   };
   const uploaded = Object.keys(formData.documents).length;
   const reqCount = REQUIRED_DOCUMENTS.filter(d => d.required).length;
-  const reqDone  = REQUIRED_DOCUMENTS.filter(d => d.required && formData.documents[d.id]).length;
+  const reqDone = REQUIRED_DOCUMENTS.filter(d => d.required && formData.documents[d.id]).length;
   return (
     <div className="wizard-step fade-in">
       <div className="step-header">
@@ -915,12 +911,12 @@ export default function Step5DocumentUpload() {
       </div>
       <div className="upload-summary-bar">
         <div className="upload-summary-item"><span className="summary-num">{uploaded}</span><span className="summary-label">Documents Uploaded</span></div>
-        <div className="upload-summary-divider"/>
+        <div className="upload-summary-divider" />
         <div className="upload-summary-item"><span className="summary-num text-success">{reqDone}</span><span className="summary-label">Required Uploaded</span></div>
-        <div className="upload-summary-divider"/>
+        <div className="upload-summary-divider" />
         <div className="upload-summary-item"><span className="summary-num text-danger">{reqCount - reqDone}</span><span className="summary-label">Required Pending</span></div>
         <div className="upload-summary-progress">
-          <div className="upload-summary-bar-fill" style={{ width: `${reqCount ? (reqDone / reqCount) * 100 : 0}%` }}/>
+          <div className="upload-summary-bar-fill" style={{ width: `${reqCount ? (reqDone / reqCount) * 100 : 0}%` }} />
         </div>
       </div>
       {submitError && <div className="alert alert-danger"><span>⚠️</span><span>{submitError}</span></div>}
@@ -930,7 +926,7 @@ export default function Step5DocumentUpload() {
       </div>
       <div className="upload-grid">
         {REQUIRED_DOCUMENTS.map(doc => (
-          <UploadCard key={doc.id} doc={doc} uploaded={formData.documents[doc.id]} onUpload={addDocument} onRemove={removeDocument}/>
+          <UploadCard key={doc.id} doc={doc} uploaded={formData.documents[doc.id]} onUpload={addDocument} onRemove={removeDocument} />
         ))}
       </div>
       <div className="step-actions">

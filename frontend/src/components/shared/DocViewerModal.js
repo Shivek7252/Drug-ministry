@@ -172,12 +172,12 @@ function getHighlightsFromOcr(query, ocrWords) {
    document type. The reviewer clicked a specific row, so the AI focuses on
    that document's own parameters — not all six Export-NOC master items. */
 const DOC_CHECKLISTS = {
-    mfg_license:      'manufacturing_license',
+    mfg_license: 'manufacturing_license',
     product_approval: 'product_approval',
-    export_auth:      'export_authorization',
-    qa_cert:          'quality_assurance',
-    batch_analysis:   'batch_analysis',
-    product_info:     'product_info',
+    export_auth: 'export_authorization',
+    qa_cert: 'quality_assurance',
+    batch_analysis: 'batch_analysis',
+    product_info: 'product_info',
 };
 
 /* ─── Single PDF page ────────────────────────────────────────────────────── */
@@ -301,8 +301,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
             const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
             const data = await apiResp.json();
             if (!apiResp.ok) {
-                if (data.error?.includes('MISTRAL_API_KEY')) { setStatus('no-key'); setErrMsg(data.error); return; }
-                throw new Error(data.error || 'Verification failed.');
+                throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
             }
             setResults(data.results); setSummary(data.summary);
             setTypeMatch(data.documentTypeMatch !== false);
@@ -371,27 +370,22 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                 )}
                 {status === 'no-key' && (
                     <div className="cl-error-state">
-                        <div style={{ fontSize: 36, marginBottom: 8 }}>🔑</div>
-                        <p style={{ fontWeight: 700, color: '#dc2626', marginBottom: 8 }}>API Key Missing</p>
-                        <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6, marginBottom: 8 }}>
-                            Set your Mistral key in <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>backend/.env</code>:
+                        <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
+                        <p style={{ fontWeight: 700, color: '#d97706', marginBottom: 8 }}>Analysis Temporarily Unavailable</p>
+                        <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+                            The AI analysis service is currently undergoing maintenance.
+                            We are working on restoring full functionality. Please try again later.
                         </p>
-                        <code style={{ display: 'block', background: '#0f172a', color: '#86efac', padding: '8px', borderRadius: 6, fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                            MISTRAL_API_KEY=your_key_here
-                        </code>
-                        <a href="https://console.mistral.ai/" target="_blank" rel="noreferrer"
-                            style={{ display: 'block', marginTop: 10, fontSize: 11, color: '#3b82f6', textAlign: 'center' }}>
-                            Get API key →
-                        </a>
+                        <button className="cl-btn-primary" onClick={run}>Retry</button>
                     </div>
                 )}
                 {status === 'error' && (
                     <div className="cl-error-state">
-                        <div style={{ fontSize: 36, marginBottom: 8 }}>⚠️</div>
-                        <p style={{ fontWeight: 700, color: '#dc2626', marginBottom: 6 }}>Verification Failed</p>
-                        <p style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{errMsg}</p>
-                        <p style={{ fontSize: 10, color: '#94a3b8', marginBottom: 12 }}>
-                            Ensure backend is running:<br /><code>cd backend &amp;&amp; npm start</code>
+                        <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
+                        <p style={{ fontWeight: 700, color: '#d97706', marginBottom: 6 }}>Analysis Temporarily Unavailable</p>
+                        <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
+                            The AI analysis service encountered a network issue.
+                            Please ensure the backend is running and try again.
                         </p>
                         <button className="cl-btn-primary" onClick={run}>Retry</button>
                     </div>
@@ -441,7 +435,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                                 return (
                                     <div key={i}
                                         className={`cl-item ${isMissing ? 'cl-item-no' : isPresent ? 'cl-item-yes' : 'cl-item-unk'} ${isActive ? 'cl-item-active' : ''}`}
-                                        >
+                                    >
                                         <span className="cl-item-icon">
                                             {isMissing ? '❌' : isPresent ? '✅' : '❓'}
                                         </span>
