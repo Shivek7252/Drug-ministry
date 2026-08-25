@@ -4,31 +4,51 @@ import { listApplications, searchFull, reviewerAction } from '../../api/applicat
 import ReviewApplicationDetail from './ReviewApplicationDetail';
 import './ReviewDashboard.css';
 
-const STATUS_FILTERS = ['All','Submitted','Under Review','Verified','Query Raised','Approved','Rejected'];
-const INDIAN_STATES  = ['All States','Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu & Kashmir'];
+const STATUS_FILTERS = ['All', 'Submitted', 'Under Review', 'Verified', 'Query Raised', 'Approved', 'Rejected'];
+const INDIAN_STATES = ['All States', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu & Kashmir'];
 
 const STAT_CONFIG = [
-  { key:'total',       label:'Total',      color:'#1a56a0' },
-  { key:'submitted',   label:'New',        color:'#d97706' },
-  { key:'underReview', label:'In Review',  color:'#7c3aed' },
-  { key:'approved',    label:'Approved',   color:'#15803d' },
-  { key:'rejected',    label:'Rejected',   color:'#dc2626' },
+  { key: 'total', label: 'Total', color: '#1a56a0' },
+  { key: 'submitted', label: 'New', color: '#d97706' },
+  { key: 'underReview', label: 'In Review', color: '#7c3aed' },
+  { key: 'approved', label: 'Approved', color: '#15803d' },
+  { key: 'rejected', label: 'Rejected', color: '#dc2626' },
 ];
+
+/* ── Persist which apps the reviewer has opened in localStorage ────────── */
+const OPENED_KEY = 'reviewer_opened_apps';
+function getOpenedApps() {
+  try { return new Set(JSON.parse(localStorage.getItem(OPENED_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function markAppOpened(appNo) {
+  const set = getOpenedApps();
+  set.add(appNo);
+  localStorage.setItem(OPENED_KEY, JSON.stringify([...set]));
+}
+
+/* An app is "new & unseen" if submitted within 48 h and not yet opened */
+function isNewUnseen(app, openedSet) {
+  if (openedSet.has(app.applicationNumber)) return false;
+  if (!app.submittedAt) return false;
+  const age = Date.now() - new Date(app.submittedAt).getTime();
+  return age < 48 * 60 * 60 * 1000; // 48 hours
+}
 
 function StatusBadge({ status }) {
   const styles = {
-    'Approved':     { bg:'#f0fdf4', color:'#15803d', border:'#bbf7d0' },
-    'Submitted':    { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
-    'Under Review': { bg:'#fefce8', color:'#a16207', border:'#fde68a' },
-    'Verified':     { bg:'#f0fdf4', color:'#15803d', border:'#bbf7d0' },
-    'Query Raised': { bg:'#fff7ed', color:'#c2410c', border:'#fdba74' },
-    'Rejected':     { bg:'#fef2f2', color:'#dc2626', border:'#fecaca' },
-    'Pending':      { bg:'#fefce8', color:'#a16207', border:'#fde68a' },
-    'Draft':        { bg:'#f8fafc', color:'#64748b', border:'#e2e8f0' },
+    'Approved': { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+    'Submitted': { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+    'Under Review': { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
+    'Verified': { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+    'Query Raised': { bg: '#fff7ed', color: '#c2410c', border: '#fdba74' },
+    'Rejected': { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+    'Pending': { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
+    'Draft': { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
   };
   const s = styles[status] || styles['Draft'];
   return (
-    <span className="rv-status-badge" style={{ background:s.bg, color:s.color, borderColor:s.border }}>
+    <span className="rv-status-badge" style={{ background: s.bg, color: s.color, borderColor: s.border }}>
       {status}
     </span>
   );
@@ -36,28 +56,29 @@ function StatusBadge({ status }) {
 
 export default function ReviewDashboard() {
   const { currentUser } = useApp();
-  const [apps,          setApps]          = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [searchQ,       setSearchQ]       = useState('');
-  const [filterStatus,  setFilterStatus]  = useState('All');
-  const [filterState,   setFilterState]   = useState('All States');
-  const [filterCat,     setFilterCat]     = useState('All');
-  const [selectedApp,   setSelectedApp]   = useState(null);
+  const [apps, setApps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterState, setFilterState] = useState('All States');
+  const [filterCat, setFilterCat] = useState('All');
+  const [selectedApp, setSelectedApp] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [stats, setStats] = useState({ total:0, submitted:0, underReview:0, approved:0, rejected:0 });
+  const [stats, setStats] = useState({ total: 0, submitted: 0, underReview: 0, approved: 0, rejected: 0 });
+  const [openedApps, setOpenedApps] = useState(() => getOpenedApps());
 
   const loadApps = useCallback(async () => {
     setLoading(true);
-    const res = await listApplications({ limit:100, isDraft:'false' });
+    const res = await listApplications({ limit: 100, isDraft: 'false' });
     if (res.success) {
       const all = res.applications || [];
       setApps(all);
       setStats({
-        total:       all.length,
-        submitted:   all.filter(a=>a.status==='Submitted').length,
-        underReview: all.filter(a=>a.status==='Under Review').length,
-        approved:    all.filter(a=>a.status==='Approved').length,
-        rejected:    all.filter(a=>a.status==='Rejected').length,
+        total: all.length,
+        submitted: all.filter(a => a.status === 'Submitted').length,
+        underReview: all.filter(a => a.status === 'Under Review').length,
+        approved: all.filter(a => a.status === 'Approved').length,
+        rejected: all.filter(a => a.status === 'Rejected').length,
       });
     }
     setLoading(false);
@@ -76,7 +97,7 @@ export default function ReviewDashboard() {
 
   const filtered = apps.filter(a => {
     if (filterStatus !== 'All' && a.status !== filterStatus) return false;
-    if (filterState  !== 'All States') {
+    if (filterState !== 'All States') {
       const inState = (a.state || '') + (a.factoryAddress || '') + (a.city || '');
       if (!inState.includes(filterState)) return false;
     }
@@ -89,18 +110,27 @@ export default function ReviewDashboard() {
     await reviewerAction(appNumber, { status, remarks, officer: currentUser });
     await loadApps();
     if (selectedApp?.applicationNumber === appNumber) {
-      setSelectedApp(p => p ? {...p, status} : p);
+      setSelectedApp(p => p ? { ...p, status } : p);
     }
     setActionLoading(false);
   };
 
-  const categories = ['All', ...new Set(apps.map(a=>a.exportCategory).filter(Boolean))];
+  const handleOpenApp = (app) => {
+    markAppOpened(app.applicationNumber);
+    setOpenedApps(getOpenedApps());
+    setSelectedApp(app);
+  };
+
+  const categories = ['All', ...new Set(apps.map(a => a.exportCategory).filter(Boolean))];
 
   const handleStatClick = (key) => {
-    const map = { submitted:'Submitted', underReview:'Under Review', approved:'Approved', rejected:'Rejected' };
+    const map = { submitted: 'Submitted', underReview: 'Under Review', approved: 'Approved', rejected: 'Rejected' };
     setFilterStatus(map[key] || 'All');
     setSelectedApp(null);
   };
+
+  /* Count unseen new apps for the notification badge */
+  const unseenCount = apps.filter(a => isNewUnseen(a, openedApps)).length;
 
   return (
     <div className="rv-page">
@@ -113,8 +143,8 @@ export default function ReviewDashboard() {
         <div className="rv-officer-pill">
           <div className="rv-officer-pill-avatar">👨‍💼</div>
           <div>
-            <div style={{fontSize:12,fontWeight:700}}>{currentUser}</div>
-            <div style={{fontSize:10,opacity:.7}}>Drug Controller Officer</div>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>{currentUser}</div>
+            <div style={{ fontSize: 10, opacity: .7 }}>Drug Controller Officer</div>
           </div>
         </div>
       </div>
@@ -123,9 +153,9 @@ export default function ReviewDashboard() {
       <div className="rv-stats-row">
         {STAT_CONFIG.map(s => (
           <div key={s.key}
-            className={`rv-stat-card ${filterStatus === (s.key==='total'?'All': s.key==='submitted'?'Submitted':s.key==='underReview'?'Under Review':s.key==='approved'?'Approved':'Rejected') ? 'active' : ''}`}
+            className={`rv-stat-card ${filterStatus === (s.key === 'total' ? 'All' : s.key === 'submitted' ? 'Submitted' : s.key === 'underReview' ? 'Under Review' : s.key === 'approved' ? 'Approved' : 'Rejected') ? 'active' : ''}`}
             onClick={() => handleStatClick(s.key)}>
-            <span className="rv-stat-num" style={{color:s.color}}>{stats[s.key]}</span>
+            <span className="rv-stat-num" style={{ color: s.color }}>{stats[s.key]}</span>
             <span className="rv-stat-label">{s.label}</span>
           </div>
         ))}
@@ -142,7 +172,7 @@ export default function ReviewDashboard() {
               value={searchQ} onChange={e => setSearchQ(e.target.value)} />
             {searchQ && <button className="rv-search-clear" onClick={() => setSearchQ('')}>✕</button>}
           </div>
-          <div className="rv-filter-sep"/>
+          <div className="rv-filter-sep" />
           <div className="rv-filter-select">
             <label>Status</label>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
@@ -166,6 +196,11 @@ export default function ReviewDashboard() {
           </button>
           <span className="rv-count-badge">
             Showing <strong>{filtered.length}</strong> / {apps.length} applications
+            {unseenCount > 0 && (
+              <span className="rv-unseen-badge" title={`${unseenCount} new application${unseenCount > 1 ? 's' : ''} not yet opened`}>
+                🔔 {unseenCount} new
+              </span>
+            )}
           </span>
         </div>
 
@@ -177,11 +212,11 @@ export default function ReviewDashboard() {
             <div className="rv-table-card">
               <div className="rv-table-card-header">
                 <span className="rv-table-card-title">📋 Review Queue</span>
-                {loading && <span style={{fontSize:12,color:'#94a3b8'}}>⏳ Loading…</span>}
+                {loading && <span style={{ fontSize: 12, color: '#94a3b8' }}>⏳ Loading…</span>}
               </div>
               {loading ? (
                 <div className="rv-state-box">
-                  <div className="rv-spinner"/>
+                  <div className="rv-spinner" />
                   <span className="rv-state-sub">Loading applications…</span>
                 </div>
               ) : filtered.length === 0 ? (
@@ -201,34 +236,52 @@ export default function ReviewDashboard() {
                         <th>State</th>
                         <th>Category</th>
                         <th>Country</th>
-                        <th>Date</th>
+                        <th>Date &amp; Time</th>
                         <th>Status</th>
                         <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map(app => (
-                        <tr key={app.applicationNumber}
-                          className={selectedApp?.applicationNumber === app.applicationNumber ? 'rv-row-selected' : ''}
-                          onClick={() => setSelectedApp(app)}>
-                          <td><span className="rv-app-no">{app.applicationNumber}</span></td>
-                          <td><span className="rv-ref-no">{app.referenceNumber}</span></td>
-                          <td>
-                            <div className="rv-org-name">{app.applicantOrganization || app.applicantName || '—'}</div>
-                            <div className="rv-org-email">{app.email || ''}</div>
-                          </td>
-                          <td><span style={{fontSize:11.5,color:'#475569'}}>{app.state || app.city || '—'}</span></td>
-                          <td><span className="rv-cat-pill">{app.exportCategory || '—'}</span></td>
-                          <td><span style={{fontSize:11.5}}>{app.destinationCountry || '—'}</span></td>
-                          <td className="rv-date-cell">{app.submittedAt ? new Date(app.submittedAt).toLocaleDateString('en-IN') : app.applicationDate || '—'}</td>
-                          <td><StatusBadge status={app.status}/></td>
-                          <td>
-                            <button className="rv-open-btn" onClick={e=>{e.stopPropagation();setSelectedApp(app);}}>
-                              Open →
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {filtered.map(app => {
+                        const unseen = isNewUnseen(app, openedApps);
+                        const submittedDate = app.submittedAt
+                          ? new Date(app.submittedAt).toLocaleDateString('en-IN')
+                          : app.applicationDate || '—';
+                        const submittedTime = app.submittedAt
+                          ? new Date(app.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                          : '';
+                        return (
+                          <tr key={app.applicationNumber}
+                            className={[
+                              selectedApp?.applicationNumber === app.applicationNumber ? 'rv-row-selected' : '',
+                              unseen ? 'rv-row-new' : '',
+                            ].filter(Boolean).join(' ')}
+                            onClick={() => handleOpenApp(app)}>
+                            <td>
+                              <span className="rv-app-no">{app.applicationNumber}</span>
+                              {unseen && <span className="rv-new-dot" title="Not yet opened">NEW</span>}
+                            </td>
+                            <td><span className="rv-ref-no">{app.referenceNumber}</span></td>
+                            <td>
+                              <div className="rv-org-name">{app.applicantOrganization || app.applicantName || '—'}</div>
+                              <div className="rv-org-email">{app.email || ''}</div>
+                            </td>
+                            <td><span style={{ fontSize: 11.5, color: '#475569' }}>{app.state || app.city || '—'}</span></td>
+                            <td><span className="rv-cat-pill">{app.exportCategory || '—'}</span></td>
+                            <td><span style={{ fontSize: 11.5 }}>{app.destinationCountry || '—'}</span></td>
+                            <td className="rv-date-cell">
+                              <div>{submittedDate}</div>
+                              {submittedTime && <div className="rv-time-cell">{submittedTime}</div>}
+                            </td>
+                            <td><StatusBadge status={app.status} /></td>
+                            <td>
+                              <button className="rv-open-btn" onClick={e => { e.stopPropagation(); handleOpenApp(app); }}>
+                                Open →
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -134,12 +134,12 @@ function MismatchPopup({ docLabel, onClose, onForward, onReject }) {
    Returns true if the uploaded file name looks like the expected doc type.
    Checks against the file's original name stored as up.name.              */
 const DOC_FILENAME_KEYWORDS = {
-  mfg_license:      [['manufactur', 'mfg', 'form-25', 'form-28', 'form25', 'form28', 'form 25', 'form 28', 'license', 'licence', 'drug license', 'dsir', 'loan licence', 'loan license']],
+  mfg_license: [['manufactur', 'mfg', 'form-25', 'form-28', 'form25', 'form28', 'form 25', 'form 28', 'license', 'licence', 'drug license', 'dsir', 'loan licence', 'loan license']],
   product_approval: [['approval', 'approved', 'cdsco', 'product approval', 'registration', 'marketing auth', 'certificate of approval', 'nda', 'new drug']],
-  export_auth:      [['export', 'authorization', 'authorisation', 'auth letter', 'noc', 'no objection', 'export noc', 'export auth']],
-  qa_cert:          [['quality', 'gmp', 'iso', 'assurance', 'qa cert', 'good manufacturing', 'who-gmp', 'who gmp', 'cgmp', 'compliance']],
-  batch_analysis:   [['batch', 'analysis', 'coa', 'certificate of analysis', 'analytical', 'test report', 'quality control', 'batch report']],
-  product_info:     [['product info', 'product information', 'package insert', 'prescribing', 'smpc', 'monograph', 'indications', 'product sheet']],
+  export_auth: [['export', 'authorization', 'authorisation', 'auth letter', 'noc', 'no objection', 'export noc', 'export auth']],
+  qa_cert: [['quality', 'gmp', 'iso', 'assurance', 'qa cert', 'good manufacturing', 'who-gmp', 'who gmp', 'cgmp', 'compliance']],
+  batch_analysis: [['batch', 'analysis', 'coa', 'certificate of analysis', 'analytical', 'test report', 'quality control', 'batch report']],
+  product_info: [['product info', 'product information', 'package insert', 'prescribing', 'smpc', 'monograph', 'indications', 'product sheet']],
 };
 
 function filenameMatchesDocType(fileName, docType) {
@@ -171,19 +171,19 @@ function NocSetupPanel({ app, currentUser, onSaved }) {
     return d.toISOString().split('T')[0];
   })();
 
-  const [sanctionedQty,  setSanctionedQty]  = useState(existingMeta?.sanctionedQty  || '');
-  const [qtyUnit,        setQtyUnit]        = useState(existingMeta?.qtyUnit         || 'units');
-  const [nocIssuedDate,  setNocIssuedDate]  = useState(
+  const [sanctionedQty, setSanctionedQty] = useState(existingMeta?.sanctionedQty || '');
+  const [qtyUnit, setQtyUnit] = useState(existingMeta?.qtyUnit || 'units');
+  const [nocIssuedDate, setNocIssuedDate] = useState(
     existingMeta?.nocIssuedDate
       ? new Date(existingMeta.nocIssuedDate).toISOString().split('T')[0]
       : todayStr
   );
-  const [nocExpiryDate,  setNocExpiryDate]  = useState(
+  const [nocExpiryDate, setNocExpiryDate] = useState(
     existingMeta?.nocExpiryDate
       ? new Date(existingMeta.nocExpiryDate).toISOString().split('T')[0]
       : nextYearStr
   );
-  const [busy,  setBusy]  = useState(false);
+  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
@@ -253,12 +253,12 @@ function NocSetupPanel({ app, currentUser, onSaved }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 16px', fontSize: 12.5 }}>
             {[
-              ['Issued Date',     existingMeta.nocIssuedDate  ? new Date(existingMeta.nocIssuedDate).toLocaleDateString('en-IN')  : '—'],
-              ['Expiry Date',     existingMeta.nocExpiryDate  ? new Date(existingMeta.nocExpiryDate).toLocaleDateString('en-IN')  : '—'],
-              ['Sanctioned Qty',  `${existingMeta.sanctionedQty || '—'} ${existingMeta.qtyUnit || ''}`],
-              ['Qty Exported',    `${existingMeta.qtyExported  || '0'} ${existingMeta.qtyUnit || ''}`],
-              ['Qty Remaining',   `${existingMeta.qtyRemaining || '—'} ${existingMeta.qtyUnit || ''}`],
-              ['NOC Status',      existingMeta.nocStatus || '—'],
+              ['Issued Date', existingMeta.nocIssuedDate ? new Date(existingMeta.nocIssuedDate).toLocaleDateString('en-IN') : '—'],
+              ['Expiry Date', existingMeta.nocExpiryDate ? new Date(existingMeta.nocExpiryDate).toLocaleDateString('en-IN') : '—'],
+              ['Sanctioned Qty', `${existingMeta.sanctionedQty || '—'} ${existingMeta.qtyUnit || ''}`],
+              ['Qty Exported', `${existingMeta.qtyExported || '0'} ${existingMeta.qtyUnit || ''}`],
+              ['Qty Remaining', `${existingMeta.qtyRemaining || '—'} ${existingMeta.qtyUnit || ''}`],
+              ['NOC Status', existingMeta.nocStatus || '—'],
             ].map(([l, v]) => (
               <div key={l}>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{l}</div>
@@ -272,10 +272,14 @@ function NocSetupPanel({ app, currentUser, onSaved }) {
       {/* Form */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {[
-          { label: 'NOC Issued Date', type: 'date', val: nocIssuedDate,
-            onChange: (e) => handleIssuedChange(e.target.value) },
-          { label: 'NOC Expiry Date (auto: issued + 1 year)', type: 'date', val: nocExpiryDate,
-            onChange: (e) => setNocExpiryDate(e.target.value) },
+          {
+            label: 'NOC Issued Date', type: 'date', val: nocIssuedDate,
+            onChange: (e) => handleIssuedChange(e.target.value)
+          },
+          {
+            label: 'NOC Expiry Date (auto: issued + 1 year)', type: 'date', val: nocExpiryDate,
+            onChange: (e) => setNocExpiryDate(e.target.value)
+          },
         ].map(({ label, type, val, onChange }) => (
           <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>{label}</label>
@@ -492,11 +496,11 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
       // Compute summary inline if backend didn't return one
       const results = respData.results || [];
       const summary = respData.summary || {
-        total:   results.length,
+        total: results.length,
         present: results.filter(r => r.present === true).length,
         missing: results.filter(r => r.present === false).length,
         unknown: results.filter(r => r.present === null).length,
-        score:   results.length > 0
+        score: results.length > 0
           ? Math.round((results.filter(r => r.present === true).length / results.length) * 100)
           : 0,
       };
@@ -565,12 +569,12 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
       {/* Tabs */}
       <div className="rv-tabs">
         {[
-          ['details',   '📋', 'Details'],
+          ['details', '📋', 'Details'],
           ['shipments', '🚚', 'Shipments'],
-          ['docs',      '📁', 'Documents'],
+          ['docs', '📁', 'Documents'],
           ['checklist', '🔍', 'Checklist\nQuery'],
-          ['noc',       '🏷', 'NOC\nSetup'],
-          ['audit',     '📜', 'Audit'],
+          ['noc', '🏷', 'NOC\nSetup'],
+          ['audit', '📜', 'Audit'],
         ].map(([k, icon, label]) => (
           <button
             key={k}
@@ -624,37 +628,37 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
             <Sec title={`Consignee / Importer${Array.isArray(data.consignees) && data.consignees.length > 1 ? ` (${data.consignees.length})` : ''}`} icon="🏢" defaultOpen={false}>
               {Array.isArray(data.consignees) && data.consignees.length > 0
                 ? data.consignees.map((c, i) => (
-                    <div key={c.consigneeRef || i} style={{
-                      border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px',
-                      marginBottom: i < data.consignees.length - 1 ? 12 : 0,
-                      background: '#f8fafc',
-                    }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: '#1e40af', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        🏢 Consignee #{i + 1}
-                        {c.country && <span style={{ background: '#dbeafe', color: '#1d4ed8', borderRadius: 12, padding: '1px 8px', fontSize: 11 }}>{c.country}</span>}
-                      </div>
-                      <div className="rv-grid-2">
-                        <F label="Consignee Name" value={c.name} />
-                        <F label="Organization" value={c.organisation} />
-                        <F label="Country" value={c.country} />
-                        <F label="Contact Person" value={c.contactPerson} />
-                        <F label="Phone" value={c.phone} />
-                        <F label="Email" value={c.email} />
-                        <F label="Address" value={[c.addressLine1, c.addressLine2, c.city, c.state, c.postalCode].filter(Boolean).join(', ')} />
-                      </div>
+                  <div key={c.consigneeRef || i} style={{
+                    border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px',
+                    marginBottom: i < data.consignees.length - 1 ? 12 : 0,
+                    background: '#f8fafc',
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#1e40af', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      🏢 Consignee #{i + 1}
+                      {c.country && <span style={{ background: '#dbeafe', color: '#1d4ed8', borderRadius: 12, padding: '1px 8px', fontSize: 11 }}>{c.country}</span>}
                     </div>
-                  ))
-                : (
                     <div className="rv-grid-2">
-                      <F label="Consignee" value={data.consigneeName} />
-                      <F label="Org" value={data.consigneeOrg} />
-                      <F label="Country" value={data.consigneeCountry} />
-                      <F label="Contact" value={data.contactPerson} />
-                      <F label="Phone" value={data.consigneePhone} />
-                      <F label="Email" value={data.consigneeEmail} />
-                      <F label="Address" value={[data.addressLine1, data.city, data.state, data.postalCode].filter(Boolean).join(', ')} />
+                      <F label="Consignee Name" value={c.name} />
+                      <F label="Organization" value={c.organisation} />
+                      <F label="Country" value={c.country} />
+                      <F label="Contact Person" value={c.contactPerson} />
+                      <F label="Phone" value={c.phone} />
+                      <F label="Email" value={c.email} />
+                      <F label="Address" value={[c.addressLine1, c.addressLine2, c.city, c.state, c.postalCode].filter(Boolean).join(', ')} />
                     </div>
-                  )
+                  </div>
+                ))
+                : (
+                  <div className="rv-grid-2">
+                    <F label="Consignee" value={data.consigneeName} />
+                    <F label="Org" value={data.consigneeOrg} />
+                    <F label="Country" value={data.consigneeCountry} />
+                    <F label="Contact" value={data.contactPerson} />
+                    <F label="Phone" value={data.consigneePhone} />
+                    <F label="Email" value={data.consigneeEmail} />
+                    <F label="Address" value={[data.addressLine1, data.city, data.state, data.postalCode].filter(Boolean).join(', ')} />
+                  </div>
+                )
               }
             </Sec>
             {data.products?.length > 0 && (
@@ -743,11 +747,6 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                         <button className="rv-verify-btn"
                           onClick={() => handleDocClick(doc.id, doc.label, doc.docType, up)}>
                           {verdict ? '👁 Open & Inspect' : '🔍 Verify & Open'}
-                        </button>
-                        <button className="rv-doc-query-btn"
-                          onClick={() => handleDocQuery(doc.label)}
-                          title={`Raise a query for ${doc.label}`}>
-                          ❓ Query
                         </button>
                       </>
                     )}
@@ -862,7 +861,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                         {!up ? '❌' : sd?.status === 'done'
                           ? (sd.documentTypeMatch === false ? '🚫'
                             : sd.summary?.score >= 75 ? '✅'
-                            : sd.summary?.score >= 50 ? '⚠️' : '🔴')
+                              : sd.summary?.score >= 50 ? '⚠️' : '🔴')
                           : '📄'}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -873,10 +872,10 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                             {sd.documentTypeMatch === false
                               ? <span style={{ color: '#b91c1c', fontStyle: 'italic' }}>⚠️ Wrong document type — {sd.documentTypeReason || 'document does not match expected type'}</span>
                               : <>
-                                  Score: <strong style={{ color: sd.summary.score >= 75 ? '#16a34a' : sd.summary.score >= 50 ? '#d97706' : '#dc2626' }}>{sd.summary.score}%</strong>
-                                  &nbsp;·&nbsp;✓ {sd.summary.present} found &nbsp;·&nbsp; ✗ {sd.summary.missing} missing
-                                  {sd.summary.unknown > 0 && <>&nbsp;·&nbsp; ? {sd.summary.unknown} unknown</>}
-                                </>
+                                Score: <strong style={{ color: sd.summary.score >= 75 ? '#16a34a' : sd.summary.score >= 50 ? '#d97706' : '#dc2626' }}>{sd.summary.score}%</strong>
+                                &nbsp;·&nbsp;✓ {sd.summary.present} found &nbsp;·&nbsp; ✗ {sd.summary.missing} missing
+                                {sd.summary.unknown > 0 && <>&nbsp;·&nbsp; ? {sd.summary.unknown} unknown</>}
+                              </>
                             }
                           </div>
                         )}
@@ -990,6 +989,10 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           verificationResult={docVerdict[viewerDoc.docId]}
           onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}
           onDecline={(id) => setDocVerdict(p => ({ ...p, [id]: 'bad' }))}
+          onRaiseQuery={(docLabel) => {
+            setViewerDoc(null);           // close viewer
+            handleDocQuery(docLabel);     // open query form pre-filled
+          }}
           onClose={() => setViewerDoc(null)}
         />
       )}
