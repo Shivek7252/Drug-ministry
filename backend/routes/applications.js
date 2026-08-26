@@ -153,6 +153,66 @@ function approvalItemId(country, subKey) {
   return `noc_approval_${subKey}_${slug}`;
 }
 
+/* ── Checklist item → filename-keyword fuzzy match ───────────────────────
+   The applicant uploads to 6 flat slots (mfg_license, product_approval, ...).
+   The checklist has its own item taxonomy (irf, legal_undertaking, ...).
+   When a checklist item's expected docId isn't found as a slot, we scan
+   every upload's filename for indicative keywords. Handles the common case
+   where an applicant names their file "1. IRF.pdf" but uploads it to any
+   slot. */
+/* Strict, mutually-exclusive filename keywords. Order matters: earlier keys
+   claim their filename first (see reserveUpload below). Justification is
+   listed BEFORE historical so a "Justification…(based on one year PO or
+   Export NOC history)" filename claims the justification slot, not the
+   historical one. */
+const CHECKLIST_ITEM_FUZZY_KEYWORDS = {
+  irf: ['integrated registration form', ' irf.', ' irf ', 'irf(', ' irf.pdf'],
+  legal_undertaking: ['legal undertaking', 'annexure-ii', 'annexure ii', 'annexure-2', 'annexure 2'],
+  legal: ['legal undertaking', 'annexure-ii', 'annexure ii', 'annexure-2', 'annexure 2'],
+  mfg_license: ['manufacturing licen', 'manufacture licen', 'form-25', 'form-28', 'form 25', 'form 28', 'form25', 'form28', 'loan licence', 'loan license'],
+  justification: ['justification'],
+  // Historical must contain the word "historical" so it can't false-match a
+  // Justification filename that happens to mention "Export NOC history".
+  historical_data: ['historical'],
+  historical: ['historical'],
+  nra_cert: ['registration or approval certificate from nra', 'nra of importing', 'importing country', 'marketing authorisation', 'marketing authorization'],
+  cdsco_approval: ['cdsco if approval status', 'approval in india from cdsco', 'dcgi permission', 'dcgi approval'],
+};
+
+/* Return the [docId, docObj] best-matching this checklist item, or null.
+   Priority: exact docId hit → filename keyword hit → nothing.
+   Callers pass a `reserved` Set to prevent the same upload being claimed by
+   multiple checklist items. */
+function findMatchingUpload(itemDocId, appDocs, reserved) {
+  if (!appDocs) return null;
+
+  const entries = appDocs?.entries ? Array.from(appDocs.entries()) : Object.entries(appDocs);
+  const isReserved = (id) => reserved && reserved.has(id);
+
+  // 1. Exact docId match — handles the direct mfg_license case, and any
+  //    per-country docs like `nra_cert_Iran`.
+  for (const [id, doc] of entries) {
+    if (id === itemDocId && doc && !isReserved(id)) {
+      return [id, doc?.toObject ? doc.toObject() : doc];
+    }
+  }
+
+  // 2. Filename keyword match. Try the specific docId first, then strip any
+  //    country/company suffix (e.g. "nra_cert_Iran" → "nra_cert").
+  const tryKeys = [itemDocId, itemDocId.replace(/_[A-Z][a-zA-Z0-9_]*$/, '')];
+  for (const key of tryKeys) {
+    const kws = CHECKLIST_ITEM_FUZZY_KEYWORDS[key];
+    if (!kws) continue;
+    for (const [id, doc] of entries) {
+      if (isReserved(id)) continue;
+      const d = doc?.toObject ? doc.toObject() : doc;
+      const name = ` ${String(d?.name || '').toLowerCase()} `.replace(/[_\-]/g, ' ');
+      if (kws.some(kw => name.includes(kw))) return [id, d];
+    }
+  }
+  return null;
+}
+
 /* Compute the display numbering for every checklist item based on the type. */
 function buildItemNumbering(profile, countries, companies) {
   const numbering = {};
@@ -297,6 +357,31 @@ function shapeChecklist(app, baseUrl) {
   const { approvalSectionNo, mfgLicenseSectionNo } = buildItemNumbering(profile, countries, companies);
   const get = (id) => items?.get ? items.get(id) : items?.[id];
 
+  /* Map from a checklist item's itemId back to the docId it expects — used
+     to fuzzy-match against actual uploads. Same mapping used at seed time. */
+  const itemDocId = (itemId) => {
+    // Try fixedItems from every profile (each profile pairs itemId → docId)
+    for (const p of Object.values(TYPE_PROFILES)) {
+      const hit = (p.fixedItems || []).find(f => f.itemId === itemId);
+      if (hit) return hit.docId;
+    }
+    if (HISTORICAL_ITEM.itemId === itemId) return HISTORICAL_ITEM.docId;
+    if (itemId === profile.justification.itemId) return profile.justification.docId;
+    // Approval-status sub-items: noc_approval_1_<country> → nra_cert_<country>
+    const m = itemId.match(/^noc_approval_(\d)_(.+)$/);
+    if (m) {
+      const sub = APPROVAL_SUBITEMS.find(s => s.key === m[1]);
+      if (sub) return `${sub.docSuffix}_${m[2]}`;
+    }
+    // Type 4 per-company: mfg-license leaves fall back to shared mfg_license
+    if (itemId.startsWith('noc_mfg_license_')) return 'mfg_license';
+    return itemId;
+  };
+
+  // Each upload can only be claimed by ONE checklist item. Reserved across
+  // every withDocUrl call in this shape.
+  const claimedSlots = new Set();
+
   const withDocUrl = (raw) => {
     if (!raw) return null;
     const item = raw.toObject ? raw.toObject() : { ...raw };
@@ -310,6 +395,43 @@ function shapeChecklist(app, baseUrl) {
         ? `${baseUrl}/api/applications/${app.applicationNumber}/checklist/${encodeURIComponent(item.itemId)}/reply-file/${q.version || (i + 1)}`
         : '',
     }));
+
+    const expectedDocId = itemDocId(item.itemId);
+    const match = findMatchingUpload(expectedDocId, app.documents, claimedSlots);
+    if (match) {
+      const [matchedSlot, matchedDoc] = match;
+      claimedSlots.add(matchedSlot);
+      const vr = matchedDoc.validationResult || null;
+      const matchType = matchedSlot === expectedDocId ? 'exact' : 'fuzzy';
+      item.matchedDoc = {
+        slot: matchedSlot,
+        name: matchedDoc.name,
+        size: matchedDoc.size,
+        type: matchedDoc.type,
+        uploadedAt: matchedDoc.uploadedAt,
+        objectUrl: (matchedDoc.path || matchedDoc.data)
+          ? `${baseUrl}/api/applications/${app.applicationNumber}/document/${matchedSlot}`
+          : '',
+        validationResult: vr,
+        matchType,
+      };
+      // Status logic:
+      //  - Exact-slot match: trust the AI verdict (it checked the right type).
+      //  - Fuzzy match: filename says it's the right type, but the AI verdict
+      //    was against a DIFFERENT slot type and doesn't apply → mark OK
+      //    (frontend shows a "fuzzy match" hint so reviewer can double-check).
+      if (matchType === 'exact') {
+        if (vr && vr.documentTypeMatch === false) item.docStatus = 'wrong';
+        else if (vr && vr.documentTypeMatch === true) item.docStatus = 'ok';
+        else item.docStatus = 'unchecked';
+      } else {
+        item.docStatus = 'ok';
+      }
+    } else {
+      item.matchedDoc = null;
+      item.docStatus = 'missing';
+    }
+
     return item;
   };
 
@@ -907,6 +1029,7 @@ router.get('/:id', async (req, res) => {
         docsOut[k] = {
           name: v.name, size: v.size, type: v.type,
           uploadedAt: v.uploadedAt, validated: v.validated,
+          validationResult: v.validationResult || null,
           objectUrl: (v.path || v.data) ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
         };
       }
@@ -986,6 +1109,7 @@ router.get('/:id/full', async (req, res) => {
         docsOut[k] = {
           name: v.name, size: v.size, type: v.type,
           uploadedAt: v.uploadedAt, validated: v.validated,
+          validationResult: v.validationResult || null,
           objectUrl: (v.path || v.data) ? `${baseUrl}/api/applications/${obj.applicationNumber}/document/${k}` : '',
         };
       }
@@ -1143,12 +1267,34 @@ router.get('/:id/checklist', async (req, res) => {
     seedChecklist(app);
     await app.save();
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // Include the application's uploaded docs + AI verdicts so the modal
+    // can show them alongside the checklist item context.
+    const docsRaw = app.documents;
+    const docEntries = docsRaw?.entries ? Array.from(docsRaw.entries()) : Object.entries(docsRaw || {});
+    const uploadedDocs = {};
+    for (const [id, docRaw] of docEntries) {
+      const d = docRaw?.toObject ? docRaw.toObject() : docRaw;
+      if (!d) continue;
+      uploadedDocs[id] = {
+        name: d.name,
+        size: d.size,
+        type: d.type,
+        uploadedAt: d.uploadedAt,
+        validationResult: d.validationResult || null,
+        objectUrl: (d.path || d.data)
+          ? `${baseUrl}/api/applications/${app.applicationNumber}/document/${id}`
+          : '',
+      };
+    }
+
     res.json({
       success: true,
       applicationNumber: app.applicationNumber,
       referenceNumber:   app.referenceNumber,
       status:            app.status,
       checklist:         shapeChecklist(app, baseUrl),
+      documents:         uploadedDocs,
     });
   } catch (err) {
     console.error('checklist load error:', err);

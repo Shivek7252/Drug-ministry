@@ -100,6 +100,31 @@ export default function NocChecklistPage({ applicationNumber, role = 'reviewer',
         </ol>
       </div>
 
+      {!loading && !error && data && (() => {
+        const allItems = flattenChecklistItems(data.checklist);
+        const counts = { ok: 0, missing: 0, wrong: 0, unchecked: 0 };
+        for (const it of allItems) {
+          const s = it.docStatus || (it.submissionDocUrl ? 'ok' : 'missing');
+          counts[s] = (counts[s] || 0) + 1;
+        }
+        const actionNeeded = counts.wrong + counts.missing;
+        return (
+          <div className={`cl-summary ${actionNeeded > 0 ? 'cl-summary-warn' : 'cl-summary-ok'}`}>
+            <div className="cl-summary-headline">
+              {actionNeeded > 0
+                ? <>⚠ <strong>{actionNeeded}</strong> checklist item{actionNeeded !== 1 ? 's' : ''} need reviewer action</>
+                : <>✅ All {allItems.length} checklist items have matching documents</>}
+            </div>
+            <div className="cl-summary-chips">
+              <span className="cl-summary-chip cl-chip-ok">✓ OK: {counts.ok}</span>
+              {counts.missing > 0   && <span className="cl-summary-chip cl-chip-missing">⚠ Missing: {counts.missing}</span>}
+              {counts.wrong > 0     && <span className="cl-summary-chip cl-chip-wrong">✗ Wrong Doc: {counts.wrong}</span>}
+              {counts.unchecked > 0 && <span className="cl-summary-chip cl-chip-unchecked">? Not Checked: {counts.unchecked}</span>}
+            </div>
+          </div>
+        );
+      })()}
+
       {loading && <div className="cl-loader">Loading checklist…</div>}
       {error && <div className="cl-error">⚠️ {error}</div>}
 
@@ -179,6 +204,7 @@ export default function NocChecklistPage({ applicationNumber, role = 'reviewer',
           role={role}
           maxRounds={data?.checklist?.maxRounds || 5}
           busy={busy}
+          applicationDocs={data?.documents || {}}
           onClose={() => setActiveItem(null)}
           onRaiseQuery={handleRaiseQuery}
           onSubmitReply={handleSubmitReply}
@@ -190,26 +216,65 @@ export default function NocChecklistPage({ applicationNumber, role = 'reviewer',
 
 /* ── Row renderer ──────────────────────────────────────────────────────── */
 function ChecklistRow({ item, onOpen, companyTag }) {
-  const status = item.status || 'OK';
+  const queryStatus = item.status || 'OK';
+  // Derived doc status from backend (based on uploads + AI verdict).
+  // 'ok' | 'missing' | 'wrong' | 'unchecked'
+  const docStatus = item.docStatus || (item.submissionDocUrl ? 'ok' : 'missing');
+
+  const cls =
+    docStatus === 'wrong'   ? 'cl-row cl-row-wrong'   :
+    docStatus === 'missing' ? 'cl-row cl-row-missing' :
+    docStatus === 'unchecked' ? 'cl-row cl-row-unchecked' :
+    'cl-row cl-row-ok';
+
+  const icon =
+    docStatus === 'wrong'   ? '✗' :
+    docStatus === 'missing' ? '⚠' :
+    docStatus === 'unchecked' ? '?' :
+    '✓';
+
+  const label =
+    docStatus === 'wrong'   ? 'Wrong Doc' :
+    docStatus === 'missing' ? 'Missing' :
+    docStatus === 'unchecked' ? 'Not Checked' :
+    'OK';
+
   return (
-    <div className="cl-row" onClick={onOpen} role="button" tabIndex={0}
+    <div className={cls} onClick={onOpen} role="button" tabIndex={0}
          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onOpen(); }}>
-      <span className="cl-check">✓</span>
+      <span className="cl-check">{icon}</span>
       <span className="cl-num">{item.itemNo}</span>
       <span className="cl-title">
         {item.title}
         {companyTag && <span style={{ marginLeft: 6, color: '#64748b', fontSize: 12, fontStyle: 'italic', textDecoration: 'none' }}>— {companyTag}</span>}
+        {item.matchedDoc?.matchType === 'fuzzy' && (
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+            matched: {item.matchedDoc.name}
+          </div>
+        )}
       </span>
       <span className="cl-status-group">
-        {status === 'Query'          && <span className="cl-tag-open">Query</span>}
-        {status === 'Query Replied OK' && <span className="cl-tag-replied">Query Replied</span>}
-        <span className={status === 'Query' ? 'cl-status-query' : 'cl-status-ok'}>OK</span>
+        {queryStatus === 'Query'            && <span className="cl-tag-open">Query</span>}
+        {queryStatus === 'Query Replied OK' && <span className="cl-tag-replied">Query Replied</span>}
+        <span className={`cl-doc-status cl-doc-status-${docStatus}`}>{label}</span>
       </span>
     </div>
   );
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
+function flattenChecklistItems(tree) {
+  if (!tree) return [];
+  const pre  = tree.preItems  || tree.preSection4  || [];
+  const post = tree.postItems || tree.postSection4 || [];
+  const approval = tree.approvalSection || tree.section4;
+  const out = [...pre, ...post];
+  if (tree.historicalItem)   out.push(tree.historicalItem);
+  if (tree.mfgLicenseSection?.companies) out.push(...tree.mfgLicenseSection.companies);
+  for (const c of (approval?.countries || [])) out.push(...(c.subItems || []));
+  return out;
+}
+
 function findItemById(tree, itemId) {
   if (!tree) return null;
   const pre  = tree.preItems  || tree.preSection4  || [];

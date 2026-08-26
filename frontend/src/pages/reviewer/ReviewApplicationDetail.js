@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { getApplicationFull, shipmentAction, setNocMeta } from '../../api/applicationService';
+import { getApplicationFull, shipmentAction, setNocMeta, preVerifyDocs } from '../../api/applicationService';
 import { useApp } from '../../context/AppContext';
 import DocViewerModal from '../../components/shared/DocViewerModal';
 import NocChecklistPage from '../../components/checklist/NocChecklistPage';
@@ -372,6 +372,8 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [summaryDocId, setSummaryDocId] = useState(null); // which doc is expanded in summary
   const [lineBusy, setLineBusy] = useState(null); // shipment index currently being actioned
   const [lineRemarksPrompt, setLineRemarksPrompt] = useState(null); // { idx, nextStatus }
+  const [aiCheckLoading, setAiCheckLoading] = useState(false); // pre-verify in flight
+  const preVerifyAttempted = useRef(new Set()); // appNumbers we've already attempted this session
 
   useEffect(() => {
     setFull(null); setLoadingFull(true); setDocResult({}); setDocVerdict({}); setShowForm(false);
@@ -380,6 +382,37 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
       setLoadingFull(false);
     });
   }, [app.applicationNumber]);
+
+  /* Kick off AI pre-verify once per application, after data loads. Uploaded
+     docs that already have a cached validationResult in Mongo return
+     instantly; uncached ones get a full Mistral pass. Guarded by a ref so
+     a partial failure doesn't loop-retry on every render. */
+  useEffect(() => {
+    if (!full?.applicationNumber) return;
+    if (preVerifyAttempted.current.has(full.applicationNumber)) return;
+
+    const docs = full.documents || {};
+    const uploaded = REQUIRED_DOCS.filter(d => docs[d.id]);
+    if (uploaded.length === 0) return;
+    const needsCheck = uploaded.some(d => {
+      const vr = docs[d.id]?.validationResult;
+      return !vr || typeof vr.documentTypeMatch !== 'boolean';
+    });
+    if (!needsCheck) return;
+
+    preVerifyAttempted.current.add(full.applicationNumber);
+    let cancelled = false;
+    setAiCheckLoading(true);
+    preVerifyDocs(full.applicationNumber).then(async (res) => {
+      if (cancelled) return;
+      if (res.success) {
+        const refreshed = await getApplicationFull(full.applicationNumber);
+        if (!cancelled && refreshed.success) setFull(refreshed.application);
+      }
+      if (!cancelled) setAiCheckLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [full]);
 
   // Lock body scroll whenever any modal overlay is open
   useEffect(() => {
@@ -429,25 +462,30 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
 
   const handleDocClick = (docId, docLabel, docType, up) => {
     if (!up) return;
+
+    // Prefer the AI content-based verdict from pre-verify — it reads the
+    // actual document, so it beats filename heuristics (e.g. a manufacturing
+    // licence file that was misnamed "CDSCO EXPORT NOC.pdf").
+    const aiMatch = up.validationResult && typeof up.validationResult.documentTypeMatch === 'boolean'
+      ? up.validationResult.documentTypeMatch
+      : null;
+    if (aiMatch === true) {
+      setVerifiedDoc({ docId, docLabel, docType, up });
+      return;
+    }
+    if (aiMatch === false) {
+      setMismatchDoc({ docId, docLabel, docType, up });
+      return;
+    }
+
+    // Fallback (no AI verdict yet — pre-verify skipped or failed):
     const prev = docResult[docId];
+    if (prev === 'ok') { setVerifiedDoc({ docId, docLabel, docType, up }); return; }
+    if (prev === 'bad') { setMismatchDoc({ docId, docLabel, docType, up }); return; }
 
-    // Already checked — cached result
-    if (prev === 'ok') {
-      setVerifiedDoc({ docId, docLabel, docType, up });
-      return;
-    }
-    if (prev === 'bad') {
-      setMismatchDoc({ docId, docLabel, docType, up });
-      return;
-    }
-
-    // First time — check filename
     const ok = checkDocFilename(docId, docType, up);
-    if (ok) {
-      setVerifiedDoc({ docId, docLabel, docType, up });
-    } else {
-      setMismatchDoc({ docId, docLabel, docType, up });
-    }
+    if (ok) setVerifiedDoc({ docId, docLabel, docType, up });
+    else setMismatchDoc({ docId, docLabel, docType, up });
   };
 
   const openViewer = (docId, docLabel, docType, up) => {
@@ -573,7 +611,6 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           ['shipments', '🚚', 'Shipments'],
           ['docs', '📁', 'Documents'],
           ['checklist', '🔍', 'Checklist\nQuery'],
-          ['noc', '🏷', 'NOC\nSetup'],
           ['audit', '📜', 'Audit'],
         ].map(([k, icon, label]) => (
           <button
@@ -722,26 +759,53 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           <div className="rv-docs-panel">
             <div className="rv-docs-info">
               <span>ℹ️</span>
-              <span>Click <strong>Verify &amp; Open</strong> to validate a document against the prescribed template before opening it.</span>
+              <span>
+                {aiCheckLoading
+                  ? <>AI is checking each uploaded document against its expected type — badges will update in a moment…</>
+                  : <>Green ✓ means the AI confirmed the uploaded file matches the expected document type. Red ✗ means a wrong document was uploaded. Click <strong>Verify &amp; Open</strong> for the full checklist.</>}
+              </span>
             </div>
             {REQUIRED_DOCS.map(doc => {
               const up = data.documents?.[doc.id];
-              const verdict = docVerdict[doc.id];
+              // Priority: reviewer's explicit verdict > AI-cached verdict from pre-verify
+              const reviewerVerdict = docVerdict[doc.id];
+              const aiVerdict = up?.validationResult && typeof up.validationResult.documentTypeMatch === 'boolean'
+                ? (up.validationResult.documentTypeMatch ? 'ok' : 'bad')
+                : null;
+              const verdict = reviewerVerdict || aiVerdict;
+              const aiPending = up && !aiVerdict && !reviewerVerdict && aiCheckLoading;
+
               const cls = !up ? 'rv-doc-none' : verdict === 'ok' ? 'rv-doc-ok' : verdict === 'bad' ? 'rv-doc-bad' : '';
               return (
                 <div key={doc.id} className={`rv-doc-row ${cls}`}>
                   <span className="rv-doc-icon-big">
-                    {!up ? '❌' : verdict === 'ok' ? '✅' : verdict === 'bad' ? '🚫' : '📄'}
+                    {!up ? '❌' : aiPending ? '⏳' : verdict === 'ok' ? '✅' : verdict === 'bad' ? '🚫' : '📄'}
                   </span>
                   <div className="rv-doc-info">
                     <div className="rv-doc-name">{doc.label}</div>
                     {up
-                      ? <div className="rv-doc-file">{up.name} · {up.uploadedAt}</div>
+                      ? <div className="rv-doc-file">
+                          {up.name} · {up.uploadedAt}
+                          {verdict === 'bad' && up.validationResult?.documentTypeReason && !reviewerVerdict && (
+                            <div style={{ marginTop: 4, color: '#dc2626', fontSize: 12 }}>
+                              ⚠ {up.validationResult.documentTypeReason}
+                            </div>
+                          )}
+                        </div>
                       : <div className="rv-doc-missing-lbl">Not uploaded</div>}
                   </div>
                   <div className="rv-doc-actions">
-                    {verdict === 'ok' && <span className="rv-status-chip rv-chip-ok">✓ Verified</span>}
-                    {verdict === 'bad' && <span className="rv-status-chip rv-chip-bad">✗ Declined</span>}
+                    {aiPending && <span className="rv-status-chip" style={{ background: '#f1f5f9', color: '#475569' }}>⏳ Checking…</span>}
+                    {verdict === 'ok' && (
+                      <span className="rv-status-chip rv-chip-ok">
+                        ✓ {reviewerVerdict ? 'Verified' : 'AI: Correct Doc'}
+                      </span>
+                    )}
+                    {verdict === 'bad' && (
+                      <span className="rv-status-chip rv-chip-bad">
+                        ✗ {reviewerVerdict ? 'Declined' : 'AI: Wrong Doc'}
+                      </span>
+                    )}
                     {up && (
                       <>
                         <button className="rv-verify-btn"
@@ -763,20 +827,6 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
             applicationNumber={data.applicationNumber}
             role="reviewer"
           />
-        )}
-
-        {/* ── NOC SETUP (reviewer sets validity + sanctioned qty after approval) ── */}
-        {!loadingFull && activeTab === 'noc' && (
-          <div style={{ padding: '14px' }}>
-            <NocSetupPanel
-              app={data}
-              currentUser={currentUser}
-              onSaved={async () => {
-                const res = await getApplicationFull(data.applicationNumber);
-                if (res.success) setFull(res.application);
-              }}
-            />
-          </div>
         )}
 
         {/* ── AUDIT ── */}

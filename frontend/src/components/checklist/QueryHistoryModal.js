@@ -28,6 +28,7 @@ export default function QueryHistoryModal({
   onRaiseQuery,
   onSubmitReply,
   busy = false,
+  applicationDocs = {},
 }) {
   const [showAction, setShowAction] = useState(false);
   const [text, setText] = useState('');
@@ -144,6 +145,11 @@ export default function QueryHistoryModal({
 
         {/* Body */}
         <div className="cl-modal-body">
+          {/* Item-specific document panel: the ONE upload that matches this
+              checklist item, with a big status badge. This is what tells
+              the reviewer whether they need to raise a query. */}
+          <ItemDocPanel item={item} role={role} />
+
           {/* Blue history bar */}
           <div className="cl-history-title">
             <span>History</span>
@@ -218,7 +224,7 @@ export default function QueryHistoryModal({
           <div className="cl-field-row">
             <div className="cl-field-label">Base Query/Remarks</div>
             <div className="cl-field-value cl-base-query">
-              {item.baseQuery ? item.baseQuery : (item.submissionRemark ? 'ok' : 'ok')}
+              {item.baseQuery || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No query raised yet</span>}
             </div>
           </div>
           <div className="cl-field-row">
@@ -227,10 +233,21 @@ export default function QueryHistoryModal({
               <textarea
                 className="cl-textarea"
                 readOnly
-                value={item.previousQuery || 'ok'}
+                placeholder="No previous query on this item."
+                value={item.previousQuery || ''}
               />
             </div>
           </div>
+
+          {/* Application-level uploaded documents (with AI verdict badges).
+              Shown for every checklist item — the reviewer needs quick access
+              to all uploaded docs regardless of which item they clicked. */}
+          <ApplicationDocsPanel
+            docs={applicationDocs}
+            emptyHint={role === 'reviewer'
+              ? 'The applicant has not uploaded any documents yet. Raise a query below to request them.'
+              : 'You have not uploaded any documents yet.'}
+          />
 
           {/* AI Verify panel */}
           {verifyTargets.length > 0 && (
@@ -419,5 +436,125 @@ export default function QueryHistoryModal({
       </div>
     </div>,
     document.body
+  );
+}
+
+/* ── Item-specific document panel ────────────────────────────────────────
+   Shows THIS checklist item's matched upload (via exact docId or fuzzy
+   filename match) with a big verdict badge. Answers the reviewer's core
+   question at a glance: "is this checklist item satisfied?" */
+function ItemDocPanel({ item, role }) {
+  const status = item.docStatus || (item.submissionDocUrl ? 'ok' : 'missing');
+  const matched = item.matchedDoc || null;
+  const url = matched?.objectUrl || item.submissionDocUrl || '';
+
+  const statusText =
+    status === 'wrong'     ? 'Wrong Document Uploaded' :
+    status === 'missing'   ? 'No Document Uploaded' :
+    status === 'unchecked' ? 'Document Uploaded — AI Check Pending' :
+    'Correct Document Uploaded';
+
+  const guidance =
+    status === 'wrong'
+      ? (role === 'reviewer'
+          ? 'Raise a query below asking the applicant to upload the correct document for this checklist item.'
+          : 'The reviewer flagged this upload as wrong. Please re-upload the correct document.')
+      : status === 'missing'
+      ? (role === 'reviewer'
+          ? 'The applicant has not uploaded any document matching this checklist item. Raise a query below to request it.'
+          : 'No document has been uploaded for this checklist item yet.')
+      : status === 'unchecked'
+      ? 'A document is attached but the AI type-check has not run yet.'
+      : 'The AI verified this upload matches the expected document type.';
+
+  return (
+    <div className={`cl-item-doc cl-item-doc-${status}`}>
+      <div className="cl-item-doc-header">
+        <span className="cl-item-doc-icon">
+          {status === 'ok' ? '✅' : status === 'wrong' ? '🚫' : status === 'unchecked' ? '⏳' : '⚠️'}
+        </span>
+        <div className="cl-item-doc-title">
+          <div className="cl-item-doc-status">{statusText}</div>
+          <div className="cl-item-doc-guidance">{guidance}</div>
+        </div>
+      </div>
+
+      {matched && (
+        <div className="cl-item-doc-file">
+          <div className="cl-item-doc-filename">
+            📄 <strong>{matched.name}</strong>
+            {matched.matchType === 'fuzzy' && (
+              <span className="cl-item-doc-fuzzy" title="Matched by filename keywords (applicant uploaded to a different slot)">
+                fuzzy match
+              </span>
+            )}
+          </div>
+          {status === 'wrong' && matched.validationResult?.documentTypeReason && (
+            <div className="cl-item-doc-reason">
+              <strong>AI reason:</strong> {matched.validationResult.documentTypeReason}
+            </div>
+          )}
+          {url && (
+            <a className="cl-item-doc-view" href={url} target="_blank" rel="noreferrer">
+              👁 Open Document
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Application documents panel — all uploaded docs with AI verdict badges ─
+   Rendered inside every checklist modal so the reviewer always has quick
+   access to the applicant's uploads, even for checklist items that don't
+   map to a specific upload slot. */
+function ApplicationDocsPanel({ docs, emptyHint }) {
+  const entries = Object.entries(docs || {});
+
+  return (
+    <div className="cl-app-docs">
+      <div className="cl-app-docs-title">
+        📎 Application Documents
+        <span className="cl-app-docs-count">{entries.length} uploaded</span>
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="cl-app-docs-empty">{emptyHint}</div>
+      ) : (
+        <div className="cl-app-docs-list">
+          {entries.map(([docId, d]) => {
+            const vr = d.validationResult || {};
+            const verdict = typeof vr.documentTypeMatch === 'boolean'
+              ? (vr.documentTypeMatch ? 'ok' : 'bad')
+              : null;
+            return (
+              <div key={docId} className={`cl-app-doc ${verdict === 'ok' ? 'ok' : verdict === 'bad' ? 'bad' : ''}`}>
+                <span className="cl-app-doc-slot">{docId}</span>
+                <div className="cl-app-doc-body">
+                  <div className="cl-app-doc-name" title={d.name}>{d.name || '—'}</div>
+                  {verdict === 'bad' && vr.documentTypeReason && (
+                    <div className="cl-app-doc-reason">⚠ {vr.documentTypeReason}</div>
+                  )}
+                </div>
+                {verdict === 'ok' && <span className="cl-app-doc-badge ok">✓ AI: Correct</span>}
+                {verdict === 'bad' && <span className="cl-app-doc-badge bad">✗ AI: Wrong Doc</span>}
+                {verdict === null && <span className="cl-app-doc-badge unk">? Not Checked</span>}
+                {d.objectUrl && (
+                  <a
+                    className="cl-app-doc-view"
+                    href={d.objectUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    👁 View
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

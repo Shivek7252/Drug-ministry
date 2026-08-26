@@ -51,9 +51,24 @@ function isTextLayerUsable(items) {
   return total > 0 && (readable / total) > 0.5;
 }
 
+/* Progressive fallback: try full query, then shorter substrings, then each
+   whitespace-separated token. Returns the first non-empty match set. */
+function progressiveQueries(query) {
+  const q = query.replace(/\s+/g, ' ').trim();
+  if (!q) return [];
+  const out = [q];
+  const parts = q.split(/\s+/);
+  // Halved from the right
+  if (parts.length >= 4) out.push(parts.slice(0, Math.ceil(parts.length / 2)).join(' '));
+  // Individual tokens ≥3 chars, in original order, dedup preserving order
+  const seen = new Set(out);
+  for (const p of parts) if (p.length >= 3 && !seen.has(p)) { out.push(p); seen.add(p); }
+  return out;
+}
+
 /* ─── PDF.js text-layer search ──────────────────────────────────────────── */
-function getHighlightsFromTextLayer(query, items, vp) {
-  if (!query?.trim() || !items?.length || !vp) return [];
+function searchTextLayer(rawQuery, items, vp) {
+  if (!items?.length || !vp) return [];
   const map = []; let raw = '';
   for (const item of items) {
     const s = item.str || '';
@@ -69,7 +84,7 @@ function getHighlightsFromTextLayer(query, items, vp) {
     } else { norm += raw[i]; normMap.push(i); lastSp = false; }
   }
   const rects = [];
-  const re = new RegExp(escRx(query.replace(/\s+/g, ' ').trim()), 'gi');
+  const re = new RegExp(escRx(rawQuery.replace(/\s+/g, ' ').trim()), 'gi');
   let m;
   while ((m = re.exec(norm)) !== null) {
     const rs = normMap[m.index];
@@ -87,6 +102,15 @@ function getHighlightsFromTextLayer(query, items, vp) {
     if (seg) { const r = toRect(seg.item, seg.s, seg.e, vp); if (r) rects.push(r); }
   }
   return rects.filter(Boolean);
+}
+
+function getHighlightsFromTextLayer(query, items, vp) {
+  if (!query?.trim() || !items?.length || !vp) return [];
+  for (const q of progressiveQueries(query)) {
+    const rects = searchTextLayer(q, items, vp);
+    if (rects.length > 0) return rects;
+  }
+  return [];
 }
 
 function toRect(item, s, e, vp) {
@@ -145,15 +169,14 @@ async function ocrCanvas(canvas) {
   return words;
 }
 
-function getHighlightsFromOcr(query, ocrWords) {
-  if (!query?.trim() || !ocrWords?.length) return [];
+function searchOcr(rawQuery, ocrWords) {
   const wordMap = []; let joined = '';
   ocrWords.forEach((w, wi) => {
     for (let ci = 0; ci < w.text.length; ci++) wordMap.push({ wi, ci });
     joined += w.text;
     if (wi < ocrWords.length - 1) { wordMap.push({ wi, ci: -1, sep: true }); joined += ' '; }
   });
-  const re = new RegExp(escRx(query.replace(/\s+/g, ' ').trim()), 'gi');
+  const re = new RegExp(escRx(rawQuery.replace(/\s+/g, ' ').trim()), 'gi');
   const rects = []; let m;
   while ((m = re.exec(joined)) !== null) {
     const spanned = new Set();
@@ -165,6 +188,15 @@ function getHighlightsFromOcr(query, ocrWords) {
     }
   }
   return rects;
+}
+
+function getHighlightsFromOcr(query, ocrWords) {
+  if (!query?.trim() || !ocrWords?.length) return [];
+  for (const q of progressiveQueries(query)) {
+    const rects = searchOcr(q, ocrWords);
+    if (rects.length > 0) return rects;
+  }
+  return [];
 }
 
 /* ─── doc-type → checklist key mapping ──────────────────────────────────── */
@@ -323,18 +355,44 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
     return words.slice(0, 3).join(' ').trim() || item.split(' ').slice(0, 2).join(' ');
   };
 
+  /* From a piece of AI evidence text, pick the shortest DISTINCTIVE token
+     that scanned-PDF OCR will most reliably find. Long full quotes with mixed
+     punctuation (e.g. "LIC No / Validity | KD/323 31/12/2026") almost never
+     match exactly against Tesseract output — but a single ID like "KD/323"
+     or date like "31/12/2026" nearly always does. Priority:
+       1. Alphanumeric ID (mix of letters + digits, has / or - allowed)
+       2. Date pattern dd/mm/yyyy or dd-mm-yyyy
+       3. All-caps run of 2+ words (proper nouns)
+       4. Fallback: first 5 significant words. */
+  const pickDistinctiveTerm = (evidence) => {
+    if (!evidence) return '';
+    const cleaned = evidence.replace(/^["'`]+|["'`]+$/g, '').trim();
+
+    // 1. Alphanumeric IDs — mix of letters + digits, minimum 3 chars, allow /-
+    const idMatch = cleaned.match(/\b[A-Z]{1,6}[\/\-][A-Z0-9]{2,}[A-Z0-9\/\-]*\b|\b[A-Z]{2,}[0-9]+[A-Z0-9]*\b|\b[0-9]+[A-Z]+[A-Z0-9]*\b/);
+    if (idMatch) return idMatch[0];
+
+    // 2. Date patterns
+    const dateMatch = cleaned.match(/\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b/);
+    if (dateMatch) return dateMatch[0];
+
+    // 3. Run of 2+ consecutive all-caps words (>=3 chars each)
+    const capsMatch = cleaned.match(/\b[A-Z]{3,}(?:\s+[A-Z]{3,}){1,4}\b/);
+    if (capsMatch) return capsMatch[0];
+
+    // 4. First 5 significant words (fallback)
+    return cleaned.split(/\s+/).slice(0, 5).join(' ');
+  };
+
   const handleItemClick = (r, i) => {
     if (!onSearch || r.present !== true) return;
-    // Prefer the AI's verbatim evidence quote (already proven to appear in the doc).
-    // Use the first ~6 words so search is forgiving of OCR/whitespace noise.
-    let term = '';
-    if (r.evidence) {
-      term = r.evidence.replace(/^["'`]+|["'`]+$/g, '').split(/\s+/).slice(0, 6).join(' ');
-    }
+    // Prefer a distinctive short token from the AI evidence (ID / date /
+    // caps run) — much more OCR-robust than the full verbatim quote.
+    let term = pickDistinctiveTerm(r.evidence);
     if (!term) term = getSearchTerm(r.item, r.note);
     if (!term) return;
     setActiveItem(i);
-    onSearch(term);
+    onSearch(term, r.page || null);
   };
 
   const score = summary?.score ?? 0;
@@ -781,7 +839,21 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
               docType={docType || docId}
               docLabel={docLabel}
               fileUrl={fileUrl}
-              onSearch={term => { setQuery(term); setActive(0); }}
+              onSearch={(term, pageHint) => {
+                setQuery(term);
+                setActive(0);
+                // Scroll to the AI-reported page as a best-effort fallback,
+                // so the reviewer at least lands near the right area even
+                // when the search term doesn't match verbatim.
+                if (pageHint && pageRefs.current[pageHint] && scrollRef.current) {
+                  requestAnimationFrame(() => {
+                    scrollRef.current?.scrollTo({
+                      top: pageRefs.current[pageHint].offsetTop - 20,
+                      behavior: 'smooth',
+                    });
+                  });
+                }
+              }}
               activeQuery={query}
             />
           </div>

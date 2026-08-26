@@ -111,6 +111,25 @@ export async function getApplicationFull(id) {
   return apiFetch(`${BASE}/${id}/full`);
 }
 
+/* ── Reviewer: pre-verify every uploaded document so the Documents tab can
+   show green/red doc-type-match badges without waiting for a manual click.
+   Backend caches verdicts in Mongo — first call runs Mistral for uncached
+   docs, subsequent calls return instantly. */
+export async function preVerifyDocs(appNumber, { force = false } = {}) {
+  try {
+    const res = await fetch(`${BASE}/${appNumber}/pre-verify${force ? '?force=1' : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(240000), // 4 min — Mistral round-trips for up to ~10 docs
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return { success: true, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 /* ── Reviewer: act on a single shipment line item ──────────────────────── */
 export async function shipmentAction(appNumber, shipmentIdx, { status, remarks = '', officer = 'reviewer' }) {
   return apiFetch(`${BASE}/${appNumber}/shipments/${shipmentIdx}/action`, {

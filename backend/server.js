@@ -286,6 +286,112 @@ async function extractTextFromPdfPages(buffer) {
   return pages;
 }
 
+/* ─── Visual-only checklist items ──────────────────────────────────────── */
+/* Items that require SEEING the document (seals, stamps, signature marks,
+   photographs, watermarks). The text pass can never confirm these, so they
+   go through a separate vision pass using Pixtral. */
+const VISUAL_ITEM_PATTERNS = [
+  /\bseal\b/i,
+  /\bstamp\b/i,
+  /signature.*(visible|present)/i,
+  /(visible|present).*signature/i,
+  /notary attestation/i,
+  /photograph/i,
+  /watermark/i,
+  /qr[\s-]?code/i,
+  /emblem/i,
+];
+
+function isVisualItem(item) {
+  return VISUAL_ITEM_PATTERNS.some(rx => rx.test(item));
+}
+
+/* ─── Vision pass: send the PDF to Pixtral and check visual items ──────── */
+/* Model fallback chain — first ID that the account has access to wins.
+   Override with MISTRAL_VISION_MODEL in .env if needed. */
+const VISION_MODEL_CANDIDATES = [
+  process.env.MISTRAL_VISION_MODEL,
+  'pixtral-12b-2409',
+  'pixtral-12b-latest',
+  'pixtral-12b',
+  'mistral-medium-latest',
+  'mistral-small-latest',
+].filter(Boolean);
+
+async function verifyVisualItemsWithVision(pdfBuffer, visualItems) {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey || apiKey === 'your_mistral_api_key_here') {
+    throw new Error('MISTRAL_API_KEY is not configured');
+  }
+
+  const b64 = pdfBuffer.toString('base64');
+  const numbered = visualItems.map((v, i) => `${i + 1}. ${v}`).join('\n');
+
+  const prompt = `You are inspecting a scanned government/regulatory document (Indian pharma export NOC context) for VISUAL elements only. Read the document images page by page.
+
+For each item below, decide if the visual element is present anywhere in the document, and on which page:
+
+${numbered}
+
+Interpretation rules — be inclusive, not strict:
+- "Seal" / "stamp" / "emblem" means ANY round, oval or shield-shaped official mark, government/authority emblem, embossed impression, notary stamp, or ink stamp — even faded, light-blue, watermark-style, or partially visible. The Indian FDA/CDSCO/State-Drug seal is typically a circular blue/black mark, often near a signature or at the bottom of the page. Watermarks that reproduce the authority logo (e.g. "FDA MAHARASHTRA" faded across the page) also count as a seal.
+- "Signature" / "signatory" means any handwritten mark, eSign block, or digitally signed name (e.g. "e-Signed by NAME on DATE") from a person.
+- "Photograph" means a passport-style photo of a person.
+- "Watermark" means a repeating faded background image or text overlay.
+- "QR code" means a square 2D barcode.
+- If the element appears anywhere on any page, mark present=true and report the earliest page.
+
+Return STRICT JSON in exactly this shape — no preamble, no markdown fences:
+{
+  "items": [
+    { "index": 1, "present": true, "page": 1, "evidence": "short description of what you saw and where" }
+  ]
+}`;
+
+  const body = (model) => JSON.stringify({
+    model,
+    temperature: 0,
+    max_tokens: 1500,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'document_url', document_url: `data:application/pdf;base64,${b64}` },
+        ],
+      },
+    ],
+  });
+
+  let lastErr = '';
+  for (const model of VISION_MODEL_CANDIDATES) {
+    const response = await fetchWithRetry('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: body(model),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const raw = data.choices?.[0]?.message?.content || '{}';
+      console.log(`[Vision] used model: ${model}`);
+      try { return JSON.parse(raw); } catch { return { items: [] }; }
+    }
+
+    const errText = await response.text();
+    lastErr = `${response.status}: ${errText.slice(0, 200)}`;
+    // Only try the next model on invalid_model / not-found errors.
+    const shouldFallback = /invalid_model|not.?found|does not exist|unauthorized model/i.test(errText)
+      || response.status === 404;
+    if (!shouldFallback) {
+      throw new Error(`Pixtral vision error ${lastErr}`);
+    }
+    console.warn(`[Vision] model "${model}" unavailable (${response.status}) — trying next.`);
+  }
+  throw new Error(`Pixtral vision error: no accessible vision model. Last: ${lastErr}`);
+}
+
 /* ─── Mistral OCR fallback for scanned / image-only PDFs ───────────────── */
 async function ocrPdfWithMistral(buffer) {
   const apiKey = process.env.MISTRAL_API_KEY;
@@ -795,67 +901,137 @@ Return ONLY valid JSON, no explanation:
   }
 });
 
-/* ─── POST /api/verify — main verification endpoint ────────────────────── */
-app.post('/api/verify', upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+/* ─── Fast doc-type-only identification (used by /api/pre-verify) ────────
+   Answers ONLY "is this the expected document type?" — skips per-item
+   checklist, skips vision pass, skips OCR fallback, uses a small model with
+   a truncated text sample. ~1-3s per doc instead of ~15-30s. */
+async function identifyDocumentTypeQuick({ buffer, mimetype, docType, docLabel }) {
+  const profile = DOC_TYPE_PROFILES[docType] || DOC_TYPE_PROFILES.default;
 
-    const docType = req.body.docType || 'default';
-    const docLabel = req.body.docLabel || 'document';
-    const items = CHECKLISTS[docType] || CHECKLISTS.default;
-    const profile = DOC_TYPE_PROFILES[docType] || DOC_TYPE_PROFILES.default;
+  let text = '';
+  let usedOcr = false;
+  if (mimetype === 'application/pdf') {
+    try {
+      const pages = await extractTextFromPdfPages(buffer);
+      text = pages.join('\n\n').trim();
+    } catch (_) { /* fall through */ }
 
-    // ── Step 1: extract per-page text ──────────────────────────────────────
-    let pages = [];
-    let textSource = 'none';
-    if (req.file.mimetype === 'application/pdf') {
-      pages = await extractTextFromPdfPages(req.file.buffer);
-      if (pages.join('').trim().length > 50) textSource = 'pdf-text';
-    }
-
-    // ── Step 2: OCR fallback for scanned / image-only PDFs ────────────────
-    const totalChars = pages.reduce((s, p) => s + (p || '').length, 0);
-    if (req.file.mimetype === 'application/pdf' && totalChars < 200) {
+    // OCR fallback for scanned PDFs — costs ~5-10s but pre-verify is meant
+    // to be accurate, and the app's uploaded docs are typically scans.
+    if (text.length < 200) {
       try {
-        const ocrPages = await ocrPdfWithMistral(req.file.buffer);
-        if (ocrPages.join('').trim().length > 50) {
-          pages = ocrPages;
-          textSource = 'mistral-ocr';
+        const ocrPages = await ocrPdfWithMistral(buffer);
+        const ocrText = ocrPages.join('\n\n').trim();
+        if (ocrText.length > text.length) {
+          text = ocrText;
+          usedOcr = true;
         }
       } catch (e) {
-        if (e.message.includes('ENOTFOUND') || e.message.includes('unreachable')) {
-          console.warn('[OCR] Mistral API unreachable (network/DNS issue) — skipping OCR, continuing with text extraction only.');
-        } else {
-          console.warn('[OCR] fallback failed:', e.message);
-        }
-        // Non-fatal: continue without OCR; hasText check below will handle it
+        console.warn('[pre-verify OCR] fallback failed:', e.message);
       }
     }
+  }
 
-    const hasText = pages.join('').trim().length > 100;
+  if (text.length < 100) {
+    return {
+      documentTypeMatch: true,
+      documentTypeReason: 'Could not extract text from document — type check skipped, please deep-verify manually.',
+    };
+  }
 
-    if (!hasText) {
-      const blankResults = items.map(it => ({
-        item: it, present: null, page: null, evidence: '',
-        note: 'Text could not be extracted. Document appears to be a scanned image — AI checklist verification requires text extraction.'
-      }));
-      return res.json({
-        success: true, docType, docLabel, hasText: false, textSource,
-        documentTypeMatch: true,
-        documentTypeReason: 'Document accepted — scanned/image-based PDF, text extraction unavailable.',
-        results: blankResults,
-        summary: { total: items.length, present: 0, missing: 0, unknown: items.length, score: 0 },
-      });
+  // Truncate — doc-type ID only needs the header/first page or two.
+  const sample = text.length > 3000 ? text.slice(0, 3000) + '\n...[truncated]' : text;
+
+  const systemPrompt = `You classify pharmaceutical/regulatory documents. Answer ONLY whether the given text is the EXPECTED document type. Return strict JSON: {"documentTypeMatch": true|false, "documentTypeReason": "one short sentence"}. No preamble, no markdown.`;
+
+  const userPrompt = `EXPECTED document type: "${docLabel}"
+
+What "${docLabel}" should look like:
+${profile.identity}
+${profile.mustNotBe || ''}
+
+Indicative keywords in genuine "${docLabel}" documents:
+${profile.mustHaveAny.length ? profile.mustHaveAny.map(k => `  • ${k}`).join('\n') : '  (none specified)'}
+
+Document text sample (may be truncated):
+"""
+${sample}
+"""
+
+Return JSON only.`;
+
+  // Use the strong model — the truncation + parallelization already give us
+  // the speed win; using `small` here would trade real accuracy for maybe 2s.
+  const raw = await callMistralJson(
+    [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+    { model: 'mistral-large-latest', maxTokens: 200 }
+  );
+
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+  return {
+    documentTypeMatch: parsed.documentTypeMatch === true,
+    documentTypeReason: typeof parsed.documentTypeReason === 'string' ? parsed.documentTypeReason.trim() : '',
+  };
+}
+
+/* ─── Reusable verification core (used by /api/verify AND /api/pre-verify) ─
+   Same logic as before, just factored so a route can call it with a buffer
+   instead of an upload. Returns the full response object; never writes to res. */
+async function verifyDocumentBuffer({ buffer, mimetype, docType, docLabel }) {
+  const items = CHECKLISTS[docType] || CHECKLISTS.default;
+  const profile = DOC_TYPE_PROFILES[docType] || DOC_TYPE_PROFILES.default;
+
+  // ── Step 1: extract per-page text ──────────────────────────────────────
+  let pages = [];
+  let textSource = 'none';
+  if (mimetype === 'application/pdf') {
+    pages = await extractTextFromPdfPages(buffer);
+    if (pages.join('').trim().length > 50) textSource = 'pdf-text';
+  }
+
+  // ── Step 2: OCR fallback for scanned / image-only PDFs ────────────────
+  const totalChars = pages.reduce((s, p) => s + (p || '').length, 0);
+  if (mimetype === 'application/pdf' && totalChars < 200) {
+    try {
+      const ocrPages = await ocrPdfWithMistral(buffer);
+      if (ocrPages.join('').trim().length > 50) {
+        pages = ocrPages;
+        textSource = 'mistral-ocr';
+      }
+    } catch (e) {
+      if (e.message.includes('ENOTFOUND') || e.message.includes('unreachable')) {
+        console.warn('[OCR] Mistral API unreachable (network/DNS issue) — skipping OCR, continuing with text extraction only.');
+      } else {
+        console.warn('[OCR] fallback failed:', e.message);
+      }
     }
+  }
 
-    // ── Step 3: build prompt with page markers ────────────────────────────
-    const MAX_CHARS = 60000;
-    let pageText = pages
-      .map((p, i) => `\n===== PAGE ${i + 1} =====\n${(p || '').trim()}`)
-      .join('\n');
-    if (pageText.length > MAX_CHARS) pageText = pageText.slice(0, MAX_CHARS) + '\n...[truncated]';
+  const hasText = pages.join('').trim().length > 100;
 
-    const systemPrompt = `You are a strict, evidence-only document verifier for the Indian pharmaceutical Export NOC process (CDSCO / Drug Ministry).
+  if (!hasText) {
+    const blankResults = items.map(it => ({
+      item: it, present: null, page: null, evidence: '',
+      note: 'Text could not be extracted. Document appears to be a scanned image — AI checklist verification requires text extraction.'
+    }));
+    return {
+      success: true, docType, docLabel, hasText: false, textSource,
+      documentTypeMatch: true,
+      documentTypeReason: 'Document accepted — scanned/image-based PDF, text extraction unavailable.',
+      results: blankResults,
+      summary: { total: items.length, present: 0, missing: 0, unknown: items.length, score: 0 },
+    };
+  }
+
+  // ── Step 3: build prompt with page markers ────────────────────────────
+  const MAX_CHARS = 60000;
+  let pageText = pages
+    .map((p, i) => `\n===== PAGE ${i + 1} =====\n${(p || '').trim()}`)
+    .join('\n');
+  if (pageText.length > MAX_CHARS) pageText = pageText.slice(0, MAX_CHARS) + '\n...[truncated]';
+
+  const systemPrompt = `You are a strict, evidence-only document verifier for the Indian pharmaceutical Export NOC process (CDSCO / Drug Ministry).
 
 You will be given:
   (a) the full text of an uploaded document (with per-page markers), and
@@ -893,7 +1069,7 @@ JSON schema:
   ]
 }`;
 
-    const userPrompt = `EXPECTED document type: "${docLabel}"
+  const userPrompt = `EXPECTED document type: "${docLabel}"
 Internal type key: "${docType}"
 Text source: ${textSource}
 
@@ -914,79 +1090,132 @@ ${items.map((it, i) => `${i + 1}. ${it}`).join('\n')}
 
 Return ONLY the JSON object described in the schema — no preamble, no markdown fences.`;
 
-    // ── Step 4: call Mistral in strict JSON mode ──────────────────────────
-    const raw = await callMistralJson([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+  // ── Step 4: call Mistral in strict JSON mode ──────────────────────────
+  const raw = await callMistralJson([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ]);
 
-    // ── Step 5: parse and normalise ───────────────────────────────────────
-    let parsed;
-    try { parsed = JSON.parse(raw); }
-    catch (e) {
-      console.error('Failed to parse Mistral JSON:', e.message, '\nRaw:', raw.slice(0, 500));
-      parsed = { items: [] };
-    }
+  // ── Step 5: parse and normalise ───────────────────────────────────────
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (e) {
+    console.error('Failed to parse Mistral JSON:', e.message, '\nRaw:', raw.slice(0, 500));
+    parsed = { items: [] };
+  }
 
-    const byIndex = new Map();
-    for (const e of (parsed.items || [])) {
-      if (e && typeof e.index === 'number') byIndex.set(e.index, e);
-    }
+  const byIndex = new Map();
+  for (const e of (parsed.items || [])) {
+    if (e && typeof e.index === 'number') byIndex.set(e.index, e);
+  }
 
-    // Document-type identification result (CHECK 1 in the prompt).
-    const documentTypeMatch = parsed.documentTypeMatch === true;
-    const documentTypeReason = typeof parsed.documentTypeReason === 'string'
-      ? parsed.documentTypeReason.trim() : '';
+  const documentTypeMatch = parsed.documentTypeMatch === true;
+  const documentTypeReason = typeof parsed.documentTypeReason === 'string'
+    ? parsed.documentTypeReason.trim() : '';
 
-    const results = items.map((it, i) => {
-      // If the AI determined the wrong document type, force every item to false.
-      if (!documentTypeMatch) {
-        return {
-          item: it,
-          present: false,
-          page: null,
-          evidence: '',
-          note: 'Document type mismatch — parameter not applicable.',
-        };
-      }
-      const m = byIndex.get(i + 1) || {};
-      const present = m.present === true ? true : m.present === false ? false : null;
-      const evidence = typeof m.evidence === 'string' ? m.evidence.trim() : '';
-      // If model claimed present but failed to provide evidence, downgrade to unknown
-      const finalPresent = present === true && !evidence ? null : present;
+  const results = items.map((it, i) => {
+    if (!documentTypeMatch) {
       return {
         item: it,
-        present: finalPresent,
-        page: typeof m.page === 'number' ? m.page : null,
-        evidence: finalPresent === true ? evidence : '',
-        note: typeof m.note === 'string' ? m.note.trim() : '',
+        present: false,
+        page: null,
+        evidence: '',
+        note: 'Document type mismatch — parameter not applicable.',
       };
+    }
+    const m = byIndex.get(i + 1) || {};
+    const present = m.present === true ? true : m.present === false ? false : null;
+    const evidence = typeof m.evidence === 'string' ? m.evidence.trim() : '';
+    const finalPresent = present === true && !evidence ? null : present;
+    return {
+      item: it,
+      present: finalPresent,
+      page: typeof m.page === 'number' ? m.page : null,
+      evidence: finalPresent === true ? evidence : '',
+      note: typeof m.note === 'string' ? m.note.trim() : '',
+    };
+  });
+
+  // ── Step 5b: vision pass for visual-only items ────────────────────────
+  let visionUsed = false;
+  if (documentTypeMatch && mimetype === 'application/pdf') {
+    const visualIdx = [];
+    items.forEach((it, i) => { if (isVisualItem(it)) visualIdx.push(i); });
+
+    if (visualIdx.length > 0) {
+      try {
+        const vision = await verifyVisualItemsWithVision(buffer, visualIdx.map(i => items[i]));
+        const visionByIdx = new Map();
+        for (const v of (vision.items || [])) {
+          if (v && typeof v.index === 'number') visionByIdx.set(v.index, v);
+        }
+        visualIdx.forEach((origIdx, k) => {
+          const v = visionByIdx.get(k + 1);
+          if (!v) return;
+          const page = typeof v.page === 'number' ? v.page : results[origIdx].page;
+          const evidence = typeof v.evidence === 'string' ? v.evidence.trim() : '';
+          if (v.present === true) {
+            results[origIdx] = {
+              ...results[origIdx],
+              present: true,
+              page,
+              evidence: evidence || 'Visually detected',
+              note: 'Verified by vision model',
+            };
+          } else if (v.present === false && results[origIdx].present !== true) {
+            results[origIdx] = {
+              ...results[origIdx],
+              present: false,
+              evidence: '',
+              note: evidence ? `Vision: ${evidence}` : 'Not visually detected',
+            };
+          }
+        });
+        visionUsed = true;
+      } catch (e) {
+        console.warn('[Vision] visual-item pass failed:', e.message);
+      }
+    }
+  }
+
+  const presentCount = results.filter(r => r.present === true).length;
+  const missingCount = results.filter(r => r.present === false).length;
+  const unknownCount = results.filter(r => r.present === null).length;
+
+  return {
+    success: true,
+    docType,
+    docLabel,
+    hasText,
+    textSource,
+    pageCount: pages.length,
+    documentTypeMatch,
+    documentTypeReason,
+    visionUsed,
+    results,
+    summary: {
+      total: items.length,
+      present: presentCount,
+      missing: missingCount,
+      unknown: unknownCount,
+      score: documentTypeMatch ? Math.round((presentCount / items.length) * 100) : 0,
+    },
+    rawResponse: raw,
+  };
+}
+
+/* ─── POST /api/verify — main verification endpoint ────────────────────── */
+app.post('/api/verify', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+    const result = await verifyDocumentBuffer({
+      buffer: req.file.buffer,
+      mimetype: req.file.mimetype,
+      docType: req.body.docType || 'default',
+      docLabel: req.body.docLabel || 'document',
     });
-
-    const presentCount = results.filter(r => r.present === true).length;
-    const missingCount = results.filter(r => r.present === false).length;
-    const unknownCount = results.filter(r => r.present === null).length;
-
-    res.json({
-      success: true,
-      docType,
-      docLabel,
-      hasText,
-      textSource,
-      pageCount: pages.length,
-      documentTypeMatch,
-      documentTypeReason,
-      results,
-      summary: {
-        total: items.length,
-        present: presentCount,
-        missing: missingCount,
-        unknown: unknownCount,
-        score: documentTypeMatch ? Math.round((presentCount / items.length) * 100) : 0,
-      },
-      rawResponse: raw,
-    });
-
+    return res.json(result);
   } catch (err) {
     const isApiIssue = err.message.includes('MISTRAL_API_KEY') ||
       err.message.includes('ENOTFOUND') ||
@@ -1015,6 +1244,111 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
       });
     }
 
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ─── POST /api/applications/:appNum/pre-verify ──────────────────────────
+   Runs AI verification for every uploaded document on an application and
+   caches the doc-type-match verdict in documents.<docId>.validationResult.
+   Reviewer's Documents tab reads the cache to show green/red badges before
+   any manual click. Skips docs already cached unless ?force=1. */
+const path = require('path');
+const fs = require('fs');
+const Application = require('./models/Application');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+app.post('/api/applications/:appNum/pre-verify', async (req, res) => {
+  try {
+    const { appNum } = req.params;
+    const force = req.query.force === '1' || req.body?.force === true;
+
+    const application = await Application.findOne({
+      $or: [{ applicationNumber: appNum }, { referenceNumber: appNum }],
+    });
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+
+    // Normalise Map / object doc storage
+    const docs = application.documents;
+    const entries = docs?.entries
+      ? Array.from(docs.entries())
+      : Object.entries(docs || {});
+
+    const results = {};
+
+    // Process each doc: return cached verdict, or run fast type-only check.
+    // All uncached docs run in parallel so pre-verify wall time ≈ slowest doc.
+    const perDoc = async ([docId, docRaw]) => {
+      const doc = docRaw?.toObject ? docRaw.toObject() : docRaw;
+      if (!doc) return [docId, null];
+
+      if (!force && doc.validated && doc.validationResult && typeof doc.validationResult.documentTypeMatch === 'boolean') {
+        return [docId, {
+          documentTypeMatch: doc.validationResult.documentTypeMatch,
+          documentTypeReason: doc.validationResult.documentTypeReason || '',
+          score: doc.validationResult.score ?? null,
+          verifiedAt: doc.validationResult.verifiedAt || null,
+          cached: true,
+        }];
+      }
+
+      // Load file bytes (disk preferred, base64 fallback)
+      let buffer;
+      try {
+        if (doc.path) {
+          const filePath = path.resolve(path.join(UPLOADS_DIR, doc.path));
+          if (!filePath.startsWith(path.resolve(UPLOADS_DIR))) return [docId, { error: 'Invalid document path' }];
+          if (!fs.existsSync(filePath)) return [docId, { error: 'File missing on disk' }];
+          buffer = fs.readFileSync(filePath);
+        } else if (doc.data) {
+          let b64 = String(doc.data);
+          const comma = b64.indexOf(',');
+          if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
+          buffer = Buffer.from(b64, 'base64');
+        } else {
+          return [docId, { error: 'File not stored' }];
+        }
+      } catch (readErr) {
+        return [docId, { error: `Read failed: ${readErr.message}` }];
+      }
+
+      const docType = CHECKLISTS[docId] ? docId : 'default';
+      const docLabel = doc.name || docId;
+      const mimetype = doc.type || 'application/pdf';
+
+      try {
+        const quick = await identifyDocumentTypeQuick({ buffer, mimetype, docType, docLabel });
+        const cached = {
+          documentTypeMatch: quick.documentTypeMatch,
+          documentTypeReason: quick.documentTypeReason,
+          score: null,
+          verifiedAt: new Date(),
+        };
+        return [docId, { cached: false, updatedDoc: { ...doc, validated: true, validationResult: cached }, result: { ...cached, cached: false } }];
+      } catch (verifyErr) {
+        console.warn(`[pre-verify] ${docId} failed:`, verifyErr.message);
+        return [docId, { error: verifyErr.message }];
+      }
+    };
+
+    const settled = await Promise.all(entries.map(perDoc));
+    for (const [docId, r] of settled) {
+      if (!r) continue;
+      if (r.updatedDoc) {
+        if (docs?.set) docs.set(docId, r.updatedDoc);
+        else docs[docId] = r.updatedDoc;
+        results[docId] = r.result;
+      } else {
+        results[docId] = r;
+      }
+    }
+
+    application.markModified('documents');
+    await application.save();
+
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error('Pre-verify error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
