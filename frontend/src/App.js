@@ -11,7 +11,29 @@ import TrackPage from './pages/TrackPage';
 import HelpPage from './pages/HelpPage';
 import ContactPage from './pages/ContactPage';
 import ReviewDashboard from './pages/reviewer/ReviewDashboard';
+import ReviewApplicationPage from './pages/reviewer/ReviewApplicationPage';
 import './App.css';
+
+/* Reviewer sub-routes: dashboard queue at /review, full-page app detail at
+   /review/application/:appNumber (opens in a new browser tab).
+   The detail page is always accessible regardless of auth state — it reads
+   reviewer identity from sessionStorage (set at login time) and fetches data
+   directly from the API, so it works in a standalone new tab. */
+function ReviewerRoutes() {
+  const { isLoggedIn, userRole } = useApp();
+  return (
+    <Routes>
+      {/* Detail page — accessible in new tab without auth context */}
+      <Route path="application/:appNumber" element={<ReviewApplicationPage />} />
+      {/* Queue page — requires reviewer login */}
+      <Route path="*" element={
+        isLoggedIn && userRole === 'reviewer'
+          ? <ReviewDashboard />
+          : <AuthGuard><DashboardPage /></AuthGuard>
+      }/>
+    </Routes>
+  );
+}
 
 /* Route guard that redirects reviewer to /review */
 function RoleRoute({ children }) {
@@ -22,16 +44,10 @@ function RoleRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { isLoggedIn, userRole } = useApp();
-
   return (
     <Routes>
-      {/* Reviewer routes */}
-      <Route path="/review/*" element={
-        isLoggedIn && userRole === 'reviewer'
-          ? <ReviewDashboard />
-          : <AuthGuard><DashboardPage /></AuthGuard>
-      }/>
+      {/* Reviewer routes — auth check is inside ReviewerRoutes */}
+      <Route path="/review/*" element={<ReviewerRoutes />} />
 
       {/* Applicant routes */}
       <Route path="/"        element={<RoleRoute><AuthGuard><DashboardPage /></AuthGuard></RoleRoute>} />

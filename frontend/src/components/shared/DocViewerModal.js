@@ -305,7 +305,7 @@ function PdfPage({ pdf, pageNum, scale, query, activeGlobal, globalOffset, onRea
 }
 
 /* ─── AI Checklist Panel ─────────────────────────────────────────────────── */
-function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery }) {
+function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber }) {
   const [status, setStatus] = useState('idle');
   const [results, setResults] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -313,34 +313,55 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
   const [typeReason, setTypeReason] = useState('');
   const [errMsg, setErrMsg] = useState('');
   const [activeItem, setActiveItem] = useState(null);
+  const [cached, setCached] = useState(false);
 
   const checklistKey = DOC_CHECKLISTS[docType || docId] || 'default';
 
-  const run = async () => {
-    if (!fileUrl) { setErrMsg('No file available for verification.'); setStatus('error'); return; }
+  // Two paths:
+  //   1. appNumber + docId → hit the backend endpoint that uses a DB cache.
+  //      First call runs full verify + caches; subsequent calls are instant.
+  //   2. No appNumber → fall back to legacy multipart upload path.
+  const run = async ({ force = false } = {}) => {
+    if (!fileUrl && !appNumber) { setErrMsg('No file available for verification.'); setStatus('error'); return; }
     setStatus('loading'); setResults(null); setSummary(null);
     setTypeMatch(true); setTypeReason(''); setErrMsg('');
     setActiveItem(null);
     if (onSearch) onSearch('');
     try {
-      const resp = await fetch(fileUrl);
-      if (!resp.ok) throw new Error('Could not read document file.');
-      const blob = await resp.blob();
-      const form = new FormData();
-      form.append('file', blob, docLabel + '.pdf');
-      form.append('docType', checklistKey);
-      form.append('docLabel', docLabel);
-      const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
-      const data = await apiResp.json();
-      if (!apiResp.ok) {
-        throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
+      let data;
+      if (appNumber && docId) {
+        const url = `http://localhost:5001/api/applications/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/verify${force ? '?force=1' : ''}`;
+        const apiResp = await fetch(url, { method: 'POST' });
+        data = await apiResp.json();
+        if (!apiResp.ok) throw new Error(data.error || 'AI analysis is temporarily unavailable. Please try again shortly.');
+      } else {
+        const resp = await fetch(fileUrl);
+        if (!resp.ok) throw new Error('Could not read document file.');
+        const blob = await resp.blob();
+        const form = new FormData();
+        form.append('file', blob, docLabel + '.pdf');
+        form.append('docType', checklistKey);
+        form.append('docLabel', docLabel);
+        const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
+        data = await apiResp.json();
+        if (!apiResp.ok) throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
       }
       setResults(data.results); setSummary(data.summary);
       setTypeMatch(data.documentTypeMatch !== false);
       setTypeReason(data.documentTypeReason || '');
+      setCached(data.cached === true);
       setStatus('done');
     } catch (e) { setErrMsg(e.message); setStatus('error'); }
   };
+
+  // Auto-run on mount whenever we have a file (or appNumber+docId cache lookup).
+  // Reviewer opens "Open & Inspect" and results appear without clicking anything.
+  useEffect(() => {
+    if (!fileUrl && !appNumber) return;
+    if (status !== 'idle') return;
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileUrl, appNumber, docId]);
 
   const getSearchTerm = (item, note) => {
     if (note) {
@@ -462,11 +483,20 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                 </div>
               </div>
             </div>
-            <button className="cl-btn-secondary" onClick={run}>🔄 Re-run Verification</button>
+            <button className="cl-btn-secondary" onClick={() => run({ force: true })}>🔄 Re-run Verification</button>
           </div>
         )}
         {status === 'done' && summary && typeMatch && (
           <div>
+            {cached && (
+              <div style={{
+                fontSize: 10.5, fontWeight: 700, color: '#64748b',
+                background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 10,
+                padding: '2px 8px', display: 'inline-block', marginBottom: 6,
+              }}>
+                ⚡ From cache
+              </div>
+            )}
             <div className="cl-score" style={{ background: sb, borderColor: sc + '55' }}>
               <div className="cl-score-num" style={{ color: sc }}>{score}%</div>
               <div className="cl-score-label">Completeness Score</div>
@@ -543,7 +573,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
                 ✕ Clear Location Search
               </button>
             )}
-            <button className="cl-btn-secondary" onClick={run}>🔄 Re-run Verification</button>
+            <button className="cl-btn-secondary" onClick={() => run({ force: true })}>🔄 Re-run Verification</button>
           </div>
         )}
       </div>
@@ -609,7 +639,7 @@ function ImageViewer({ fileUrl, fileName, fileSize, onClose }) {
 }
 
 /* ─── Main exported component ────────────────────────────────────────────── */
-export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, onRaiseQuery, verificationResult }) {
+export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, onRaiseQuery, verificationResult, appNumber }) {
   const isPDF = fileType?.includes('pdf') || fileName?.toLowerCase().endsWith('.pdf');
   const isImg = fileType?.startsWith('image/');
 
@@ -617,7 +647,13 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   const [numPages, setPages] = useState(0);
   const [fitScale, setFit] = useState(null);
   const [zoom, setZoom] = useState(1.0);
+  // Two separate query states:
+  //   `query`          — text the user typed into the top search bar (shown in input)
+  //   `highlightQuery` — term triggered by clicking the checklist 🔍 icon
+  //                      (drives highlighting but does NOT appear in the input)
   const [query, setQuery] = useState('');
+  const [highlightQuery, setHighlightQuery] = useState('');
+  const effectiveQuery = query || highlightQuery;
   const [pageHl, setPageHl] = useState({});
   const [activeIdx, setActive] = useState(0);
   const [ocrStatus, setOcrStatus] = useState({});
@@ -649,7 +685,7 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
     });
   }, [pdf]);
 
-  useEffect(() => { setActive(0); }, [query]);
+  useEffect(() => { setActive(0); }, [query, highlightQuery]);
 
   // keyboard shortcuts
   useEffect(() => {
@@ -694,14 +730,14 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   const safeIdx = total > 0 ? ((activeIdx % total) + total) % total : 0;
   const cur = allMatches[safeIdx];
 
-  // auto-scroll to active match
+  // auto-scroll to active match (fires when new highlights land)
   useEffect(() => {
     if (!cur || !scrollRef.current) return;
     const wrap = pageRefs.current[cur.pageNum];
     if (!wrap) return;
     const rect = (pageHl[cur.pageNum] || [])[cur.rectIdx];
     if (rect) scrollRef.current.scrollTo({ top: wrap.offsetTop + rect.top - 80, behavior: 'smooth' });
-  }, [safeIdx, total]); // eslint-disable-line
+  }, [safeIdx, total, effectiveQuery]); // eslint-disable-line
 
   const ocrRunning = Object.values(ocrStatus).some(s => s === 'running');
 
@@ -758,10 +794,14 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input ref={inputRef} className="dv-search-input" placeholder="Search in document…"
-                value={query} onChange={e => { setQuery(e.target.value); setActive(0); }} />
-              {query && <button className="dv-search-clear" onClick={() => { setQuery(''); setActive(0); }}>✕</button>}
+                value={query}
+                onChange={e => { setQuery(e.target.value); setHighlightQuery(''); setActive(0); }} />
+              {(query || highlightQuery) && (
+                <button className="dv-search-clear"
+                  onClick={() => { setQuery(''); setHighlightQuery(''); setActive(0); }}>✕</button>
+              )}
             </div>
-            {query.trim() && (
+            {effectiveQuery.trim() && (
               <span className="dv-match-badge" style={{
                 background: total > 0 ? '#fef3c7' : '#fef2f2',
                 color: total > 0 ? '#92400e' : '#dc2626',
@@ -825,7 +865,7 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
               <PdfPage
                 key={`${docId}-p${n}`}
                 pdf={pdf} pageNum={n} scale={scale}
-                query={query} activeGlobal={safeIdx} globalOffset={offsets[n] ?? 0}
+                query={effectiveQuery} activeGlobal={safeIdx} globalOffset={offsets[n] ?? 0}
                 onReady={onReady} onOcrDone={onNeedsOcr}
                 wrapRef={el => { pageRefs.current[n] = el; }}
                 ocrWords={ocrWords[n] || null}
@@ -839,12 +879,13 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
               docType={docType || docId}
               docLabel={docLabel}
               fileUrl={fileUrl}
+              appNumber={appNumber}
               onSearch={(term, pageHint) => {
-                setQuery(term);
+                // Drive highlighting via highlightQuery — the top search bar
+                // stays empty so the reviewer doesn't see typed-in text.
+                setHighlightQuery(term);
+                setQuery('');
                 setActive(0);
-                // Scroll to the AI-reported page as a best-effort fallback,
-                // so the reviewer at least lands near the right area even
-                // when the search term doesn't match verbatim.
                 if (pageHint && pageRefs.current[pageHint] && scrollRef.current) {
                   requestAnimationFrame(() => {
                     scrollRef.current?.scrollTo({
@@ -854,7 +895,7 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                   });
                 }
               }}
-              activeQuery={query}
+              activeQuery={effectiveQuery}
             />
           </div>
         </div>

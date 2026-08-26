@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import DocViewerModal from '../../components/shared/DocViewerModal';
 import NocChecklistPage from '../../components/checklist/NocChecklistPage';
 import ShipmentsTab from './ShipmentsTab';
+import SummaryPanel from './SummaryPanel';
 import './ReviewDashboard.css';
 
 const REQUIRED_DOCS = [
@@ -368,8 +369,6 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
   const [activeTab, setActiveTab] = useState('details');
   const [viewerDoc, setViewerDoc] = useState(null); // { docId, docLabel, docType, fileUrl, fileName, fileSize, fileType }
   const [showSummary, setShowSummary] = useState(false);
-  const [summaryData, setSummaryData] = useState({}); // docId → { status: 'idle'|'loading'|'done'|'error', results, summary, error }
-  const [summaryDocId, setSummaryDocId] = useState(null); // which doc is expanded in summary
   const [lineBusy, setLineBusy] = useState(null); // shipment index currently being actioned
   const [lineRemarksPrompt, setLineRemarksPrompt] = useState(null); // { idx, nextStatus }
   const [aiCheckLoading, setAiCheckLoading] = useState(false); // pre-verify in flight
@@ -507,66 +506,8 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
     setShowForm(true);
   };
 
-  /* Fetch verify results for a single document (for summary) */
-  const fetchDocSummary = async (docId, docLabel, docType, up) => {
-    if (!up) return;
-    setSummaryData(p => ({ ...p, [docId]: { status: 'loading', results: null, summary: null, error: '' } }));
-    try {
-      // objectUrl may be missing — try to construct it from applicationNumber
-      const fileUrl = up.objectUrl || `http://localhost:5001/api/applications/${data.applicationNumber}/document/${docId}`;
-      if (!fileUrl) throw new Error('Document URL not available.');
-
-      const resp = await fetch(fileUrl);
-      if (!resp.ok) throw new Error(`Could not fetch document (${resp.status}).`);
-      const blob = await resp.blob();
-
-      const form = new FormData();
-      // Use correct docType per document, fallback to docId
-      const mappedDocType = docType || docId || 'default';
-      form.append('file', blob, (up.name || docLabel) + (up.name ? '' : '.pdf'));
-      form.append('docType', mappedDocType);
-      form.append('docLabel', docLabel);
-
-      const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
-      const respData = await apiResp.json();
-      if (!apiResp.ok) throw new Error(respData.error || 'Verification failed.');
-
-      // Compute summary inline if backend didn't return one
-      const results = respData.results || [];
-      const summary = respData.summary || {
-        total: results.length,
-        present: results.filter(r => r.present === true).length,
-        missing: results.filter(r => r.present === false).length,
-        unknown: results.filter(r => r.present === null).length,
-        score: results.length > 0
-          ? Math.round((results.filter(r => r.present === true).length / results.length) * 100)
-          : 0,
-      };
-
-      setSummaryData(p => ({ ...p, [docId]: { status: 'done', results, summary, documentTypeMatch: respData.documentTypeMatch, documentTypeReason: respData.documentTypeReason, error: '' } }));
-    } catch (e) {
-      setSummaryData(p => ({ ...p, [docId]: { status: 'error', results: null, summary: null, error: e.message } }));
-    }
-  };
-
-  /* Trigger summary panel: load all uploaded docs — sequentially to avoid rate limiting */
-  const handleOpenSummary = async () => {
-    setShowSummary(true);
-    const docs = data.documents || {};
-    const toFetch = REQUIRED_DOCS.filter(doc => {
-      if (!docs[doc.id]) return false;                       // not uploaded
-      const sd = summaryData[doc.id];
-      if (!sd) return true;                                  // never fetched
-      if (sd.status === 'error') return false;               // let user retry manually
-      if (sd.status === 'done') return false;                // already done
-      return false;                                          // loading in progress
-    });
-    for (const doc of toFetch) {
-      await fetchDocSummary(doc.id, doc.label, doc.docType, docs[doc.id]);
-      // Small delay between calls to avoid rate limiting
-      await new Promise(r => setTimeout(r, 800));
-    }
-  };
+  /* Open the compliance dashboard — data is fetched inside SummaryPanel. */
+  const handleOpenSummary = () => setShowSummary(true);
 
   const handleSubmit = () => {
     if (!actionStatus) { alert('Please select a status.'); return; }
@@ -888,99 +829,15 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
         )}
       </div>
 
-      {/* Summary Modal */}
-      {showSummary && createPortal(
-        <div className="rv-popup-overlay" onClick={e => e.target === e.currentTarget && setShowSummary(false)}>
-          <div className="rv-summary-box" onClick={e => e.stopPropagation()}>
-            <div className="rv-summary-head">
-              <span style={{ fontSize: 20 }}>📊</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: 15, color: '#0f2d5e' }}>Document Summary</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>AI-verified parameter check for each uploaded document</div>
-              </div>
-              <button className="rv-popup-btn-cancel" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setShowSummary(false)}>✕ Close</button>
-            </div>
-            <div className="rv-summary-body">
-              {REQUIRED_DOCS.map(doc => {
-                const up = data.documents?.[doc.id];
-                const sd = summaryData[doc.id];
-                return (
-                  <div key={doc.id} className="rv-summary-doc-card">
-                    <div className="rv-summary-doc-header" onClick={() => setSummaryDocId(summaryDocId === doc.id ? null : doc.id)}>
-                      <span className="rv-doc-icon-big" style={{ fontSize: 16 }}>
-                        {!up ? '❌' : sd?.status === 'done'
-                          ? (sd.documentTypeMatch === false ? '🚫'
-                            : sd.summary?.score >= 75 ? '✅'
-                              : sd.summary?.score >= 50 ? '⚠️' : '🔴')
-                          : '📄'}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 12.5, color: '#1e293b' }}>{doc.label}</div>
-                        {!up && <div style={{ fontSize: 10.5, color: '#dc2626', fontStyle: 'italic' }}>Not uploaded</div>}
-                        {up && sd?.status === 'done' && (
-                          <div style={{ fontSize: 10.5, color: '#64748b' }}>
-                            {sd.documentTypeMatch === false
-                              ? <span style={{ color: '#b91c1c', fontStyle: 'italic' }}>⚠️ Wrong document type — {sd.documentTypeReason || 'document does not match expected type'}</span>
-                              : <>
-                                Score: <strong style={{ color: sd.summary.score >= 75 ? '#16a34a' : sd.summary.score >= 50 ? '#d97706' : '#dc2626' }}>{sd.summary.score}%</strong>
-                                &nbsp;·&nbsp;✓ {sd.summary.present} found &nbsp;·&nbsp; ✗ {sd.summary.missing} missing
-                                {sd.summary.unknown > 0 && <>&nbsp;·&nbsp; ? {sd.summary.unknown} unknown</>}
-                              </>
-                            }
-                          </div>
-                        )}
-                        {up && sd?.status === 'loading' && <div style={{ fontSize: 10.5, color: '#3b82f6' }}>⏳ Analyzing…</div>}
-                        {up && sd?.status === 'error' && <div style={{ fontSize: 10.5, color: '#dc2626' }}>⚠️ {sd.error}</div>}
-                        {up && !sd && <div style={{ fontSize: 10.5, color: '#94a3b8' }}>Pending analysis</div>}
-                      </div>
-                      {up && sd?.status === 'done' && (
-                        <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>{summaryDocId === doc.id ? '▲' : '▼'}</span>
-                      )}
-                      {up && (!sd || sd.status === 'idle') && (
-                        <button className="rv-verify-btn" style={{ fontSize: 10, padding: '3px 8px' }}
-                          onClick={e => { e.stopPropagation(); fetchDocSummary(doc.id, doc.label, doc.docType, up); }}>
-                          Analyze
-                        </button>
-                      )}
-                      {up && sd?.status === 'error' && (
-                        <button className="rv-verify-btn" style={{ fontSize: 10, padding: '3px 8px' }}
-                          onClick={e => { e.stopPropagation(); fetchDocSummary(doc.id, doc.label, doc.docType, up); }}>
-                          Retry
-                        </button>
-                      )}
-                    </div>
-                    {up && sd?.status === 'done' && summaryDocId === doc.id && (
-                      <div className="rv-summary-doc-items">
-                        {sd.results.map((r, i) => {
-                          const isPresent = r.present === true;
-                          const isMissing = r.present === false;
-                          return (
-                            <div key={i} className={`rv-summary-item ${isMissing ? 'rv-summary-item-no' : isPresent ? 'rv-summary-item-yes' : 'rv-summary-item-unk'}`}>
-                              <span className="rv-summary-item-icon">{isMissing ? '❌' : isPresent ? '✅' : '❓'}</span>
-                              <div className="rv-summary-item-text">
-                                <div className="rv-summary-item-label">{r.item}</div>
-                                {isPresent && r.evidence && (
-                                  <div className="rv-summary-item-evidence">
-                                    📍 {typeof r.page === 'number' ? `Page ${r.page}: ` : ''}"{r.evidence}"
-                                  </div>
-                                )}
-                                {r.note && <div className="rv-summary-item-note">{r.note}</div>}
-                              </div>
-                              <span className={`cl-badge rv-summary-item-badge ${isMissing ? 'cl-badge-no' : isPresent ? 'cl-badge-yes' : 'cl-badge-unk'}`}>
-                                {isMissing ? 'NO' : isPresent ? 'YES' : '?'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>,
-        document.body
+      {/* Compliance dashboard */}
+      {showSummary && (
+        <SummaryPanel
+          appNumber={data.applicationNumber}
+          application={data}
+          onClose={() => setShowSummary(false)}
+          onNavigateTo={(tab) => setActiveTab(tab)}
+          onOpenDoc={(docId, docLabel, docType, doc) => openViewer(docId, docLabel, docType, doc)}
+        />
       )}
 
       {/* Verified popup — shown when filename matches the prescribed template */}
@@ -1036,6 +893,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           fileName={viewerDoc.fileName}
           fileSize={viewerDoc.fileSize}
           fileType={viewerDoc.fileType}
+          appNumber={data.applicationNumber}
           verificationResult={docVerdict[viewerDoc.docId]}
           onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}
           onDecline={(id) => setDocVerdict(p => ({ ...p, [id]: 'bad' }))}

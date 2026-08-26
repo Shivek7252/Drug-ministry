@@ -116,12 +116,18 @@ export function AppProvider({ children }) {
     setCurrentUser(username);
     setUserRole(role);
     setLoginOpen(false);
+    // Persist reviewer identity so detail tabs opened via window.open() can
+    // read the correct user name / role without re-authenticating.
+    try {
+      sessionStorage.setItem('reviewer_identity', JSON.stringify({ username, role }));
+    } catch (_) {}
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setUserRole('applicant');
+    try { sessionStorage.removeItem('reviewer_identity'); } catch (_) {}
     resetForm();
   };
 

@@ -1353,6 +1353,79 @@ app.post('/api/applications/:appNum/pre-verify', async (req, res) => {
   }
 });
 
+/* ─── POST /api/applications/:appNum/document/:docId/verify ──────────────
+   Runs the FULL AI verification (text + OCR + per-item checklist + vision
+   pass) for one stored application document and caches the full results on
+   documents.<docId>.validationResult.fullResults. Subsequent calls hit the
+   cache instantly. Pass ?force=1 to re-run and refresh the cache. */
+app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) => {
+  try {
+    const { appNum, docId } = req.params;
+    const force = req.query.force === '1' || req.body?.force === true;
+
+    const application = await Application.findOne({
+      $or: [{ applicationNumber: appNum }, { referenceNumber: appNum }],
+    });
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+
+    const docs = application.documents;
+    const docRaw = docs?.get ? docs.get(docId) : docs?.[docId];
+    if (!docRaw) return res.status(404).json({ error: 'Document not found' });
+    const doc = docRaw?.toObject ? docRaw.toObject() : docRaw;
+
+    // Cache hit
+    if (!force && doc.validationResult?.fullResults) {
+      return res.json({ ...doc.validationResult.fullResults, cached: true });
+    }
+
+    // Load bytes
+    let buffer;
+    if (doc.path) {
+      const filePath = path.resolve(path.join(UPLOADS_DIR, doc.path));
+      if (!filePath.startsWith(path.resolve(UPLOADS_DIR))) return res.status(400).json({ error: 'Invalid document path' });
+      if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing on disk' });
+      buffer = fs.readFileSync(filePath);
+    } else if (doc.data) {
+      let b64 = String(doc.data);
+      const comma = b64.indexOf(',');
+      if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
+      buffer = Buffer.from(b64, 'base64');
+    } else {
+      return res.status(404).json({ error: 'File not stored' });
+    }
+
+    const docType = CHECKLISTS[docId] ? docId : 'default';
+    const docLabel = doc.name || docId;
+    const mimetype = doc.type || 'application/pdf';
+
+    const verifyResult = await verifyDocumentBuffer({ buffer, mimetype, docType, docLabel });
+
+    // Persist full result + refresh the top-level type match/reason too so
+    // the reviewer's Documents-tab badge stays in sync.
+    const updatedDoc = {
+      ...doc,
+      validated: true,
+      validationResult: {
+        ...(doc.validationResult || {}),
+        documentTypeMatch: verifyResult.documentTypeMatch,
+        documentTypeReason: verifyResult.documentTypeReason,
+        score: verifyResult.summary?.score ?? null,
+        verifiedAt: new Date(),
+        fullResults: verifyResult,
+      },
+    };
+    if (docs?.set) docs.set(docId, updatedDoc);
+    else docs[docId] = updatedDoc;
+    application.markModified('documents');
+    await application.save();
+
+    res.json({ ...verifyResult, cached: false });
+  } catch (err) {
+    console.error('Doc verify error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ─── POST /api/fill-templates — fill all PDF templates with form data ──── */
 app.post('/api/fill-templates', async (req, res) => {
   try {
