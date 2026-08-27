@@ -328,8 +328,8 @@ export default function ReviewApplicationPage() {
       {/* ═══ Sticky topbar ═════════════════════════════════════════════ */}
       <div className="rap-topbar">
         <div className="rap-topbar-left">
-          <Link to="/review" className="rap-back-btn">← Review Queue</Link>
-          <span className="rap-crumb-sep">/</span>
+          {/* <Link to="/review" className="rap-back-btn">← Review Queue</Link> */}
+          {/* <span className="rap-crumb-sep">/</span> */}
           <span className="rap-crumb">{data.applicationNumber}</span>
         </div>
         <div className="rap-topbar-right">
