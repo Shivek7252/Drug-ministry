@@ -305,7 +305,7 @@ function PdfPage({ pdf, pageNum, scale, query, activeGlobal, globalOffset, onRea
 }
 
 /* ─── AI Checklist Panel ─────────────────────────────────────────────────── */
-function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber, onTypeMatchChange }) {
+function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber }) {
   const [status, setStatus] = useState('idle');
   const [results, setResults] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -347,13 +347,10 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
         if (!apiResp.ok) throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
       }
       setResults(data.results); setSummary(data.summary);
-      const matched = data.documentTypeMatch !== false;
-      setTypeMatch(matched);
+      setTypeMatch(data.documentTypeMatch !== false);
       setTypeReason(data.documentTypeReason || '');
       setCached(data.cached === true);
       setStatus('done');
-      // Notify parent so it can disable the Verify button when type mismatches
-      if (onTypeMatchChange) onTypeMatchChange(matched);
     } catch (e) { setErrMsg(e.message); setStatus('error'); }
   };
 
@@ -661,8 +658,6 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   const [activeIdx, setActive] = useState(0);
   const [ocrStatus, setOcrStatus] = useState({});
   const [ocrWords, setOcrWords] = useState({});
-  // Track whether AI confirmed the document type matches — null = not yet run
-  const [docTypeMatch, setDocTypeMatch] = useState(null);
 
   const scrollRef = useRef();
   const pageRefs = useRef({});
@@ -885,7 +880,6 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
               docLabel={docLabel}
               fileUrl={fileUrl}
               appNumber={appNumber}
-              onTypeMatchChange={setDocTypeMatch}
               onSearch={(term, pageHint) => {
                 // Drive highlighting via highlightQuery — the top search bar
                 // stays empty so the reviewer doesn't see typed-in text.
@@ -923,16 +917,11 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                   ❓ Raise Query
                 </button>
               )}
-              {/* Hide Verify if AI confirmed the document type does NOT match */}
-              {onVerify && docTypeMatch !== false && (
+              {onVerify && (
                 <button className="dv-verdict-btn dv-verdict-btn-verify"
                   onClick={() => { onVerify(docId, docLabel); onClose(); }}>
                   ✓ Verify
                 </button>
-              )}
-              {/* When type mismatches, show a mismatch chip instead */}
-              {onVerify && docTypeMatch === false && (
-                <span className="dv-verdict-chip dv-verdict-bad" title="Document type does not match — cannot verify">✗ Wrong Doc Type</span>
               )}
             </div>
           )}

@@ -559,6 +559,25 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
     name: data.consigneeName, country: data.consigneeCountry, city: data.city,
   }] : []);
 
+  // Fetch CDSCO approved-drugs list and match against each product's genericName
+  const [approvedDrugs, setApprovedDrugs] = useState([]);
+  useEffect(() => {
+    fetch('http://localhost:5001/api/approved-drugs')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.drugs)) setApprovedDrugs(d.drugs); })
+      .catch(() => { });
+  }, []);
+
+  const findApproval = (genericName) => {
+    if (!genericName || !approvedDrugs.length) return null;
+    const q = genericName.trim().toLowerCase();
+    return approvedDrugs.find(d =>
+      d.genericName.trim().toLowerCase() === q ||
+      q.includes(d.genericName.trim().toLowerCase()) ||
+      d.genericName.trim().toLowerCase().includes(q)
+    ) || null;
+  };
+
   return (
     <div className="rap-section">
       <SectionCard title="Snapshot" icon="👁️">
@@ -632,36 +651,84 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
         </SectionCard>
       </div>
 
+      {/* CDSCO Drug Approval Status */}
+      {products.length > 0 && (
+        <SectionCard title="CDSCO Drug Approval Status" icon="💊">
+          <div className="rap-cdsco-list">
+            {products.map((p, i) => {
+              const drug = findApproval(p.genericName);
+              const stored = p.cdscoApproved === true || p.cdscoApproved === 'true';
+              const isApproved = drug || stored;
+              return (
+                <div key={i} className={`rap-cdsco-row ${isApproved ? 'rap-cdsco-ok' : 'rap-cdsco-warn'}`}>
+                  <div className="rap-cdsco-row-header">
+                    <span className="rap-cdsco-icon">{isApproved ? '✅' : '⚠️'}</span>
+                    <div>
+                      <div className="rap-cdsco-product">
+                        <strong>{p.productName || p.genericName}</strong>
+                        {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
+                        {p.dosageForm && <span className="rap-chip-tag">{p.dosageForm}</span>}
+                      </div>
+                      <div className="rap-cdsco-generic">{p.genericName}</div>
+                    </div>
+                    <span className={`rap-cdsco-badge ${isApproved ? 'rap-cdsco-badge-ok' : 'rap-cdsco-badge-warn'}`}>
+                      {isApproved ? 'CDSCO Approved' : 'Not in CDSCO list'}
+                    </span>
+                  </div>
+                  {isApproved && (drug || p.cdscoApprovalDate) && (
+                    <div className="rap-cdsco-details">
+                      {(drug?.genericName || p.genericName) && (
+                        <span>📋 {drug?.genericName || p.genericName}</span>
+                      )}
+                      {(drug?.approvalDate || p.cdscoApprovalDate) && (
+                        <span>📅 Approval Date: <strong>{drug?.approvalDate || p.cdscoApprovalDate}</strong></span>
+                      )}
+                      {drug?.indication && (
+                        <span>🩺 Indication: {drug.indication}</span>
+                      )}
+                    </div>
+                  )}
+                  {!isApproved && (
+                    <div className="rap-cdsco-details">
+                      <span>This drug may require additional approval documentation. Verify with applicant.</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+
       {consignees.length > 0 && (
-        <SectionCard title="Consignees & Products" icon="🌍">
-          <div className="rap-two-col">
-            <div>
-              <div className="rap-mini-label">Consignees</div>
+        <SectionCard title="Consignees & Products" icon="🌍">          <div className="rap-two-col">
+          <div>
+            <div className="rap-mini-label">Consignees</div>
+            <div className="rap-chip-cloud">
+              {consignees.map((c, i) => (
+                <span key={i} className="rap-chip">
+                  <strong>{c.name || 'Consignee ' + (i + 1)}</strong>
+                  {c.country && <span className="rap-chip-tag">{c.country}</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="rap-mini-label">Products</div>
+            {products.length === 0 ? (
+              <div className="rap-empty rap-empty-inline">No products listed.</div>
+            ) : (
               <div className="rap-chip-cloud">
-                {consignees.map((c, i) => (
+                {products.map((p, i) => (
                   <span key={i} className="rap-chip">
-                    <strong>{c.name || 'Consignee ' + (i + 1)}</strong>
-                    {c.country && <span className="rap-chip-tag">{c.country}</span>}
+                    <strong>{p.productName}</strong>
+                    {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
                   </span>
                 ))}
               </div>
-            </div>
-            <div>
-              <div className="rap-mini-label">Products</div>
-              {products.length === 0 ? (
-                <div className="rap-empty rap-empty-inline">No products listed.</div>
-              ) : (
-                <div className="rap-chip-cloud">
-                  {products.map((p, i) => (
-                    <span key={i} className="rap-chip">
-                      <strong>{p.productName}</strong>
-                      {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
+        </div>
         </SectionCard>
       )}
     </div>
