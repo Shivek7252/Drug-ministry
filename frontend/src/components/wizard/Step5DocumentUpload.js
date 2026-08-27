@@ -759,7 +759,7 @@ function ImageViewerModal({ docId, fallbackUrl, fileName, fileSize, onClose }) {
 }
 
 /* ─── Upload Card ───────────────────────────────────────────────────────── */
-function UploadCard({ doc, uploaded, onUpload, onRemove }) {
+function UploadCard({ doc, uploaded, verification, onUpload, onRemove }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -789,7 +789,7 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
             objectUrl: url || '',
             data: base64,
             uploadedAt: new Date().toLocaleTimeString(),
-          });
+          }, file);
         }
       }, 120);
     };
@@ -800,7 +800,7 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
 
   return (
     <>
-      <div className={`upload-card ${uploaded ? 'uploaded' : ''} ${dragging ? 'dragging' : ''}`}>
+      <div className={`upload-card ${uploaded ? 'uploaded' : ''} ${verification?.status === 'verified' ? 'verification-verified' : ''} ${verification?.status === 'failed' || verification?.status === 'error' ? 'verification-failed' : ''} ${dragging ? 'dragging' : ''}`}>
         <div className="upload-card-header">
           <div className="upload-doc-info">
             <span className="upload-doc-icon">{uploaded ? fileIcon(uploaded.type) : '📎'}</span>
@@ -812,10 +812,14 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
             </div>
           </div>
           <div className="uc-header-right">
-            {uploaded && <span className="upload-status-badge">✓ Uploaded</span>}
+            {uploaded && !verification && <span className="upload-status-badge">✓ Uploaded</span>}
+            {verification?.status === 'loading' && <span className="upload-status-badge verification-loading">🤖 Analyzing...</span>}
+            {verification?.status === 'verified' && <span className="upload-status-badge verification-badge-ok">✓ AI Verified</span>}
+            {(verification?.status === 'failed' || verification?.status === 'error') && <span className="upload-status-badge verification-badge-failed">✕ AI Issue</span>}
           </div>
         </div>
         {uploaded ? (
+          <>
           <div className="uploaded-file">
             <div className="uploaded-file-info">
               <span className="file-icon">{fileIcon(uploaded.type)}</span>
@@ -835,6 +839,13 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
                 onClick={() => { clearDocStores(doc.id); onRemove(doc.id); }}>🗑️ Remove</button>
             </div>
           </div>
+          {verification?.status === 'verified' && (
+            <div className="document-verification-message verification-message-ok">✓ AI verification passed. Document appears correct and complete.</div>
+          )}
+          {(verification?.status === 'failed' || verification?.status === 'error') && (
+            <div className="document-verification-message verification-message-failed">✕ AI verification found an issue. Review this document before continuing.</div>
+          )}
+          </>
         ) : uploading ? (
           <div className="upload-progress-wrap">
             <div className="upload-progress-label">Uploading... {progress}%</div>
@@ -895,6 +906,41 @@ function UploadCard({ doc, uploaded, onUpload, onRemove }) {
 export default function Step5DocumentUpload() {
   const { formData, addDocument, removeDocument, setCurrentStep, saveDraft, draftSaved } = useApp();
   const [submitError, setSubmitError] = useState('');
+  const [verification, setVerification] = useState({});
+
+  const verifyUploadedDocument = async (doc, file) => {
+    setVerification(prev => ({ ...prev, [doc.id]: { status: 'loading' } }));
+    try {
+      const form = new FormData();
+      form.append('file', file, file.name);
+      form.append('docType', DOC_CHECKLISTS[doc.id] || 'default');
+      form.append('docLabel', doc.label);
+      const response = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Verification failed');
+      const passed = data.documentTypeMatch !== false &&
+        data.summary?.total > 0 && data.summary.missing === 0 && data.summary.unknown === 0;
+      setVerification(prev => ({ ...prev, [doc.id]: { status: passed ? 'verified' : 'failed', data } }));
+    } catch (error) {
+      setVerification(prev => ({ ...prev, [doc.id]: { status: 'error', error: error.message } }));
+    }
+  };
+
+  const handleUpload = (docId, fileData, file) => {
+    addDocument(docId, fileData);
+    const doc = REQUIRED_DOCUMENTS.find(item => item.id === docId);
+    if (doc && file) verifyUploadedDocument(doc, file);
+  };
+
+  const handleRemove = (docId) => {
+    removeDocument(docId);
+    setVerification(prev => {
+      const next = { ...prev };
+      delete next[docId];
+      return next;
+    });
+  };
+
   const handleNext = () => {
     const missing = REQUIRED_DOCUMENTS.filter(d => d.required && !formData.documents[d.id]);
     if (missing.length > 0) { setSubmitError(`Please upload: ${missing.map(d => d.label).join(', ')}`); return; }
@@ -926,7 +972,7 @@ export default function Step5DocumentUpload() {
       </div>
       <div className="upload-grid">
         {REQUIRED_DOCUMENTS.map(doc => (
-          <UploadCard key={doc.id} doc={doc} uploaded={formData.documents[doc.id]} onUpload={addDocument} onRemove={removeDocument} />
+          <UploadCard key={doc.id} doc={doc} uploaded={formData.documents[doc.id]} verification={verification[doc.id]} onUpload={handleUpload} onRemove={handleRemove} />
         ))}
       </div>
       <div className="step-actions">

@@ -1,12 +1,52 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const multer = require('multer');
 const fetch = require('node-fetch');
 const pdfParse = require('pdf-parse');
 const JSZip = require('jszip');
 const mongoose = require('mongoose');
 const { fillAllTemplates } = require('./templateFiller');
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const APPROVED_DRUGS_WORKBOOK = path.join(__dirname, '..', 'approved_drugs.xlsx');
+
+function decodeXml(value) {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+async function readApprovedDrugsWorkbook() {
+  const zip = await JSZip.loadAsync(fs.readFileSync(APPROVED_DRUGS_WORKBOOK));
+  const sharedStringsXml = await zip.file('xl/sharedStrings.xml').async('string');
+  const sheetXml = await zip.file('xl/worksheets/sheet1.xml').async('string');
+  const sharedStrings = [...sharedStringsXml.matchAll(/<si>[\s\S]*?<t[^>]*>([\s\S]*?)<\/t>[\s\S]*?<\/si>/g)]
+    .map(match => decodeXml(match[1]).trim());
+
+  return [...sheetXml.matchAll(/<row[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)]
+    .slice(1)
+    .map(([_, rowNumber, rowXml]) => {
+      const cells = {};
+      for (const [, cellTag, column, value] of rowXml.matchAll(/(<c[^>]*r="([A-Z]+)\d+"[^>]*>\s*<v>([\s\S]*?)<\/v>\s*<\/c>)/g)) {
+        const type = cellTag.match(/\bt="([^"]+)"/)?.[1];
+        cells[column] = type === 's' ? sharedStrings[Number(value)] : decodeXml(value).trim();
+      }
+      return {
+        id: Number(rowNumber) - 1,
+        genericName: cells.B || '',
+        strength: cells.C || '',
+        indication: cells.D || '',
+        approvalDate: cells.E || '',
+      };
+    })
+    .filter(drug => drug.genericName);
+}
 
 /* ── MongoDB connection ──────────────────────────────────────────────────── */
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/drug_ministry';
@@ -18,7 +58,7 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   });
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } });
 
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json({ limit: '50mb' }));
@@ -26,6 +66,16 @@ app.use(express.json({ limit: '50mb' }));
 /* ── Application CRUD routes ────────────────────────────────────────────── */
 const applicationRoutes = require('./routes/applications');
 app.use('/api/applications', applicationRoutes);
+
+let approvedDrugs = [];
+readApprovedDrugsWorkbook()
+  .then(drugs => {
+    approvedDrugs = drugs;
+    console.log(`Loaded ${approvedDrugs.length} approved drugs from approved_drugs.xlsx`);
+  })
+  .catch(err => console.warn(`Could not load approved_drugs.xlsx: ${err.message}`));
+
+app.get('/api/approved-drugs', (_, res) => res.json({ drugs: approvedDrugs }));
 
 /* ─── Health check ─────────────────────────────────────────────────────── */
 app.get('/health', (_, res) => res.json({ status: 'ok', model: 'mistral-large-latest' }));
@@ -1253,8 +1303,6 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
    caches the doc-type-match verdict in documents.<docId>.validationResult.
    Reviewer's Documents tab reads the cache to show green/red badges before
    any manual click. Skips docs already cached unless ?force=1. */
-const path = require('path');
-const fs = require('fs');
 const Application = require('./models/Application');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 

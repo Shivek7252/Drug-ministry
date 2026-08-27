@@ -1,7 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DOSAGE_FORMS } from '../../data/mockData';
-import { searchApprovedDrugs, findApprovedDrug } from '../../data/approvedDrugs';
+import {
+  loadApprovedDrugs,
+  searchApprovedDrugs,
+  findApprovedDrug,
+} from '../../data/approvedDrugs';
 import './WizardStep.css';
 
 const emptyProduct = {
@@ -249,11 +253,19 @@ export default function Step3DrugInfo() {
   const [product, setProduct]     = useState(emptyProduct);
   const [errors, setErrors]       = useState({});
   const [tableError, setTableError] = useState('');
+  const [, setDrugsLoaded] = useState(false);
+
+  useEffect(() => {
+    loadApprovedDrugs().then(() => setDrugsLoaded(true));
+  }, []);
 
   const validateProduct = () => {
     const e = {};
     if (!product.productName.trim())  e.productName  = 'Required';
     if (!product.genericName.trim())  e.genericName  = 'Required';
+    else if (!findApprovedDrug(product.genericName)) {
+      e.genericName = 'Select a generic name from the CDSCO approved list';
+    }
     if (!product.dosageForm)          e.dosageForm   = 'Required';
     if (!product.strength.trim())     e.strength     = 'Required';
     if (!product.batchNumber.trim())  e.batchNumber  = 'Required';
@@ -298,8 +310,17 @@ export default function Step3DrugInfo() {
   };
 
   const handleNext = () => {
+    if (showForm && !findApprovedDrug(product.genericName)) {
+      setErrors(p => ({ ...p, genericName: 'Select a generic name from the CDSCO approved list' }));
+      setTableError('Please select an approved generic name before proceeding.');
+      return;
+    }
     if (formData.products.length === 0) {
       setTableError('Please add at least one drug/product before proceeding.');
+      return;
+    }
+    if (formData.products.some(item => !findApprovedDrug(item.genericName))) {
+      setTableError('Only CDSCO approved generic names can proceed to the next step.');
       return;
     }
     setCurrentStep(4);

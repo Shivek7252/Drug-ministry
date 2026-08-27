@@ -293,6 +293,17 @@
   background: var(--bg);
 }
 
+/* Back to Queue button — visible on the dark topbar */
+.rap-btn-back {
+  background: linear-gradient(135deg, #074595, #2b67a8);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.rap-btn-back:hover {
+  background: linear-gradient(135deg, #074595, #2b67a8);
+}
+
 /* Ghost button on hero card is white-on-dark */
 .rap-hero .rap-btn-ghost {
   color: #fff;

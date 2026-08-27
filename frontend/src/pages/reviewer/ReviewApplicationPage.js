@@ -334,7 +334,7 @@ export default function ReviewApplicationPage() {
         </div>
         <div className="rap-topbar-right">
           <StatusBadge status={data.status} />
-          <button className="rap-btn rap-btn-ghost" onClick={() => navigate('/review')}>← Back to Queue</button>
+          <button className="rap-btn rap-btn-back" onClick={() => navigate('/review')}>← Back to Queue</button>
         </div>
       </div>
 
@@ -362,10 +362,28 @@ export default function ReviewApplicationPage() {
           )}
         </div>
         <div className="rap-hero-actions">
-          <button className="rap-btn rap-btn-warn" onClick={() => { setActionStatus('Under Review'); setShowForm(true); }}>🔍 Under Review</button>
+          {/* Summary always visible */}
           <button className="rap-btn rap-btn-neutral" onClick={() => setShowSummary(true)}>📊 Summary</button>
-          <button className="rap-btn rap-btn-danger" onClick={() => { setActionStatus('Rejected'); setShowForm(true); }}>✕ Reject</button>
-          <button className="rap-btn rap-btn-primary" onClick={() => { setActionStatus('Approved'); setShowForm(true); }}>✓ Approve</button>
+
+          {/* Submitted / Query Raised / Partially Approved — full action set */}
+          {(data.status === 'Submitted' || data.status === 'Query Raised' || data.status === 'Partially Approved') && (
+            <>
+              <button className="rap-btn rap-btn-warn" onClick={() => { setActionStatus('Under Review'); setShowForm(true); }}>🔍 Under Review</button>
+              <button className="rap-btn rap-btn-danger" onClick={() => { setActionStatus('Rejected'); setShowForm(true); }}>✕ Reject</button>
+              <button className="rap-btn rap-btn-primary" onClick={() => { setActionStatus('Approved'); setShowForm(true); }}>✓ Approve</button>
+            </>
+          )}
+
+          {/* Under Review — no "Under Review" button (already there), just Reject + Approve */}
+          {data.status === 'Under Review' && (
+            <>
+              <button className="rap-btn rap-btn-danger" onClick={() => { setActionStatus('Rejected'); setShowForm(true); }}>✕ Reject</button>
+              <button className="rap-btn rap-btn-primary" onClick={() => { setActionStatus('Approved'); setShowForm(true); }}>✓ Approve</button>
+            </>
+          )}
+
+          {/* Approved — Summary only (no extra buttons) */}
+          {/* Rejected — Summary only (no extra buttons) */}
         </div>
       </div>
 

@@ -8,6 +8,7 @@ const Application = require('../models/Application');
 const { v4: uuidv4 } = require('uuid');
 const { validateProductsApproval } = require('../approvedDrugs');
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 /* ── Uploads root (PDF binaries live here, NOT in MongoDB) ───────────────── */
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -15,7 +16,7 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 /* Multer memory upload for applicant checklist replies (small doc payloads). */
 const checklistUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: MAX_FILE_SIZE },
 });
 
 const MAX_QUERY_ROUNDS = 5;
@@ -1467,7 +1468,7 @@ router.get('/:id/checklist/:itemId/reply-file/:version', async (req, res) => {
 
 const reconciliationUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: MAX_FILE_SIZE },
 });
 
 /* ── Compute residual shelf life % (for formulations) ──────────────────────
