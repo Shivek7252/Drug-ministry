@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { listApplications, searchFull } from '../../api/applicationService';
 import './ReviewDashboard.css';
@@ -24,23 +25,23 @@ const INDIAN_STATES = [
 ];
 
 const KPI_CONFIG = [
-  { key: 'total',       label: 'Total',     tone: 'primary', icon: '📋', filter: 'All'          },
-  { key: 'submitted',   label: 'New',       tone: 'warn',    icon: '✨', filter: 'Submitted'    },
-  { key: 'underReview', label: 'In Review', tone: 'info',    icon: '🔍', filter: 'Under Review' },
-  { key: 'queryRaised', label: 'Query',     tone: 'orange',  icon: '❓', filter: 'Query Raised' },
-  { key: 'approved',    label: 'Approved',  tone: 'ok',      icon: '✓',  filter: 'Approved'     },
-  { key: 'rejected',    label: 'Rejected',  tone: 'bad',     icon: '✕',  filter: 'Rejected'     },
+  { key: 'total', label: 'Total', tone: 'primary', icon: '📋', filter: 'All' },
+  { key: 'submitted', label: 'New', tone: 'warn', icon: '✨', filter: 'Submitted' },
+  { key: 'underReview', label: 'In Review', tone: 'info', icon: '🔍', filter: 'Under Review' },
+  { key: 'queryRaised', label: 'Query', tone: 'orange', icon: '❓', filter: 'Query Raised' },
+  { key: 'approved', label: 'Approved', tone: 'ok', icon: '✓', filter: 'Approved' },
+  { key: 'rejected', label: 'Rejected', tone: 'bad', icon: '✕', filter: 'Rejected' },
 ];
 
 const STATUS_TONES = {
-  'Submitted':          { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-  'Under Review':       { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
-  'Verified':           { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-  'Query Raised':       { bg: '#fff7ed', color: '#c2410c', border: '#fdba74' },
-  'Approved':           { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+  'Submitted': { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  'Under Review': { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
+  'Verified': { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+  'Query Raised': { bg: '#fff7ed', color: '#c2410c', border: '#fdba74' },
+  'Approved': { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
   'Partially Approved': { bg: '#eff6ff', color: '#1e40af', border: '#bfdbfe' },
-  'Rejected':           { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
-  'Draft':              { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
+  'Rejected': { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+  'Draft': { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
 };
 
 /* ── localStorage helpers ───────────────────────────────────────────────── */
@@ -112,14 +113,15 @@ function LoadingRow() {
 
 export default function ReviewDashboard() {
   const { currentUser } = useApp();
+  const navigate = useNavigate();
 
-  const [apps,         setApps]         = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [searchQ,      setSearchQ]      = useState('');
+  const [apps, setApps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [filterState,  setFilterState]  = useState('All States');
-  const [filterCat,    setFilterCat]    = useState('All');
-  const [openedApps,   setOpenedApps]   = useState(() => getOpenedApps());
+  const [filterState, setFilterState] = useState('All States');
+  const [filterCat, setFilterCat] = useState('All');
+  const [openedApps, setOpenedApps] = useState(() => getOpenedApps());
 
   /* ── Data fetching ──────────────────────────────────────────────────── */
   const loadApps = useCallback(async () => {
@@ -143,12 +145,12 @@ export default function ReviewDashboard() {
 
   /* ── Derived data ───────────────────────────────────────────────────── */
   const stats = useMemo(() => ({
-    total:       apps.length,
-    submitted:   apps.filter(a => a.status === 'Submitted').length,
+    total: apps.length,
+    submitted: apps.filter(a => a.status === 'Submitted').length,
     underReview: apps.filter(a => a.status === 'Under Review').length,
     queryRaised: apps.filter(a => a.status === 'Query Raised').length,
-    approved:    apps.filter(a => a.status === 'Approved').length,
-    rejected:    apps.filter(a => a.status === 'Rejected').length,
+    approved: apps.filter(a => a.status === 'Approved').length,
+    rejected: apps.filter(a => a.status === 'Rejected').length,
   }), [apps]);
 
   const filtered = useMemo(() => apps.filter(a => {
@@ -167,20 +169,16 @@ export default function ReviewDashboard() {
   );
 
   const unseenCount = filtered.filter(a => isNewUnseen(a, openedApps)).length;
-  const hasFilters  = filterStatus !== 'All'
-                   || filterState  !== 'All States'
-                   || filterCat    !== 'All'
-                   || searchQ.trim() !== '';
+  const hasFilters = filterStatus !== 'All'
+    || filterState !== 'All States'
+    || filterCat !== 'All'
+    || searchQ.trim() !== '';
 
   /* ── Handlers ───────────────────────────────────────────────────────── */
   const openConsignment = (app) => {
     markAppOpened(app.applicationNumber);
     setOpenedApps(getOpenedApps());
-    window.open(
-      `/review/application/${encodeURIComponent(app.applicationNumber)}`,
-      '_blank',
-      'noopener',
-    );
+    navigate(`/review/application/${encodeURIComponent(app.applicationNumber)}`);
   };
 
   const handleKpiClick = (kpi) => setFilterStatus(kpi.filter);

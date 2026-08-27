@@ -552,7 +552,6 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           ['shipments', '🚚', 'Shipments'],
           ['docs', '📁', 'Documents'],
           ['checklist', '🔍', 'Checklist\nQuery'],
-          ['audit', '📜', 'Audit'],
         ].map(([k, icon, label]) => (
           <button
             key={k}
@@ -726,13 +725,13 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
                     <div className="rv-doc-name">{doc.label}</div>
                     {up
                       ? <div className="rv-doc-file">
-                          {up.name} · {up.uploadedAt}
-                          {verdict === 'bad' && up.validationResult?.documentTypeReason && !reviewerVerdict && (
-                            <div style={{ marginTop: 4, color: '#dc2626', fontSize: 12 }}>
-                              ⚠ {up.validationResult.documentTypeReason}
-                            </div>
-                          )}
-                        </div>
+                        {up.name} · {up.uploadedAt}
+                        {verdict === 'bad' && up.validationResult?.documentTypeReason && !reviewerVerdict && (
+                          <div style={{ marginTop: 4, color: '#dc2626', fontSize: 12 }}>
+                            ⚠ {up.validationResult.documentTypeReason}
+                          </div>
+                        )}
+                      </div>
                       : <div className="rv-doc-missing-lbl">Not uploaded</div>}
                   </div>
                   <div className="rv-doc-actions">
@@ -770,29 +769,7 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           />
         )}
 
-        {/* ── AUDIT ── */}
-        {!loadingFull && activeTab === 'audit' && (
-          <div className="rv-audit-panel">
-            {(!data.auditLog || data.auditLog.length === 0)
-              ? <div className="rv-state-box" style={{ padding: 24 }}><span className="rv-state-sub">No audit events recorded</span></div>
-              : [...(data.auditLog || [])].reverse().map((e, i, arr) => (
-                <div key={i} className="rv-audit-entry">
-                  <div className="rv-audit-dot-wrap">
-                    <div className="rv-audit-dot" />
-                    {i < arr.length - 1 && <div className="rv-audit-line" />}
-                  </div>
-                  <div className="rv-audit-body">
-                    <div className="rv-audit-evt">{(e.action || '').replace(/_/g, ' ')}</div>
-                    <div className="rv-audit-desc">{e.detail}</div>
-                    <div className="rv-audit-meta">
-                      <span>👤 {e.user || 'system'}</span>
-                      <span>🕒 {e.timestamp ? new Date(e.timestamp).toLocaleString('en-IN') : '—'}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
+        {/* ── AUDIT tab removed ── */}
       </div>
 
       {/* ── Action bar ── */}

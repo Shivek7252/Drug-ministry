@@ -27,32 +27,31 @@ import './ReviewApplicationPage.css';
 
 /* Doc slots the applicant uploads to. Same list the queue-side modal used. */
 const REQUIRED_DOCS = [
-  { id: 'mfg_license',      label: 'Manufacturing License',       docType: 'mfg_license' },
+  { id: 'mfg_license', label: 'Manufacturing License', docType: 'mfg_license' },
   { id: 'product_approval', label: 'Product Approval Certificate', docType: 'product_approval' },
-  { id: 'export_auth',      label: 'Export Authorization Letter',  docType: 'export_auth' },
-  { id: 'qa_cert',          label: 'Quality Assurance Certificate', docType: 'qa_cert' },
-  { id: 'batch_analysis',   label: 'Batch Analysis Report',        docType: 'batch_analysis' },
-  { id: 'product_info',     label: 'Product Information Sheet',    docType: 'product_info' },
+  { id: 'export_auth', label: 'Export Authorization Letter', docType: 'export_auth' },
+  { id: 'qa_cert', label: 'Quality Assurance Certificate', docType: 'qa_cert' },
+  { id: 'batch_analysis', label: 'Batch Analysis Report', docType: 'batch_analysis' },
+  { id: 'product_info', label: 'Product Information Sheet', docType: 'product_info' },
 ];
 
 const SECTIONS = [
-  { id: 'overview',  label: 'Overview',        icon: '📊' },
-  { id: 'details',   label: 'Application',     icon: '📋' },
-  { id: 'docs',      label: 'Documents',       icon: '📁' },
-  { id: 'shipments', label: 'Shipments',       icon: '🚚' },
+  { id: 'overview', label: 'Overview', icon: '📊' },
+  { id: 'details', label: 'Application', icon: '📋' },
+  { id: 'docs', label: 'Documents', icon: '📁' },
+  { id: 'shipments', label: 'Shipments', icon: '🚚' },
   { id: 'checklist', label: 'Checklist Query', icon: '🔍' },
-  { id: 'audit',     label: 'Audit Trail',     icon: '📜' },
 ];
 
 const STATUS_TONES = {
-  'Submitted':        { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-  'Under Review':     { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
-  'Verified':         { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-  'Query Raised':     { bg: '#fff7ed', color: '#c2410c', border: '#fdba74' },
-  'Approved':         { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+  'Submitted': { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  'Under Review': { bg: '#fefce8', color: '#a16207', border: '#fde68a' },
+  'Verified': { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+  'Query Raised': { bg: '#fff7ed', color: '#c2410c', border: '#fdba74' },
+  'Approved': { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
   'Partially Approved': { bg: '#eff6ff', color: '#1e40af', border: '#bfdbfe' },
-  'Rejected':         { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
-  'Draft':            { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
+  'Rejected': { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+  'Draft': { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -113,21 +112,21 @@ export default function ReviewApplicationPage() {
         const parsed = JSON.parse(stored);
         return parsed.username || null;
       }
-    } catch (_) {}
+    } catch (_) { }
     return null;
   }, [ctxUser]);
 
-  const [full, setFull]                 = useState(null);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState('');
+  const [full, setFull] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('overview');
 
   // Doc verdict / verify state — ported from the modal
-  const [docResult, setDocResult]     = useState({}); // filename-check cache
-  const [docVerdict, setDocVerdict]   = useState({}); // reviewer's explicit verify/decline
+  const [docResult, setDocResult] = useState({}); // filename-check cache
+  const [docVerdict, setDocVerdict] = useState({}); // reviewer's explicit verify/decline
   const [verifiedDoc, setVerifiedDoc] = useState(null);
   const [mismatchDoc, setMismatchDoc] = useState(null);
-  const [viewerDoc, setViewerDoc]     = useState(null);
+  const [viewerDoc, setViewerDoc] = useState(null);
 
   // Compliance snapshot (fetched once for the Overview KPI strip)
   const [compliance, setCompliance] = useState(null);
@@ -136,10 +135,10 @@ export default function ReviewApplicationPage() {
   const [showSummary, setShowSummary] = useState(false);
 
   // Action form
-  const [showForm, setShowForm]         = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [actionStatus, setActionStatus] = useState('');
-  const [remarks, setRemarks]           = useState('');
-  const [actionBusy, setActionBusy]     = useState(false);
+  const [remarks, setRemarks] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
 
   // Shipment line action state
   const [lineBusy, setLineBusy] = useState(null);
@@ -242,7 +241,7 @@ export default function ReviewApplicationPage() {
     const aiMatch = up.validationResult && typeof up.validationResult.documentTypeMatch === 'boolean'
       ? up.validationResult.documentTypeMatch
       : null;
-    if (aiMatch === true)  { setVerifiedDoc({ docId, docLabel, docType, up }); return; }
+    if (aiMatch === true) { setVerifiedDoc({ docId, docLabel, docType, up }); return; }
     if (aiMatch === false) { setMismatchDoc({ docId, docLabel, docType, up }); return; }
     // No cached verdict yet — go straight to the viewer (auto-run kicks in there).
     openViewer(docId, docLabel, docType, up);
@@ -335,7 +334,7 @@ export default function ReviewApplicationPage() {
         </div>
         <div className="rap-topbar-right">
           <StatusBadge status={data.status} />
-          <button className="rap-btn rap-btn-ghost" onClick={() => window.close()}>✕ Close</button>
+          <button className="rap-btn rap-btn-ghost" onClick={() => navigate('/review')}>← Back to Queue</button>
         </div>
       </div>
 
@@ -442,12 +441,11 @@ export default function ReviewApplicationPage() {
         </aside>
 
         <main className="rap-main">
-          {activeSection === 'overview'  && <OverviewSection data={data} compliance={compliance} uploadStats={uploadStats} onNavigate={setActiveSection} onOpenSummary={() => setShowSummary(true)} />}
-          {activeSection === 'details'   && <DetailsSection data={data} />}
-          {activeSection === 'docs'      && <DocumentsSection data={data} docVerdict={docVerdict} aiCheckLoading={aiCheckLoading} onDocClick={handleDocClick} />}
+          {activeSection === 'overview' && <OverviewSection data={data} compliance={compliance} uploadStats={uploadStats} onNavigate={setActiveSection} onOpenSummary={() => setShowSummary(true)} />}
+          {activeSection === 'details' && <DetailsSection data={data} />}
+          {activeSection === 'docs' && <DocumentsSection data={data} docVerdict={docVerdict} aiCheckLoading={aiCheckLoading} onDocClick={handleDocClick} />}
           {activeSection === 'shipments' && <ShipmentsTab data={data} actionBusy={lineBusy} onLineAction={handleLineAction} />}
           {activeSection === 'checklist' && <NocChecklistPage applicationNumber={data.applicationNumber} role="reviewer" />}
-          {activeSection === 'audit'     && <AuditSection data={data} />}
         </main>
       </div>
 
@@ -594,10 +592,10 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
                 <div className="rap-glance-cap">Checklist complete</div>
               </div>
               <div className="rap-glance-list">
-                <GlanceRow label="Correct documents"  count={compliance.counts.ok}        tone="ok"       />
-                <GlanceRow label="Missing documents"  count={compliance.counts.missing}   tone="missing"  onClick={compliance.counts.missing > 0 ? () => onNavigate('checklist') : null} />
-                <GlanceRow label="Wrong documents"    count={compliance.counts.wrong}     tone="wrong"    onClick={compliance.counts.wrong > 0 ? () => onNavigate('checklist') : null} />
-                <GlanceRow label="Not yet verified"   count={compliance.counts.unchecked} tone="unchecked" onClick={compliance.counts.unchecked > 0 ? () => onNavigate('docs') : null} />
+                <GlanceRow label="Correct documents" count={compliance.counts.ok} tone="ok" />
+                <GlanceRow label="Missing documents" count={compliance.counts.missing} tone="missing" onClick={compliance.counts.missing > 0 ? () => onNavigate('checklist') : null} />
+                <GlanceRow label="Wrong documents" count={compliance.counts.wrong} tone="wrong" onClick={compliance.counts.wrong > 0 ? () => onNavigate('checklist') : null} />
+                <GlanceRow label="Not yet verified" count={compliance.counts.unchecked} tone="unchecked" onClick={compliance.counts.unchecked > 0 ? () => onNavigate('docs') : null} />
               </div>
             </div>
           ) : (
@@ -607,11 +605,11 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
 
         <SectionCard title="File Uploads" icon="📎" right={<button className="rap-mini-btn" onClick={() => onNavigate('docs')}>Manage →</button>}>
           <div className="rap-glance-list">
-            <GlanceRow label="Files uploaded"    count={uploadStats.uploaded}                tone="ok" />
-            <GlanceRow label="AI verified"        count={uploadStats.verified}                 tone="ok" />
-            <GlanceRow label="AI flagged wrong"   count={uploadStats.wrong}    tone="wrong"     onClick={uploadStats.wrong > 0 ? () => onNavigate('docs') : null} />
-            <GlanceRow label="Awaiting AI check"  count={uploadStats.pending}  tone="unchecked" />
-            <GlanceRow label="Empty slots"        count={uploadStats.total - uploadStats.uploaded} tone="missing" />
+            <GlanceRow label="Files uploaded" count={uploadStats.uploaded} tone="ok" />
+            <GlanceRow label="AI verified" count={uploadStats.verified} tone="ok" />
+            <GlanceRow label="AI flagged wrong" count={uploadStats.wrong} tone="wrong" onClick={uploadStats.wrong > 0 ? () => onNavigate('docs') : null} />
+            <GlanceRow label="Awaiting AI check" count={uploadStats.pending} tone="unchecked" />
+            <GlanceRow label="Empty slots" count={uploadStats.total - uploadStats.uploaded} tone="missing" />
           </div>
         </SectionCard>
       </div>
@@ -800,7 +798,7 @@ function DocumentsSection({ data, docVerdict, aiCheckLoading, onDocClick }) {
                   </span>
                   <div className="rap-doc-name">{slot.label}</div>
                   {aiPending && <span className="rap-badge rap-badge-pending">Checking…</span>}
-                  {verdict === 'ok'  && <span className="rap-badge rap-badge-ok">{reviewerVerdict ? '✓ Verified' : '✓ AI Correct'}</span>}
+                  {verdict === 'ok' && <span className="rap-badge rap-badge-ok">{reviewerVerdict ? '✓ Verified' : '✓ AI Correct'}</span>}
                   {verdict === 'bad' && <span className="rap-badge rap-badge-bad">{reviewerVerdict ? '✗ Declined' : '✗ Wrong Doc'}</span>}
                 </div>
                 {up ? (
@@ -826,41 +824,6 @@ function DocumentsSection({ data, docVerdict, aiCheckLoading, onDocClick }) {
             );
           })}
         </div>
-      </SectionCard>
-    </div>
-  );
-}
-
-function AuditSection({ data }) {
-  const log = [...(data.auditLog || [])].reverse();
-  if (log.length === 0) {
-    return (
-      <div className="rap-section">
-        <SectionCard title="Audit Trail" icon="📜">
-          <div className="rap-empty">No audit events recorded yet.</div>
-        </SectionCard>
-      </div>
-    );
-  }
-  return (
-    <div className="rap-section">
-      <SectionCard title="Audit Trail" icon="📜" right={<span className="rap-mini-label">{log.length} events</span>}>
-        <ol className="rap-timeline">
-          {log.map((e, i) => (
-            <li key={i} className="rap-timeline-item">
-              <div className="rap-timeline-dot" />
-              <div className="rap-timeline-body">
-                <div className="rap-timeline-title">{(e.action || '').replace(/_/g, ' ')}</div>
-                <div className="rap-timeline-detail">{e.detail}</div>
-                <div className="rap-timeline-meta">
-                  <span>👤 {e.user || 'system'}</span>
-                  <span>·</span>
-                  <span>🕒 {e.timestamp ? new Date(e.timestamp).toLocaleString('en-IN') : '—'}</span>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
       </SectionCard>
     </div>
   );
