@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { getApplicationFull, shipmentAction, setNocMeta, preVerifyDocs } from '../../api/applicationService';
+import { getApplicationFull, shipmentAction, setNocMeta, preVerifyDocs, reviewerAction } from '../../api/applicationService';
 import { useApp } from '../../context/AppContext';
 import DocViewerModal from '../../components/shared/DocViewerModal';
 import NocChecklistPage from '../../components/checklist/NocChecklistPage';
@@ -518,6 +518,19 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
     setShowForm(false); setRemarks(''); setActionStatus('');
   };
 
+  const handleDocumentReviewDecision = async (status, decisionRemarks, context = {}) => {
+    const documentContext = context.docLabel ? `Document: ${context.docLabel}\n` : '';
+    const res = await reviewerAction(data.applicationNumber, {
+      status,
+      remarks: `${documentContext}${decisionRemarks}`.trim(),
+      officer: currentUser?.username || currentUser || 'reviewer',
+    });
+    if (!res.success) throw new Error(res.error || 'Reviewer action failed.');
+    const refreshed = await getApplicationFull(data.applicationNumber);
+    if (refreshed.success) setFull(refreshed.application);
+    return res;
+  };
+
   /* Status badge color */
   const statusColor = { Approved: '#15803d', Rejected: '#dc2626', 'Under Review': '#a16207', Verified: '#15803d', 'Query Raised': '#c2410c', Submitted: '#1d4ed8' };
   const statusBg = { Approved: '#f0fdf4', Rejected: '#fef2f2', 'Under Review': '#fefce8', Verified: '#f0fdf4', 'Query Raised': '#fff7ed', Submitted: '#eff6ff' };
@@ -871,6 +884,9 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           fileSize={viewerDoc.fileSize}
           fileType={viewerDoc.fileType}
           appNumber={data.applicationNumber}
+          reviewerMode
+          onReviewerDecision={handleDocumentReviewDecision}
+          reviewActionsDisabled={data.status === 'Approved' || data.status === 'Rejected'}
           verificationResult={docVerdict[viewerDoc.docId]}
           onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}
           onDecline={(id) => setDocVerdict(p => ({ ...p, [id]: 'bad' }))}

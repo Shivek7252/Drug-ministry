@@ -447,6 +447,12 @@
   flex-direction: column;
 }
 
+.dv-split-right-reviewer {
+  width: 460px;
+  min-width: 400px;
+  max-width: 500px;
+}
+
 /* ── Checklist Panel ─────────────────────────────────────── */
 .cl-panel {
   display: flex;
@@ -910,6 +916,377 @@
   border-color: #14532d;
   box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
   animation: clSearchPulse 1.2s ease infinite;
+}
+
+/* Reviewer-only structured AI verification result */
+.cl-review-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cl-review-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.cl-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cl-cache-badge {
+  padding: 3px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cl-overall-card {
+  padding: 14px;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: 10px;
+}
+
+.cl-overall-approved {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.cl-overall-rejected {
+  background: #fff7f7;
+  border-color: #fca5a5;
+}
+
+.cl-overall-pending,
+.cl-overall-incomplete {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.cl-overall-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cl-overall-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cl-overall-approved .cl-overall-icon { color: #15803d; box-shadow: inset 0 0 0 1px #86efac; }
+.cl-overall-rejected .cl-overall-icon { color: #dc2626; box-shadow: inset 0 0 0 1px #fca5a5; }
+.cl-overall-pending .cl-overall-icon,
+.cl-overall-incomplete .cl-overall-icon { color: #b45309; box-shadow: inset 0 0 0 1px #fcd34d; }
+
+.cl-overall-kicker {
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.cl-overall-title {
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.cl-status-badge {
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cl-status-approved { background: #dcfce7; border-color: #86efac; color: #166534; }
+.cl-status-rejected { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+.cl-status-pending,
+.cl-status-incomplete { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+
+.cl-result-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(100, 116, 139, .18);
+}
+
+.cl-result-metrics span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .72);
+  color: #475569;
+  font-size: 10px;
+}
+
+.cl-result-metrics .is-pass { color: #166534; }
+.cl-result-metrics .is-fail { color: #b91c1c; }
+.cl-result-metrics .is-pending { color: #92400e; }
+
+.cl-result-meta {
+  margin-top: 9px;
+  color: #475569;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.cl-result-meta p { margin: 0 0 5px; }
+.cl-result-meta > div { display: flex; flex-wrap: wrap; gap: 4px 12px; color: #64748b; }
+
+.cl-primary-reason,
+.cl-supporting-evidence,
+.cl-corrective-action,
+.cl-detail-unavailable {
+  padding: 11px 12px;
+  border-radius: 8px;
+}
+
+.cl-primary-reason {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.cl-primary-reason p,
+.cl-corrective-action p,
+.cl-check-action p {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.cl-detail-label {
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.cl-supporting-evidence {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+}
+
+.cl-supporting-evidence blockquote {
+  margin: 6px 0 8px;
+  color: #7c2d12;
+  font-size: 11.5px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+.cl-failed-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cl-failed-check {
+  padding: 11px;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.cl-failed-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  color: #1e293b;
+  font-size: 11.5px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.cl-issue-badge {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.cl-issue-missing { background: #fef3c7; color: #92400e; }
+.cl-issue-incorrect { background: #fee2e2; color: #b91c1c; }
+
+.cl-failed-reason {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.cl-value-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.cl-value-comparison > div {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 7px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.cl-value-comparison span,
+.cl-check-action span {
+  display: block;
+  margin-bottom: 3px;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.cl-value-comparison strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #334155;
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.cl-check-evidence {
+  margin-top: 9px;
+  padding: 8px 9px;
+  border-left: 3px solid #f59e0b;
+  border-radius: 5px;
+  background: #fffbeb;
+}
+
+.cl-check-evidence p {
+  margin: 4px 0 7px;
+  color: #78350f;
+  font-size: 10.5px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.cl-locate-evidence {
+  padding: 4px 8px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 750;
+}
+
+.cl-locate-evidence:hover { background: #dbeafe; }
+
+.cl-check-action,
+.cl-corrective-action {
+  margin-top: 9px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.cl-check-action { padding: 8px 9px; border-radius: 6px; }
+.cl-corrective-action { margin-top: 0; }
+
+.cl-detail-unavailable {
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.cl-review-check-list { display: flex; flex-direction: column; gap: 7px; }
+
+.cl-review-check {
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.cl-review-check-approved { border-color: #bbf7d0; background: #f0fdf4; }
+.cl-review-check-incomplete { border-color: #fde68a; background: #fffbeb; }
+
+.cl-review-check-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.cl-review-check-approved .cl-review-check-title > span { color: #16a34a; }
+.cl-review-check-incomplete .cl-review-check-title > span { color: #d97706; }
+.cl-review-check > p { margin: 5px 0 0 20px; color: #64748b; font-size: 10.5px; line-height: 1.5; }
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .dv-split-right-reviewer {
+    width: 410px;
+    min-width: 360px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dv-split-right-reviewer {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .dv-overlay-reviewer { padding: 0; }
+  .dv-modal-reviewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
+  .dv-modal-reviewer .dv-header { padding: 8px 10px; }
+  .dv-modal-reviewer .dv-toolbar { width: 100%; }
+  .dv-modal-reviewer .dv-search-wrap { flex: 1; }
+  .dv-modal-reviewer .dv-search-input,
+  .dv-modal-reviewer .dv-search-input:focus { width: 100%; }
+  .dv-modal-reviewer .dv-split-left { height: 42%; }
+  .dv-modal-reviewer .dv-split-right { height: 58%; }
+  .dv-modal-reviewer .cl-body { padding: 12px; }
+  .cl-value-comparison { grid-template-columns: 1fr; }
+  .cl-overall-top { align-items: flex-start; flex-wrap: wrap; }
+  .cl-status-badge { margin-left: 42px; }
 }
 
 @keyframes clSearchPulse {

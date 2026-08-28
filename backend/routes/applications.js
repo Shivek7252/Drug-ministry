@@ -5,8 +5,20 @@ const path = require('path');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const Application = require('../models/Application');
+const ApplicationQuery = require('../models/ApplicationQuery');
 const { v4: uuidv4 } = require('uuid');
 const { validateProductsApproval } = require('../approvedDrugs');
+const { requireReviewer } = require('../middleware/reviewerAuth');
+const {
+  applicationsToCsv,
+  buildReviewerFilter,
+  exportFilename,
+} = require('../services/reviewerFilters');
+const {
+  createApplicationQuery,
+  getCompleteQueryHistory,
+  queryCountsForApplications,
+} = require('../services/queryHistory');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 /* ── Uploads root (PDF binaries live here, NOT in MongoDB) ───────────────── */
@@ -958,6 +970,115 @@ router.get('/stats/summary', async (req, res) => {
 });
 
 /* ── GET /api/applications/:id/document/:docId — stream raw document file ── */
+/* Reviewer-only list metadata. */
+router.get('/reviewer/options', requireReviewer, async (req, res) => {
+  try {
+    const applications = await Application.find({ isDraft: false })
+      .select('destinationCountry consigneeCountry consignees.country exportCategory')
+      .lean();
+    const countries = new Set();
+    const categories = new Set();
+    for (const app of applications) {
+      [app.destinationCountry, app.consigneeCountry, ...(app.consignees || []).map(c => c.country)]
+        .filter(Boolean)
+        .forEach(country => countries.add(String(country).trim()));
+      if (app.exportCategory) categories.add(String(app.exportCategory).trim());
+    }
+    res.json({
+      success: true,
+      countries: [...countries].sort((a, b) => a.localeCompare(b)),
+      categories: [...categories].sort((a, b) => a.localeCompare(b)),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* Reviewer paginated queue; every filter is applied before pagination. */
+router.get('/reviewer', requireReviewer, async (req, res) => {
+  try {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 20));
+    const { filter, dateRange } = buildReviewerFilter(req.query);
+    const { filter: statusBaseFilter } = buildReviewerFilter({ ...req.query, status: 'All' });
+
+    const [apps, total, statusRows] = await Promise.all([
+      Application.find(filter)
+        .select('-documents -auditLog')
+        .sort({ submittedAt: -1, createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize),
+      Application.countDocuments(filter),
+      Application.aggregate([
+        { $match: statusBaseFilter },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+    ]);
+    const queryCounts = await queryCountsForApplications(apps);
+    const applications = apps.map(app => ({
+      ...app.toObject({ flattenMaps: true }),
+      queryCount: queryCounts.get(String(app._id)) || 0,
+    }));
+    const statusCounts = Object.fromEntries(statusRows.map(row => [row._id, row.count]));
+
+    res.json({
+      success: true,
+      total,
+      count: applications.length,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      dateRange,
+      statusCounts,
+      applications,
+    });
+  } catch (err) {
+    const validationError = /datePreset|date range|startDate|endDate/.test(err.message);
+    res.status(validationError ? 400 : 500).json({ error: err.message });
+  }
+});
+
+/* Reviewer filtered CSV export; intentionally unpaginated. */
+router.get('/reviewer/export', requireReviewer, async (req, res) => {
+  try {
+    const { filter, dateRange } = buildReviewerFilter(req.query);
+    const applications = await Application.find(filter)
+      .select('-documents')
+      .sort({ submittedAt: -1, createdAt: -1 });
+    if (!applications.length) {
+      return res.status(404).json({ error: 'No applications match the selected filters.' });
+    }
+    const queryCounts = await queryCountsForApplications(applications);
+    const csv = applicationsToCsv(applications, queryCounts);
+    const filename = exportFilename(dateRange, req.query.country);
+    console.info(`[reviewer_export] reviewer=${req.reviewer.name} records=${applications.length} file=${filename}`);
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
+      'X-Export-Record-Count': String(applications.length),
+    });
+    return res.send(csv);
+  } catch (err) {
+    const validationError = /datePreset|date range|startDate|endDate/.test(err.message);
+    return res.status(validationError ? 400 : 500).json({ error: err.message });
+  }
+});
+
+/* Complete cross-workflow query history for one reviewer application. */
+router.get('/:id/query-history', requireReviewer, async (req, res) => {
+  try {
+    const app = await Application.findOne({
+      $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
+    });
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+    const queries = await getCompleteQueryHistory(app);
+    return res.json({ success: true, total: queries.length, queries });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id/document/:docId', async (req, res) => {
   try {
     const { id, docId } = req.params;
@@ -1072,9 +1193,15 @@ router.get('/', async (req, res) => {
 });
 
 /* ── POST /api/applications/:id/review — reviewer action ────────────────── */
-router.post('/:id/review', async (req, res) => {
+router.post('/:id/review', requireReviewer, async (req, res) => {
   try {
-    const { status, remarks, officer = 'reviewer' } = req.body;
+    const { status, remarks } = req.body;
+    const officer = req.reviewer.name;
+    const allowedStatuses = ['Submitted', 'Under Review', 'Document Verification', 'Compliance Check', 'Query Raised', 'Approved', 'Partially Approved', 'Rejected'];
+    if (!allowedStatuses.includes(status)) return res.status(400).json({ error: 'Invalid reviewer status.' });
+    if ((status === 'Rejected' || status === 'Query Raised') && !String(remarks || '').trim()) {
+      return res.status(400).json({ error: 'Remarks are required for this action.' });
+    }
     const app = await Application.findOne({
       $or: [
         { applicationNumber: req.params.id },
@@ -1085,7 +1212,16 @@ router.post('/:id/review', async (req, res) => {
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     const prev = app.status;
-    if (status) app.status = status;
+    let queryRecord = null;
+    if (status === 'Query Raised') {
+      queryRecord = await createApplicationQuery(app, {
+        remarks: String(remarks).trim(), officer, source: 'application', sourceReference: 'application',
+      });
+      app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
+    }
+    app.status = status;
+    if (status === 'Approved') app.approvedAt = new Date();
+    if (status === 'Rejected') app.rejectedAt = new Date();
     app.auditLog.push({
       action: 'reviewer_action',
       detail: `Status: ${prev} → ${status || prev}. Remarks: ${remarks || '—'}`,
@@ -1094,17 +1230,34 @@ router.post('/:id/review', async (req, res) => {
     });
     if (remarks) {
       if (!app.reviewerRemarks) app.reviewerRemarks = [];
-      app.reviewerRemarks.push({ text: remarks, officer, timestamp: new Date(), status: status || prev });
+      app.reviewerRemarks.push({
+        text: remarks,
+        officer,
+        timestamp: new Date(),
+        status,
+        queryIdentifier: queryRecord?.queryIdentifier,
+      });
     }
-    await app.save();
-    res.json({ success: true, status: app.status, auditLog: app.auditLog });
+    try {
+      await app.save();
+    } catch (saveError) {
+      if (queryRecord) await ApplicationQuery.deleteOne({ _id: queryRecord._id });
+      throw saveError;
+    }
+    res.json({
+      success: true,
+      status: app.status,
+      queryIdentifier: queryRecord?.queryIdentifier || null,
+      queryCount: app.queryCount || 0,
+      auditLog: app.auditLog,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 /* ── GET /api/applications/:id/full — full detail with audit log ─────────── */
-router.get('/:id/full', async (req, res) => {
+router.get('/:id/full', requireReviewer, async (req, res) => {
   try {
     const app = await Application.findOne({
       $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
@@ -1148,15 +1301,19 @@ function rollupApplicationStatus(shipmentStatuses) {
   return null; // no change — leave whatever's there
 }
 
-router.post('/:id/shipments/:idx/action', async (req, res) => {
+router.post('/:id/shipments/:idx/action', requireReviewer, async (req, res) => {
   try {
-    const { status, remarks = '', officer = 'reviewer' } = req.body;
+    const { status, remarks = '' } = req.body;
+    const officer = req.reviewer.name;
     const idx = Number(req.params.idx);
     if (!Number.isFinite(idx) || idx < 0) {
       return res.status(400).json({ error: 'Invalid shipment index' });
     }
     if (!['Pending', 'Verified', 'Query', 'Approved', 'Rejected'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
+    }
+    if ((status === 'Query' || status === 'Rejected') && !String(remarks).trim()) {
+      return res.status(400).json({ error: 'Remarks are required for this line action.' });
     }
     const app = await Application.findOne({
       $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
@@ -1207,9 +1364,25 @@ router.post('/:id/shipments/:idx/action', async (req, res) => {
 
     const line = app.shipments[idx];
     const prev = line.lineStatus || 'Pending';
+    let queryRecord = null;
+    if (status === 'Query') {
+      queryRecord = await createApplicationQuery(app, {
+        remarks: String(remarks).trim(),
+        officer,
+        source: 'shipment',
+        sourceReference: String(idx),
+      });
+      app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
+    }
     line.lineStatus = status;
     line.lineRemarks = line.lineRemarks || [];
-    line.lineRemarks.push({ text: remarks, officer, status, timestamp: new Date() });
+    line.lineRemarks.push({
+      text: remarks,
+      officer,
+      status,
+      timestamp: new Date(),
+      queryIdentifier: queryRecord?.queryIdentifier,
+    });
     app.markModified('shipments');
 
     // Roll-up application-level status
@@ -1223,12 +1396,19 @@ router.post('/:id/shipments/:idx/action', async (req, res) => {
       timestamp: new Date(),
     });
 
-    await app.save();
+    try {
+      await app.save();
+    } catch (saveError) {
+      if (queryRecord) await ApplicationQuery.deleteOne({ _id: queryRecord._id });
+      throw saveError;
+    }
     res.json({
       success: true,
       status: app.status,
       shipmentIdx: idx,
       lineStatus: status,
+      queryIdentifier: queryRecord?.queryIdentifier || null,
+      queryCount: app.queryCount || 0,
     });
   } catch (err) {
     console.error('Line action error:', err.message);
@@ -1314,9 +1494,10 @@ router.get('/:id/checklist', async (req, res) => {
 });
 
 /* ── POST /:id/checklist/:itemId/query — reviewer raises a query ────── */
-router.post('/:id/checklist/:itemId/query', async (req, res) => {
+router.post('/:id/checklist/:itemId/query', requireReviewer, async (req, res) => {
   try {
-    const { queryText, officer = 'reviewer' } = req.body;
+    const { queryText } = req.body;
+    const officer = req.reviewer.name;
     if (!queryText || !String(queryText).trim()) {
       return res.status(400).json({ error: 'queryText is required' });
     }
@@ -1337,8 +1518,15 @@ router.post('/:id/checklist/:itemId/query', async (req, res) => {
     }
 
     const version = (item.queries || []).length + 1;
+    const queryRecord = await createApplicationQuery(app, {
+      remarks: String(queryText).trim(),
+      officer,
+      source: 'checklist',
+      sourceReference: `${req.params.itemId}:v${version}`,
+    });
     item.queries = item.queries || [];
     item.queries.push({
+      queryIdentifier: queryRecord.queryIdentifier,
       version,
       queryText: String(queryText).trim(),
       queryDate: new Date(),
@@ -1348,6 +1536,7 @@ router.post('/:id/checklist/:itemId/query', async (req, res) => {
     item.status = 'Query';
 
     app.status = 'Query Raised';
+    app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
     app.checklistItems.set(req.params.itemId, item);
     app.markModified('checklistItems');
     app.auditLog.push({
@@ -1355,10 +1544,20 @@ router.post('/:id/checklist/:itemId/query', async (req, res) => {
       detail: `Item ${item.itemNo} (${item.title}) — v${version} query raised: "${item.queries[version - 1].queryText}"`,
       user: officer,
     });
-    await app.save();
+    try {
+      await app.save();
+    } catch (saveError) {
+      await ApplicationQuery.deleteOne({ _id: queryRecord._id });
+      throw saveError;
+    }
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    res.json({ success: true, checklist: shapeChecklist(app, baseUrl) });
+    res.json({
+      success: true,
+      queryIdentifier: queryRecord.queryIdentifier,
+      queryCount: app.queryCount,
+      checklist: shapeChecklist(app, baseUrl),
+    });
   } catch (err) {
     console.error('checklist query error:', err);
     res.status(500).json({ error: err.message });
@@ -1385,6 +1584,30 @@ router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), 
     const round = item.queries[openIdx];
     round.reply = reply;
     round.replyDate = new Date();
+
+    // Link legacy checklist rounds on first response, then keep the dedicated
+    // history record synchronized with the applicant's response.
+    let queryRecord = round.queryIdentifier
+      ? await ApplicationQuery.findOne({ queryIdentifier: round.queryIdentifier })
+      : await ApplicationQuery.findOne({
+        legacyKey: `${app._id}:checklist:${req.params.itemId}:${round.version || openIdx + 1}`,
+      });
+    if (!queryRecord) {
+      queryRecord = await createApplicationQuery(app, {
+        remarks: round.queryText,
+        officer: round.queryBy || 'reviewer',
+        source: 'legacy',
+        sourceReference: `${req.params.itemId}:v${round.version || openIdx + 1}`,
+        legacyKey: `${app._id}:checklist:${req.params.itemId}:${round.version || openIdx + 1}`,
+        createdAt: round.queryDate,
+      });
+    }
+    round.queryIdentifier = queryRecord.queryIdentifier;
+    queryRecord.status = 'Responded';
+    queryRecord.applicantResponse = reply;
+    queryRecord.responseAt = round.replyDate;
+    await queryRecord.save();
+    app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
 
     if (req.file) {
       const relPath = persistReplyFile(app.applicationNumber, req.params.itemId, round.version, req.file);

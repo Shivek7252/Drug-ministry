@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { listApplications, searchFull } from '../../api/applicationService';
+import {
+  exportReviewerApplications,
+  getReviewerFilterOptions,
+  listReviewerApplications,
+} from '../../api/applicationService';
 import './ReviewDashboard.css';
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -15,14 +19,7 @@ const STATUS_FILTERS = [
   'Query Raised', 'Approved', 'Rejected',
 ];
 
-const INDIAN_STATES = [
-  'All States',
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
-  'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu & Kashmir',
-];
+const PAGE_SIZE = 20;
 
 const KPI_CONFIG = [
   { key: 'total', label: 'Total', tone: 'primary', icon: '📋', filter: 'All' },
@@ -100,7 +97,7 @@ function KpiCard({ tone, icon, label, value, active, onClick }) {
 function LoadingRow() {
   return (
     <tr className="rq-row-skeleton" aria-hidden="true">
-      {Array.from({ length: 9 }).map((_, i) => (
+      {Array.from({ length: 10 }).map((_, i) => (
         <td key={i}><div className="rq-skel-cell" /></td>
       ))}
     </tr>
@@ -114,80 +111,164 @@ function LoadingRow() {
 export default function ReviewDashboard() {
   const { currentUser } = useApp();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQ, setSearchQ] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [filterState, setFilterState] = useState('All States');
-  const [filterCat, setFilterCat] = useState('All');
+  const [error, setError] = useState('');
+  const [searchQ, setSearchQ] = useState(() => searchParams.get('q') || '');
+  const [debouncedQ, setDebouncedQ] = useState(() => searchParams.get('q') || '');
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') || 'All');
+  const [filterCat, setFilterCat] = useState(() => searchParams.get('category') || 'All');
+  const [datePreset, setDatePreset] = useState(() => searchParams.get('datePreset') || 'all');
+  const [startDate, setStartDate] = useState(() => searchParams.get('startDate') || '');
+  const [endDate, setEndDate] = useState(() => searchParams.get('endDate') || '');
+  const [country, setCountry] = useState(() => searchParams.get('country') || 'All');
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1));
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusCounts, setStatusCounts] = useState({});
+  const [countries, setCountries] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [exportState, setExportState] = useState({ status: 'idle', message: '' });
   const [openedApps, setOpenedApps] = useState(() => getOpenedApps());
 
   /* ── Data fetching ──────────────────────────────────────────────────── */
   const loadApps = useCallback(async () => {
     setLoading(true);
-    const res = await listApplications({ limit: 100, isDraft: 'false' });
-    if (res.success) setApps(res.applications || []);
+    setError('');
+    const res = await listReviewerApplications({
+      page,
+      pageSize: PAGE_SIZE,
+      q: debouncedQ,
+      status: filterStatus,
+      category: filterCat,
+      country,
+      datePreset,
+      ...(datePreset === 'custom' ? { startDate, endDate } : {}),
+    });
+    if (res.success) {
+      setApps(res.applications || []);
+      setTotal(res.total || 0);
+      setTotalPages(res.totalPages || 1);
+      setStatusCounts(res.statusCounts || {});
+      if (page > (res.totalPages || 1)) setPage(res.totalPages || 1);
+    } else {
+      setApps([]);
+      setTotal(0);
+      setError(res.error || 'Applications could not be loaded.');
+    }
     setLoading(false);
-  }, []);
+  }, [page, debouncedQ, filterStatus, filterCat, country, datePreset, startDate, endDate]);
 
   useEffect(() => { loadApps(); }, [loadApps]);
 
   /* Debounced search */
   useEffect(() => {
-    if (!searchQ.trim()) { loadApps(); return; }
-    const t = setTimeout(async () => {
-      const res = await searchFull(searchQ);
-      if (res.success) setApps(res.results || []);
-    }, 400);
+    const t = setTimeout(() => { setDebouncedQ(searchQ.trim()); setPage(1); }, 350);
     return () => clearTimeout(t);
-  }, [searchQ]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchQ]);
+
+  useEffect(() => {
+    getReviewerFilterOptions().then(res => {
+      if (res.success) {
+        setCountries(res.countries || []);
+        setCategories(res.categories || []);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (debouncedQ) next.set('q', debouncedQ);
+    if (filterStatus !== 'All') next.set('status', filterStatus);
+    if (filterCat !== 'All') next.set('category', filterCat);
+    if (country !== 'All') next.set('country', country);
+    if (datePreset !== 'all') next.set('datePreset', datePreset);
+    if (datePreset === 'custom' && startDate) next.set('startDate', startDate);
+    if (datePreset === 'custom' && endDate) next.set('endDate', endDate);
+    if (page > 1) next.set('page', String(page));
+    setSearchParams(next, { replace: true });
+  }, [debouncedQ, filterStatus, filterCat, country, datePreset, startDate, endDate, page, setSearchParams]);
 
   /* ── Derived data ───────────────────────────────────────────────────── */
   const stats = useMemo(() => ({
-    total: apps.length,
-    submitted: apps.filter(a => isNewUnseen(a, openedApps)).length,
-    underReview: apps.filter(a => a.status === 'Under Review').length,
-    queryRaised: apps.filter(a => a.status === 'Query Raised').length,
-    approved: apps.filter(a => a.status === 'Approved').length,
-    rejected: apps.filter(a => a.status === 'Rejected').length,
-  }), [apps, openedApps]);
+    total: Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
+    submitted: statusCounts.Submitted || 0,
+    underReview: statusCounts['Under Review'] || 0,
+    queryRaised: statusCounts['Query Raised'] || 0,
+    approved: statusCounts.Approved || 0,
+    rejected: statusCounts.Rejected || 0,
+  }), [statusCounts]);
 
-  const filtered = useMemo(() => apps.filter(a => {
-    if (filterStatus !== 'All' && a.status !== filterStatus) return false;
-    if (filterState !== 'All States') {
-      const haystack = (a.state || '') + (a.factoryAddress || '') + (a.city || '');
-      if (!haystack.includes(filterState)) return false;
-    }
-    if (filterCat !== 'All' && a.exportCategory !== filterCat) return false;
-    return true;
-  }), [apps, filterStatus, filterState, filterCat]);
-
-  const categories = useMemo(
-    () => ['All', ...new Set(apps.map(a => a.exportCategory).filter(Boolean))],
-    [apps],
-  );
-
-  const unseenCount = filtered.filter(a => isNewUnseen(a, openedApps)).length;
+  const unseenCount = apps.filter(a => isNewUnseen(a, openedApps)).length;
   const hasFilters = filterStatus !== 'All'
-    || filterState !== 'All States'
     || filterCat !== 'All'
+    || country !== 'All'
+    || datePreset !== 'all'
     || searchQ.trim() !== '';
 
   /* ── Handlers ───────────────────────────────────────────────────────── */
   const openConsignment = (app) => {
     markAppOpened(app.applicationNumber);
     setOpenedApps(getOpenedApps());
-    navigate(`/review/application/${encodeURIComponent(app.applicationNumber)}`);
+    const query = searchParams.toString();
+    navigate(`/review/application/${encodeURIComponent(app.applicationNumber)}${query ? `?${query}` : ''}`);
   };
 
-  const handleKpiClick = (kpi) => setFilterStatus(kpi.filter);
+  const handleKpiClick = (kpi) => { setFilterStatus(kpi.filter); setPage(1); };
 
   const resetFilters = () => {
     setFilterStatus('All');
-    setFilterState('All States');
     setFilterCat('All');
+    setCountry('All');
+    setDatePreset('all');
+    setStartDate('');
+    setEndDate('');
     setSearchQ('');
+    setDebouncedQ('');
+    setPage(1);
+  };
+
+  const exportFilters = {
+    q: debouncedQ,
+    status: filterStatus,
+    category: filterCat,
+    country,
+    datePreset,
+    ...(datePreset === 'custom' ? { startDate, endDate } : {}),
+  };
+
+  const handleExport = async () => {
+    if (!loading && total === 0) {
+      setExportState({ status: 'empty', message: 'No applications match the selected filters.' });
+      return;
+    }
+    if (datePreset === 'custom' && (!startDate || !endDate)) {
+      setExportState({ status: 'error', message: 'Choose both custom range dates before exporting.' });
+      return;
+    }
+    setExportState({ status: 'loading', message: 'Preparing all matching records…' });
+    const res = await exportReviewerApplications(exportFilters);
+    if (!res.success) {
+      setExportState({
+        status: res.error?.includes('No applications') ? 'empty' : 'error',
+        message: res.error || 'Export failed.',
+      });
+      return;
+    }
+    const url = URL.createObjectURL(res.blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = res.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setExportState({
+      status: 'success',
+      message: `${res.count} matching record${res.count === 1 ? '' : 's'} downloaded as ${res.filename}.`,
+    });
   };
 
   /* ── Render ─────────────────────────────────────────────────────────── */
@@ -278,7 +359,7 @@ export default function ReviewDashboard() {
                 <span>Status</span>
                 <select
                   value={filterStatus}
-                  onChange={e => setFilterStatus(e.target.value)}
+                  onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
                   aria-label="Filter by status"
                 >
                   {STATUS_FILTERS.map(s => <option key={s}>{s}</option>)}
@@ -286,26 +367,70 @@ export default function ReviewDashboard() {
               </label>
 
               <label className="rq-filter">
-                <span>State</span>
+                <span>Category</span>
                 <select
-                  value={filterState}
-                  onChange={e => setFilterState(e.target.value)}
-                  aria-label="Filter by state"
+                  value={filterCat}
+                  onChange={e => { setFilterCat(e.target.value); setPage(1); }}
+                  aria-label="Filter by category"
                 >
-                  {INDIAN_STATES.map(s => <option key={s}>{s}</option>)}
+                  <option>All</option>
+                  {categories.map(c => <option key={c}>{c}</option>)}
                 </select>
               </label>
 
               <label className="rq-filter">
-                <span>Category</span>
-                <select
-                  value={filterCat}
-                  onChange={e => setFilterCat(e.target.value)}
-                  aria-label="Filter by category"
-                >
-                  {categories.map(c => <option key={c}>{c}</option>)}
+                <span>Country</span>
+                <select value={country} onChange={e => { setCountry(e.target.value); setPage(1); }} aria-label="Filter by country">
+                  <option>All</option>
+                  {countries.map(value => <option key={value}>{value}</option>)}
                 </select>
               </label>
+
+              <label className="rq-filter">
+                <span>Submitted</span>
+                <select value={datePreset} onChange={e => { setDatePreset(e.target.value); setPage(1); }} aria-label="Filter by submission date">
+                  <option value="all">All dates</option>
+                  <option value="3months">Last 3 months</option>
+                  <option value="1year">Last 1 year</option>
+                  <option value="custom">Custom range</option>
+                </select>
+              </label>
+
+              {datePreset === 'custom' && (
+                <div className="rq-custom-dates">
+                  <label className="rq-filter">
+                    <span>From</span>
+                    <input type="date" value={startDate} max={endDate || undefined} onChange={e => { setStartDate(e.target.value); setPage(1); }} />
+                  </label>
+                  <label className="rq-filter">
+                    <span>To</span>
+                    <input type="date" value={endDate} min={startDate || undefined} onChange={e => { setEndDate(e.target.value); setPage(1); }} />
+                  </label>
+                </div>
+              )}
+
+              <button
+                className="rq-export-btn"
+                onClick={handleExport}
+                disabled={exportState.status === 'loading' || loading || !!error || total === 0}
+                title="Download every application matching the selected filters"
+              >
+                <span className="rq-export-btn-icon" aria-hidden="true">
+                  {exportState.status === 'loading' ? (
+                    <span className="rq-export-spinner" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M12 3v12" />
+                      <path d="m7 10 5 5 5-5" />
+                      <path d="M5 21h14" />
+                    </svg>
+                  )}
+                </span>
+                <span className="rq-export-btn-copy">
+                  <strong>{exportState.status === 'loading' ? 'Preparing CSV' : 'Export CSV'}</strong>
+                  <small>{loading ? 'Loading records…' : total === 0 ? 'No records to export' : `All ${total} matching record${total === 1 ? '' : 's'}`}</small>
+                </span>
+              </button>
 
               {hasFilters && (
                 <button className="rq-reset-btn" onClick={resetFilters}>
@@ -315,19 +440,42 @@ export default function ReviewDashboard() {
             </div>
           </div>
 
+          {exportState.status !== 'idle' && (
+            <div className={`rq-export-state rq-export-${exportState.status}`} role="status">
+              <div className="rq-export-feedback-main">
+                <span className="rq-export-feedback-icon" aria-hidden="true">
+                  {exportState.status === 'success' ? '✓' : exportState.status === 'loading' ? '…' : exportState.status === 'empty' ? '○' : '!'}
+                </span>
+                <div>
+                  <strong>
+                    {exportState.status === 'success' ? 'Export complete' : exportState.status === 'loading' ? 'Preparing your download' : exportState.status === 'empty' ? 'Nothing to export' : 'Export failed'}
+                  </strong>
+                  <span>{exportState.message}</span>
+                </div>
+              </div>
+              <div className="rq-export-feedback-actions">
+                {exportState.status === 'error' && <button className="rq-export-retry" onClick={handleExport}>Try again</button>}
+                {exportState.status !== 'loading' && <button className="rq-export-dismiss" onClick={() => setExportState({ status: 'idle', message: '' })} aria-label="Dismiss export message">×</button>}
+              </div>
+            </div>
+          )}
+
           {/* ── Result count ──────────────────────────────────────── */}
           <div className="rq-result-bar" aria-live="polite" aria-atomic="true">
             <div>
-              Showing&nbsp;<strong>{filtered.length}</strong>&nbsp;of&nbsp;
-              {apps.length} application{apps.length !== 1 ? 's' : ''}
+              Showing&nbsp;<strong>{apps.length}</strong>&nbsp;of&nbsp;
+              {total} application{total !== 1 ? 's' : ''}
               {filterStatus !== 'All' && (
                 <> · <span className="rq-active-filter">Status: {filterStatus}</span></>
               )}
-              {filterState !== 'All States' && (
-                <> · <span className="rq-active-filter">State: {filterState}</span></>
-              )}
               {filterCat !== 'All' && (
                 <> · <span className="rq-active-filter">Category: {filterCat}</span></>
+              )}
+              {country !== 'All' && (
+                <> · <span className="rq-active-filter">Country: {country}</span></>
+              )}
+              {datePreset !== 'all' && (
+                <> · <span className="rq-active-filter">Date: {datePreset === '3months' ? 'Last 3 months' : datePreset === '1year' ? 'Last 1 year' : `${startDate || '…'} to ${endDate || '…'}`}</span></>
               )}
             </div>
             {unseenCount > 0 && (
@@ -352,9 +500,9 @@ export default function ReviewDashboard() {
                   </span>
                 )}
               </div>
-              {!loading && filtered.length > 0 && (
+              {!loading && apps.length > 0 && (
                 <span style={{ fontSize: 12, color: 'var(--muted-2)' }}>
-                  {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+                  {apps.length} record{apps.length !== 1 ? 's' : ''} on this page
                 </span>
               )}
             </div>
@@ -372,6 +520,7 @@ export default function ReviewDashboard() {
                       <th>Category</th>
                       <th>Destination</th>
                       <th>Submitted</th>
+                      <th>Queries</th>
                       <th>Status</th>
                       <th className="rq-th-action">Action</th>
                     </tr>
@@ -382,7 +531,14 @@ export default function ReviewDashboard() {
                 </table>
               </div>
 
-            ) : filtered.length === 0 ? (
+            ) : error ? (
+              <div className="rq-empty" role="alert">
+                <div className="rq-empty-icon" aria-hidden="true">⚠</div>
+                <h3>Could not load applications</h3>
+                <p>{error}</p>
+                <button className="rq-btn rq-btn-primary" onClick={loadApps}>Try again</button>
+              </div>
+            ) : apps.length === 0 ? (
               /* Empty state */
               <div className="rq-empty" role="status">
                 <div className="rq-empty-icon" aria-hidden="true">📭</div>
@@ -404,7 +560,7 @@ export default function ReviewDashboard() {
               <div className="rq-table-wrap">
                 <table
                   className="rq-table"
-                  aria-label={`${filtered.length} application${filtered.length !== 1 ? 's' : ''} in review queue`}
+                  aria-label={`${apps.length} application${apps.length !== 1 ? 's' : ''} in review queue`}
                 >
                   <thead>
                     <tr>
@@ -415,12 +571,13 @@ export default function ReviewDashboard() {
                       <th scope="col">Category</th>
                       <th scope="col">Destination</th>
                       <th scope="col">Submitted</th>
+                      <th scope="col">Queries</th>
                       <th scope="col">Status</th>
                       <th scope="col" className="rq-th-action">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(app => {
+                    {apps.map(app => {
                       const unseen = isNewUnseen(app, openedApps);
                       const dt = app.submittedAt ? new Date(app.submittedAt) : null;
 
@@ -515,6 +672,10 @@ export default function ReviewDashboard() {
                             )}
                           </td>
 
+                          <td>
+                            <span className={`rq-query-count${app.queryCount > 0 ? ' has-queries' : ''}`}>{app.queryCount || 0}</span>
+                          </td>
+
                           {/* Status badge */}
                           <td><StatusBadge status={app.status} /></td>
 
@@ -547,6 +708,13 @@ export default function ReviewDashboard() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {!loading && !error && totalPages > 1 && (
+              <div className="rq-pagination" aria-label="Application pagination">
+                <button disabled={page <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>← Previous</button>
+                <span>Page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
+                <button disabled={page >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}>Next →</button>
               </div>
             )}
           </div>

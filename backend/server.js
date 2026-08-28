@@ -1093,13 +1093,18 @@ CHECK 1 — Document type identification (do this first):
   Decide whether the uploaded document is actually the EXPECTED document type.
   - Use the identity description and the indicative keyword set you are given.
   - If the document is clearly a DIFFERENT type (e.g. an invoice, an undertaking, a CoA when a manufacturing licence is expected, a manufacturing licence when a product approval is expected), set "documentTypeMatch": false and explain why in "documentTypeReason".
+  - When the type is wrong, cite a short verbatim quote that supports the decision in "documentTypeEvidence" and its page in "documentTypePage", wherever the document provides usable evidence.
+  - Set "detectedDocumentType" to the document type actually observed, when it can be identified from the document.
+  - Give a specific upload correction in "suggestedCorrectiveAction". Base it on the expected document type and the observed problem.
   - If the document type matches, set "documentTypeMatch": true.
 
 CHECK 2 — Per-parameter verification:
   ONLY IF documentTypeMatch is true, evaluate each checklist parameter.
   - For each parameter decide present=true / present=false.
   - If present=true, you MUST cite a verbatim quote (<=25 words) copied directly from the document text into "evidence", and the integer "page" it appears on.
-  - If you cannot find a verbatim quote, set present=false. Do NOT guess. Do NOT paraphrase. Do NOT invent quotes.
+  - If a parameter is absent, set present=false and explain what is missing in "note".
+  - If a parameter is present but its value is wrong, expired, inconsistent, or otherwise invalid, set present=false, put the required value/condition in "expectedValue", the verbatim observed value in "extractedValue", and cite supporting text/page in "evidence" and "page".
+  - For every failed parameter, provide a specific "correctiveAction". Do NOT guess, paraphrase evidence, or invent quotes.
   - If documentTypeMatch is false, set every item's present=false, evidence="", page=null, and note="document type mismatch — parameter not applicable".
 
 Output STRICT JSON only — no preamble, no markdown fences, no commentary.
@@ -1108,13 +1113,20 @@ JSON schema:
 {
   "documentTypeMatch": true | false,
   "documentTypeReason": "<one short sentence explaining the type decision>",
+  "documentTypeEvidence": "<verbatim short quote supporting a type mismatch, or empty>",
+  "documentTypePage": <integer page number or null>,
+  "detectedDocumentType": "<observed document type, or empty when uncertain>",
+  "suggestedCorrectiveAction": "<specific corrective action when verification fails, or empty>",
   "items": [
     {
       "index": <1..N>,
       "present": true | false,
       "page": <integer page number or null>,
-      "evidence": "<verbatim short quote from document, or empty>",
-      "note": "<one-line reason in <= 20 words>"
+      "evidence": "<verbatim short quote from document, or empty when information is missing>",
+      "note": "<one-line result or failure reason in <= 20 words>",
+      "expectedValue": "<required value or condition, or empty>",
+      "extractedValue": "<verbatim observed value when relevant, or empty>",
+      "correctiveAction": "<specific correction for a failed check, or empty>"
     }
   ]
 }`;
@@ -1162,6 +1174,14 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
   const documentTypeMatch = parsed.documentTypeMatch === true;
   const documentTypeReason = typeof parsed.documentTypeReason === 'string'
     ? parsed.documentTypeReason.trim() : '';
+  const documentTypeEvidence = typeof parsed.documentTypeEvidence === 'string'
+    ? parsed.documentTypeEvidence.trim() : '';
+  const documentTypePage = typeof parsed.documentTypePage === 'number'
+    ? parsed.documentTypePage : null;
+  const detectedDocumentType = typeof parsed.detectedDocumentType === 'string'
+    ? parsed.detectedDocumentType.trim() : '';
+  const suggestedCorrectiveAction = typeof parsed.suggestedCorrectiveAction === 'string'
+    ? parsed.suggestedCorrectiveAction.trim() : '';
 
   const results = items.map((it, i) => {
     if (!documentTypeMatch) {
@@ -1171,6 +1191,9 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
         page: null,
         evidence: '',
         note: 'Document type mismatch — parameter not applicable.',
+        expectedValue: it,
+        extractedValue: '',
+        correctiveAction: '',
       };
     }
     const m = byIndex.get(i + 1) || {};
@@ -1181,8 +1204,12 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
       item: it,
       present: finalPresent,
       page: typeof m.page === 'number' ? m.page : null,
-      evidence: finalPresent === true ? evidence : '',
+      evidence,
       note: typeof m.note === 'string' ? m.note.trim() : '',
+      expectedValue: typeof m.expectedValue === 'string' && m.expectedValue.trim()
+        ? m.expectedValue.trim() : it,
+      extractedValue: typeof m.extractedValue === 'string' ? m.extractedValue.trim() : '',
+      correctiveAction: typeof m.correctiveAction === 'string' ? m.correctiveAction.trim() : '',
     };
   });
 
@@ -1236,11 +1263,16 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
     success: true,
     docType,
     docLabel,
+    expectedDocumentType: docLabel,
     hasText,
     textSource,
     pageCount: pages.length,
     documentTypeMatch,
     documentTypeReason,
+    documentTypeEvidence,
+    documentTypePage,
+    detectedDocumentType,
+    suggestedCorrectiveAction,
     visionUsed,
     results,
     summary: {
@@ -1423,7 +1455,11 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
 
     // Cache hit
     if (!force && doc.validationResult?.fullResults) {
-      return res.json({ ...doc.validationResult.fullResults, cached: true });
+      return res.json({
+        ...doc.validationResult.fullResults,
+        cached: true,
+        verifiedAt: doc.validationResult.verifiedAt || doc.validationResult.fullResults.verifiedAt || null,
+      });
     }
 
     // Load bytes
@@ -1443,10 +1479,11 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
     }
 
     const docType = CHECKLISTS[docId] ? docId : 'default';
-    const docLabel = doc.name || docId;
+    const docLabel = TEMPLATE_REQUIREMENTS[docId]?.label || doc.name || docId;
     const mimetype = doc.type || 'application/pdf';
 
     const verifyResult = await verifyDocumentBuffer({ buffer, mimetype, docType, docLabel });
+    const verifiedAt = new Date();
 
     // Persist full result + refresh the top-level type match/reason too so
     // the reviewer's Documents-tab badge stays in sync.
@@ -1458,7 +1495,7 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
         documentTypeMatch: verifyResult.documentTypeMatch,
         documentTypeReason: verifyResult.documentTypeReason,
         score: verifyResult.summary?.score ?? null,
-        verifiedAt: new Date(),
+        verifiedAt,
         fullResults: verifyResult,
       },
     };
@@ -1467,7 +1504,7 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
     application.markModified('documents');
     await application.save();
 
-    res.json({ ...verifyResult, cached: false });
+    res.json({ ...verifyResult, cached: false, verifiedAt });
   } catch (err) {
     console.error('Doc verify error:', err.message);
     res.status(500).json({ error: err.message });

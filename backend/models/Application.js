@@ -62,6 +62,7 @@ const ShipmentSchema = new mongoose.Schema({
     text:      String,
     officer:   String,
     status:    String,
+    queryIdentifier: String,
     timestamp: { type: Date, default: Date.now },
   }],
 }, { _id: false });
@@ -162,6 +163,7 @@ const AuditSchema = new mongoose.Schema({
 
 /* ── Checklist query round (one entry per version, max 5) ──────────────── */
 const ChecklistQuerySchema = new mongoose.Schema({
+  queryIdentifier:String,          // AIQ-* identifier (legacy records may not have one)
   version:      Number,          // 1..5
   queryText:    String,
   queryDate:    { type: Date, default: Date.now },
@@ -282,8 +284,15 @@ const ApplicationSchema = new mongoose.Schema({
     text:      String,
     officer:   String,
     status:    String,
+    queryIdentifier: String,
     timestamp: { type: Date, default: Date.now },
   }],
+
+  // Denormalized for fast reviewer queue display; query records live in
+  // the ApplicationQuery collection and legacy records are backfilled safely.
+  queryCount:  { type: Number, default: 0, min: 0 },
+  approvedAt:  Date,
+  rejectedAt:  Date,
 
   // Export NOC Check-List Query state (per item; section 4 has one item per destination country)
   checklistItems: {
