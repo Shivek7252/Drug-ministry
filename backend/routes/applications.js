@@ -16,7 +16,7 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 /* Multer memory upload for applicant checklist replies (small doc payloads). */
 const checklistUpload = multer({
   storage: multer.memoryStorage(),
-  limits:  { fileSize: MAX_FILE_SIZE },
+  limits: { fileSize: MAX_FILE_SIZE },
 });
 
 const MAX_QUERY_ROUNDS = 5;
@@ -24,8 +24,8 @@ const MAX_QUERY_ROUNDS = 5;
 /* Approval-section sub-items — same 2 rows for every destination country,
    in every type. Only the display numbering changes per type. */
 const APPROVAL_SUBITEMS = [
-  { key: '1', title: 'Registration/Approval certificate from NRA of importing Country in case NRA issue the same',      docSuffix: 'nra_cert' },
-  { key: '2', title: 'Approval in India from CDSCO if approval status is not available from importing Countrys NRA',    docSuffix: 'cdsco_approval' },
+  { key: '1', title: 'Registration/Approval certificate from NRA of importing Country in case NRA issue the same', docSuffix: 'nra_cert' },
+  { key: '2', title: 'Approval in India from CDSCO if approval status is not available from importing Countrys NRA', docSuffix: 'cdsco_approval' },
 ];
 
 /* Per-type layout config. Item IDs are stable across types so query history
@@ -36,9 +36,9 @@ const APPROVAL_SUBITEMS = [
    5=approval-status per country, 6=justification). Only classification differs. */
 const TYPE_2_3_LAYOUT = {
   fixedItems: [
-    { itemId: 'irf',         docId: 'irf',               title: 'System generated Integrated Registration Form (IRF)' },
-    { itemId: 'legal',       docId: 'legal_undertaking', title: 'Legal undertaking in Annexure-II(on Rs. 100 non-judicial stamp paper)' },
-    { itemId: 'mfg_license', docId: 'mfg_license',       title: 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29' },
+    { itemId: 'irf', docId: 'irf', title: 'System generated Integrated Registration Form (IRF)' },
+    { itemId: 'legal', docId: 'legal_undertaking', title: 'Legal undertaking in Annexure-II(on Rs. 100 non-judicial stamp paper)' },
+    { itemId: 'mfg_license', docId: 'mfg_license', title: 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29' },
   ],
   hasHistorical: true,
   approvalSectionNo: 5,
@@ -52,9 +52,9 @@ const TYPE_PROFILES = {
   type_1: {
     label: 'Different Products – Different Companies – Different Destination Countries',
     fixedItems: [
-      { itemId: 'irf',         docId: 'irf',               title: 'System generated Integrated Registration Form (IRF)' },
-      { itemId: 'legal',       docId: 'legal_undertaking', title: 'Legal undertaking in Annexture-II' },
-      { itemId: 'mfg_license', docId: 'mfg_license',       title: 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29' },
+      { itemId: 'irf', docId: 'irf', title: 'System generated Integrated Registration Form (IRF)' },
+      { itemId: 'legal', docId: 'legal_undertaking', title: 'Legal undertaking in Annexture-II' },
+      { itemId: 'mfg_license', docId: 'mfg_license', title: 'Copy of Manufacturing License (Form-29/Form-25/Form-28/Form-28D/Loan Licence)/ DSIR/Form-29' },
     ],
     hasHistorical: false,
     hasMfgLicensePerCompany: false,
@@ -80,8 +80,8 @@ const TYPE_PROFILES = {
        becomes a parent section with one leaf per company, like section 5.
        hasMfgLicensePerCompany drives that behavior in shape/seed. */
     fixedItems: [
-      { itemId: 'irf',         docId: 'irf',               title: 'System generated Integrated Registration Form (IRF)' },
-      { itemId: 'legal',       docId: 'legal_undertaking', title: 'Legal undertaking in Annexure-II(on Rs. 100 non-judicial stamp paper)' },
+      { itemId: 'irf', docId: 'irf', title: 'System generated Integrated Registration Form (IRF)' },
+      { itemId: 'legal', docId: 'legal_undertaking', title: 'Legal undertaking in Annexure-II(on Rs. 100 non-judicial stamp paper)' },
     ],
     hasMfgLicensePerCompany: true,
     hasHistorical: true,
@@ -111,15 +111,15 @@ function detectChecklistType(app) {
   const co = uniq(app.companies, 'name').size || 1;
   const pr = uniq(app.products, 'productName').size || 1;
   if (co === 1 && pr === 1) return 'type_2';
-  if (co === 1 && pr > 1)   return 'type_3';
-  if (pr === 1 && co > 1)   return 'type_4';
+  if (co === 1 && pr > 1) return 'type_3';
+  if (pr === 1 && co > 1) return 'type_4';
   return 'type_1';
 }
 
 /* Return unique companies from companies[] in insertion order. */
 function uniqueCompanies(app) {
   const seen = new Set();
-  const out  = [];
+  const out = [];
   for (const c of (app.companies || [])) {
     const name = (c.name || '').trim();
     if (name && !seen.has(name)) { seen.add(name); out.push(c); }
@@ -139,7 +139,7 @@ function mfgLicenseItemId(companyName) {
 /* Return unique destination countries from consignees[] in insertion order. */
 function uniqueDestinationCountries(app) {
   const seen = new Set();
-  const out  = [];
+  const out = [];
   for (const c of (app.consignees || [])) {
     const country = (c.country || '').trim();
     if (country && !seen.has(country)) { seen.add(country); out.push(country); }
@@ -242,8 +242,8 @@ function buildItemNumbering(profile, countries, companies) {
   return {
     numbering,
     mfgLicenseSectionNo: mfgLicenseSectionNo === null ? null : String(mfgLicenseSectionNo),
-    approvalSectionNo:   String(approvalSecNo),
-    justificationNo:     String(n),
+    approvalSectionNo: String(approvalSecNo),
+    justificationNo: String(n),
   };
 }
 
@@ -252,7 +252,7 @@ function buildItemNumbering(profile, countries, companies) {
    (e.g. countries removed after the fact) alone so their history isn't lost. */
 function seedChecklist(app) {
   if (!app.checklistItems) app.checklistItems = new Map();
-  const items    = app.checklistItems;
+  const items = app.checklistItems;
 
   // Migration: pre-refactor keys `noc_4_<sub>_<country>` → `noc_approval_<sub>_<country>`
   for (const key of Array.from(items.keys ? items.keys() : Object.keys(items))) {
@@ -266,8 +266,8 @@ function seedChecklist(app) {
     }
   }
 
-  const type      = detectChecklistType(app);
-  const profile   = TYPE_PROFILES[type] || TYPE_PROFILES.type_1;
+  const type = detectChecklistType(app);
+  const profile = TYPE_PROFILES[type] || TYPE_PROFILES.type_1;
   const countries = uniqueDestinationCountries(app);
   const companies = uniqueCompanies(app);
   const { numbering } = buildItemNumbering(profile, countries, companies);
@@ -277,11 +277,11 @@ function seedChecklist(app) {
     if (existing) {
       // Preserve queries + status; refresh display fields + doc pointers.
       existing.itemNo = seed.itemNo || existing.itemNo;
-      existing.title  = seed.title  || existing.title;
-      if (seed.country)      existing.country     = seed.country;
-      if (seed.company)      existing.company     = seed.company;
-      if (seed.parentGroup)  existing.parentGroup = seed.parentGroup;
-      if (seed.submissionRemark !== undefined)  existing.submissionRemark  = seed.submissionRemark;
+      existing.title = seed.title || existing.title;
+      if (seed.country) existing.country = seed.country;
+      if (seed.company) existing.company = seed.company;
+      if (seed.parentGroup) existing.parentGroup = seed.parentGroup;
+      if (seed.submissionRemark !== undefined) existing.submissionRemark = seed.submissionRemark;
       if (seed.submissionDocName !== undefined) existing.submissionDocName = seed.submissionDocName;
       if (seed.submissionDocPath !== undefined) existing.submissionDocPath = seed.submissionDocPath;
       items.set(itemId, existing);
@@ -297,8 +297,8 @@ function seedChecklist(app) {
     const uploaded = getDoc(row.docId);
     upsert(row.itemId, {
       itemNo: numbering[row.itemId],
-      title:  row.title,
-      submissionRemark:  uploaded ? `${row.title.split('(')[0].trim()} has been submitted` : '',
+      title: row.title,
+      submissionRemark: uploaded ? `${row.title.split('(')[0].trim()} has been submitted` : '',
       submissionDocName: uploaded?.name || '',
       submissionDocPath: uploaded?.path || '',
     });
@@ -310,14 +310,14 @@ function seedChecklist(app) {
   if (profile.hasMfgLicensePerCompany) {
     companies.forEach((company) => {
       const itemId = mfgLicenseItemId(company.name);
-      const docId  = `mfg_license_${String(company.name || '').replace(/[^a-zA-Z0-9]+/g, '_')}`;
+      const docId = `mfg_license_${String(company.name || '').replace(/[^a-zA-Z0-9]+/g, '_')}`;
       const uploaded = getDoc(docId) || getDoc('mfg_license'); // fall back to shared upload if per-company doc absent
       upsert(itemId, {
         itemNo: numbering[itemId],
-        title:  MFG_LICENSE_SUBITEM_TITLE,
+        title: MFG_LICENSE_SUBITEM_TITLE,
         parentGroup: 'mfg_license',
         company: company.name,
-        submissionRemark:  uploaded ? `Copy of Manufacturing License has been submitted for ${company.name}` : '',
+        submissionRemark: uploaded ? `Copy of Manufacturing License has been submitted for ${company.name}` : '',
         submissionDocName: uploaded?.name || '',
         submissionDocPath: uploaded?.path || '',
       });
@@ -329,14 +329,14 @@ function seedChecklist(app) {
   countries.forEach((country) => {
     for (const sub of APPROVAL_SUBITEMS) {
       const itemId = approvalItemId(country, sub.key);
-      const docId  = `${sub.docSuffix}_${country.replace(/[^a-zA-Z0-9]+/g, '_')}`;
+      const docId = `${sub.docSuffix}_${country.replace(/[^a-zA-Z0-9]+/g, '_')}`;
       const uploaded = getDoc(docId);
       upsert(itemId, {
         itemNo: numbering[itemId],
-        title:  sub.title,
+        title: sub.title,
         country,
         parentGroup: 'approval_status',
-        submissionRemark:  uploaded ? `${sub.title.split(' of ')[0].trim()} has been submitted` : '',
+        submissionRemark: uploaded ? `${sub.title.split(' of ')[0].trim()} has been submitted` : '',
         submissionDocName: uploaded?.name || '',
         submissionDocPath: uploaded?.path || '',
       });
@@ -350,9 +350,9 @@ function seedChecklist(app) {
 
 /* Shape the checklistItems Map into an ordered tree the UI can render. */
 function shapeChecklist(app, baseUrl) {
-  const items    = app.checklistItems;
-  const type     = detectChecklistType(app);
-  const profile  = TYPE_PROFILES[type] || TYPE_PROFILES.type_1;
+  const items = app.checklistItems;
+  const type = detectChecklistType(app);
+  const profile = TYPE_PROFILES[type] || TYPE_PROFILES.type_1;
   const countries = uniqueDestinationCountries(app);
   const companies = uniqueCompanies(app);
   const { approvalSectionNo, mfgLicenseSectionNo } = buildItemNumbering(profile, countries, companies);
@@ -443,7 +443,7 @@ function shapeChecklist(app, baseUrl) {
   if (profile.hasMfgLicensePerCompany && mfgLicenseSectionNo) {
     mfgLicenseSection = {
       itemNo: mfgLicenseSectionNo,
-      title:  'Copy of Manufacturing License',
+      title: 'Copy of Manufacturing License',
       companies: companies.map((company, i) => {
         const leaf = withDocUrl(get(mfgLicenseItemId(company.name)));
         if (leaf) leaf.itemNo = leaf.itemNo || `${mfgLicenseSectionNo}.${i + 1}`;
@@ -464,9 +464,9 @@ function shapeChecklist(app, baseUrl) {
 
   const approvalSection = {
     itemNo: approvalSectionNo,
-    title:  'Approval Status in importing Country',
+    title: 'Approval Status in importing Country',
     countries: countries.map((country, i) => ({
-      itemNo:  `${approvalSectionNo}.${i + 1}`,
+      itemNo: `${approvalSectionNo}.${i + 1}`,
       country,
       subItems: APPROVAL_SUBITEMS.map(sub => withDocUrl(get(approvalItemId(country, sub.key)))).filter(Boolean),
     })),
@@ -478,8 +478,8 @@ function shapeChecklist(app, baseUrl) {
     type,
     typeLabel: profile.label,
     // Back-compat aliases so old field names still work:
-    preSection4:  preItems,
-    section4:     approvalSection,
+    preSection4: preItems,
+    section4: approvalSection,
     postSection4: postItems,
     // New canonical names:
     mfgLicenseSection,
@@ -537,12 +537,12 @@ function persistDocsToDisk(appNumber, docs) {
       try {
         fs.writeFileSync(filePath, Buffer.from(b64, 'base64'));
         out[docId] = {
-          name:       doc.name,
-          size:       doc.size,
-          type:       doc.type,
+          name: doc.name,
+          size: doc.size,
+          type: doc.type,
           uploadedAt: doc.uploadedAt,
-          path:       `${appNumber}/${fileName}`,   // relative under UPLOADS_DIR
-          validated:  doc.validated,
+          path: `${appNumber}/${fileName}`,   // relative under UPLOADS_DIR
+          validated: doc.validated,
           validationResult: doc.validationResult,
         };
         continue;
@@ -569,15 +569,15 @@ function shapeMultiRows(obj) {
   if (!Array.isArray(obj.companies) || obj.companies.length === 0) {
     if (obj.manufacturerName || obj.mfgLicenseNo || obj.factoryAddress) {
       obj.companies = [{
-        companyRef:           'legacy-co',
-        name:                 obj.manufacturerName || '',
-        licenseNo:            obj.mfgLicenseNo || '',
-        factoryAddress:       obj.factoryAddress || '',
-        manufacturingSite:    obj.manufacturingSite || '',
-        contactPerson:        obj.mfgContactPerson || '',
-        contactNumber:        obj.mfgContactNumber || '',
-        email:                obj.mfgEmail || '',
-        signatoryName:        obj.signatoryName || '',
+        companyRef: 'legacy-co',
+        name: obj.manufacturerName || '',
+        licenseNo: obj.mfgLicenseNo || '',
+        factoryAddress: obj.factoryAddress || '',
+        manufacturingSite: obj.manufacturingSite || '',
+        contactPerson: obj.mfgContactPerson || '',
+        contactNumber: obj.mfgContactNumber || '',
+        email: obj.mfgEmail || '',
+        signatoryName: obj.signatoryName || '',
         signatoryDesignation: obj.signatoryDesignation || '',
       }];
     } else {
@@ -589,18 +589,18 @@ function shapeMultiRows(obj) {
   if (!Array.isArray(obj.consignees) || obj.consignees.length === 0) {
     if (obj.consigneeName || obj.consigneeCountry || obj.destinationCountry) {
       obj.consignees = [{
-        consigneeRef:  'legacy-cn',
-        name:          obj.consigneeName || '',
-        organisation:  obj.consigneeOrg || '',
-        addressLine1:  obj.addressLine1 || '',
-        addressLine2:  obj.addressLine2 || '',
-        city:          obj.city || '',
-        state:         obj.state || '',
-        country:       obj.consigneeCountry || obj.destinationCountry || '',
-        postalCode:    obj.postalCode || '',
+        consigneeRef: 'legacy-cn',
+        name: obj.consigneeName || '',
+        organisation: obj.consigneeOrg || '',
+        addressLine1: obj.addressLine1 || '',
+        addressLine2: obj.addressLine2 || '',
+        city: obj.city || '',
+        state: obj.state || '',
+        country: obj.consigneeCountry || obj.destinationCountry || '',
+        postalCode: obj.postalCode || '',
         contactPerson: obj.contactPerson || '',
-        phone:         obj.consigneePhone || '',
-        email:         obj.consigneeEmail || '',
+        phone: obj.consigneePhone || '',
+        email: obj.consigneeEmail || '',
       }];
     } else {
       obj.consignees = [];
@@ -621,14 +621,14 @@ function shapeMultiRows(obj) {
     const cn = obj.consignees[0];
     if (co && cn && Array.isArray(obj.products) && obj.products.length > 0) {
       obj.shipments = obj.products.map(p => ({
-        companyRef:   co.companyRef,
-        productRef:   p.productRef,
+        companyRef: co.companyRef,
+        productRef: p.productRef,
         consigneeRef: cn.consigneeRef,
-        quantity:     0,
-        packSize:     p.packSize || '',
+        quantity: 0,
+        packSize: p.packSize || '',
         batchNumbers: p.batchNumber ? [p.batchNumber] : [],
-        lineStatus:   'Pending',
-        lineRemarks:  [],
+        lineStatus: 'Pending',
+        lineRemarks: [],
       }));
     } else {
       obj.shipments = [];
@@ -964,7 +964,7 @@ router.get('/:id/document/:docId', async (req, res) => {
     const app = await Application.findOne({
       $or: [
         { applicationNumber: id },
-        { referenceNumber:   id },
+        { referenceNumber: id },
         { _id: mongoose.isValidObjectId(id) ? id : null },
       ],
     });
@@ -985,7 +985,7 @@ router.get('/:id/document/:docId', async (req, res) => {
         return res.status(404).json({ error: 'Document file missing on disk' });
       }
       res.set({
-        'Content-Type':        inferMimeType(doc.name, doc.type),
+        'Content-Type': inferMimeType(doc.name, doc.type),
         'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
       });
       return fs.createReadStream(resolved).pipe(res);
@@ -998,9 +998,9 @@ router.get('/:id/document/:docId', async (req, res) => {
       if (b64.startsWith('data:') && comma >= 0) b64 = b64.slice(comma + 1);
       const buf = Buffer.from(b64, 'base64');
       res.set({
-        'Content-Type':        inferMimeType(doc.name, doc.type),
+        'Content-Type': inferMimeType(doc.name, doc.type),
         'Content-Disposition': `inline; filename="${doc.name || 'document'}"`,
-        'Content-Length':      buf.length,
+        'Content-Length': buf.length,
       });
       return res.send(buf);
     }
@@ -1076,7 +1076,11 @@ router.post('/:id/review', async (req, res) => {
   try {
     const { status, remarks, officer = 'reviewer' } = req.body;
     const app = await Application.findOne({
-      $or: [{ applicationNumber: req.params.id }, { _id: req.params.id }],
+      $or: [
+        { applicationNumber: req.params.id },
+        { referenceNumber: req.params.id },
+        ...(mongoose.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []),
+      ],
     });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
@@ -1129,16 +1133,18 @@ router.get('/:id/full', async (req, res) => {
 
 /* ── POST /api/applications/:id/shipments/:idx/action ────────────────────
    Reviewer sets lineStatus + adds a lineRemarks entry on ONE shipment line,
-   then app-level status is rolled up from every line's status. */
+   then app-level status is rolled up from every line's status.
+   NOTE: all('Approved') intentionally NOT mapped — full approval requires
+   an explicit reviewer decision via POST /:id/review. Shipment actions can
+   only raise queries, partial rejections, or move to Under Review. */
 function rollupApplicationStatus(shipmentStatuses) {
   if (!Array.isArray(shipmentStatuses) || shipmentStatuses.length === 0) return null;
   const has = (s) => shipmentStatuses.includes(s);
   const all = (s) => shipmentStatuses.every(x => x === s);
-  if (all('Approved'))                        return 'Approved';
-  if (all('Rejected'))                        return 'Rejected';
-  if (has('Query'))                           return 'Query Raised';
-  if (has('Approved') && has('Rejected'))     return 'Partially Approved';
-  if (has('Approved') || has('Verified'))     return 'Under Review';
+  if (all('Rejected')) return 'Rejected';
+  if (has('Query')) return 'Query Raised';
+  if (has('Approved') && has('Rejected')) return 'Partially Approved';
+  if (has('Approved') || has('Verified')) return 'Under Review';
   return null; // no change — leave whatever's there
 }
 
@@ -1182,14 +1188,14 @@ router.post('/:id/shipments/:idx/action', async (req, res) => {
       const cn = consignees[0];
       if (co && cn && products.length > 0) {
         app.shipments = products.map(p => ({
-          companyRef:   co.companyRef,
-          productRef:   p.productRef,
+          companyRef: co.companyRef,
+          productRef: p.productRef,
           consigneeRef: cn.consigneeRef,
-          quantity:     0,
-          packSize:     p.packSize || '',
+          quantity: 0,
+          packSize: p.packSize || '',
           batchNumbers: p.batchNumber ? [p.batchNumber] : [],
-          lineStatus:   'Pending',
-          lineRemarks:  [],
+          lineStatus: 'Pending',
+          lineRemarks: [],
         }));
         app.markModified('shipments');
       }
@@ -1213,7 +1219,7 @@ router.post('/:id/shipments/:idx/action', async (req, res) => {
     app.auditLog.push({
       action: 'line_action',
       detail: `Shipment #${idx + 1}: ${prev} → ${status}. ${remarks ? '"' + remarks + '"' : ''}`,
-      user:   officer,
+      user: officer,
       timestamp: new Date(),
     });
 
@@ -1256,7 +1262,7 @@ async function loadAppOr404(idOrRef, res) {
   const app = await Application.findOne({
     $or: [
       { applicationNumber: idOrRef },
-      { referenceNumber:   idOrRef },
+      { referenceNumber: idOrRef },
       { _id: mongoose.isValidObjectId(idOrRef) ? idOrRef : null },
     ],
   });
@@ -1296,10 +1302,10 @@ router.get('/:id/checklist', async (req, res) => {
     res.json({
       success: true,
       applicationNumber: app.applicationNumber,
-      referenceNumber:   app.referenceNumber,
-      status:            app.status,
-      checklist:         shapeChecklist(app, baseUrl),
-      documents:         uploadedDocs,
+      referenceNumber: app.referenceNumber,
+      status: app.status,
+      checklist: shapeChecklist(app, baseUrl),
+      documents: uploadedDocs,
     });
   } catch (err) {
     console.error('checklist load error:', err);
@@ -1336,7 +1342,7 @@ router.post('/:id/checklist/:itemId/query', async (req, res) => {
       version,
       queryText: String(queryText).trim(),
       queryDate: new Date(),
-      queryBy:   officer,
+      queryBy: officer,
     });
     if (version === 1) item.baseQuery = String(queryText).trim();
     item.status = 'Query';
@@ -1347,7 +1353,7 @@ router.post('/:id/checklist/:itemId/query', async (req, res) => {
     app.auditLog.push({
       action: 'checklist_query',
       detail: `Item ${item.itemNo} (${item.title}) — v${version} query raised: "${item.queries[version - 1].queryText}"`,
-      user:   officer,
+      user: officer,
     });
     await app.save();
 
@@ -1362,7 +1368,7 @@ router.post('/:id/checklist/:itemId/query', async (req, res) => {
 /* ── POST /:id/checklist/:itemId/reply — applicant replies to latest query ── */
 router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), async (req, res) => {
   try {
-    const reply     = (req.body.reply || '').trim();
+    const reply = (req.body.reply || '').trim();
     const applicant = req.body.applicant || 'applicant';
     if (!reply) return res.status(400).json({ error: 'reply text is required' });
 
@@ -1377,7 +1383,7 @@ router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), 
     if (openIdx === -1) return res.status(409).json({ error: 'No open query to reply to.' });
 
     const round = item.queries[openIdx];
-    round.reply     = reply;
+    round.reply = reply;
     round.replyDate = new Date();
 
     if (req.file) {
@@ -1401,7 +1407,7 @@ router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), 
     app.auditLog.push({
       action: 'checklist_reply',
       detail: `Item ${item.itemNo} (${item.title}) — v${round.version} reply: "${reply}"${req.file ? ' [file attached]' : ''}`,
-      user:   applicant,
+      user: applicant,
     });
     await app.save();
 
@@ -1425,7 +1431,7 @@ router.get('/:id/checklist/:itemId/submission-file', async (req, res) => {
     if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
     const mimeType = inferMimeType(item.submissionDocName, item.submissionDocType);
     res.set({
-      'Content-Type':        mimeType,
+      'Content-Type': mimeType,
       'Content-Disposition': `inline; filename="${item.submissionDocName || 'document'}"`,
     });
     fs.createReadStream(resolved).pipe(res);
@@ -1440,7 +1446,7 @@ router.get('/:id/checklist/:itemId/reply-file/:version', async (req, res) => {
   try {
     const app = await loadAppOr404(req.params.id, res);
     if (!app) return;
-    const item  = app.checklistItems?.get(req.params.itemId);
+    const item = app.checklistItems?.get(req.params.itemId);
     const round = item?.queries?.find(q => String(q.version) === String(req.params.version));
     if (!round?.replyDocPath) return res.status(404).json({ error: 'File not found' });
     const resolved = path.resolve(path.join(UPLOADS_DIR, round.replyDocPath));
@@ -1448,7 +1454,7 @@ router.get('/:id/checklist/:itemId/reply-file/:version', async (req, res) => {
     if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
     const mimeType = inferMimeType(round.replyDocName, round.replyDocType);
     res.set({
-      'Content-Type':        mimeType,
+      'Content-Type': mimeType,
       'Content-Disposition': `inline; filename="${round.replyDocName || 'reply-document'}"`,
     });
     fs.createReadStream(resolved).pipe(res);
@@ -1473,12 +1479,12 @@ const reconciliationUpload = multer({
    Returns a number 0-100, or null if dates not parseable. */
 function residualShelfLifePct(mfgDate, expiryDate) {
   try {
-    const mfg  = new Date(mfgDate);
-    const exp  = new Date(expiryDate);
-    const now  = new Date();
+    const mfg = new Date(mfgDate);
+    const exp = new Date(expiryDate);
+    const now = new Date();
     if (isNaN(mfg) || isNaN(exp)) return null;
-    const totalMs  = exp - mfg;
-    const usedMs   = now - mfg;
+    const totalMs = exp - mfg;
+    const usedMs = now - mfg;
     const remainPct = Math.max(0, Math.round(((totalMs - usedMs) / totalMs) * 100));
     return remainPct;
   } catch { return null; }
@@ -1487,10 +1493,10 @@ function residualShelfLifePct(mfgDate, expiryDate) {
 /* ── Residual shelf life in months (for APIs) ───────────────────────────── */
 function residualShelfLifeMonths(expiryDate) {
   try {
-    const exp  = new Date(expiryDate);
-    const now  = new Date();
+    const exp = new Date(expiryDate);
+    const now = new Date();
     if (isNaN(exp)) return null;
-    const diffMs   = exp - now;
+    const diffMs = exp - now;
     return Math.max(0, diffMs / (1000 * 60 * 60 * 24 * 30.44));
   } catch { return null; }
 }
@@ -1519,18 +1525,18 @@ router.get('/:id/reconciliation', async (req, res) => {
     const totalExported = exportedNums.reduce((s, n) => s + n, 0);
 
     res.json({
-      success:           true,
+      success: true,
       applicationNumber: obj.applicationNumber,
-      referenceNumber:   obj.referenceNumber,
-      status:            obj.status,
-      nocMeta:           obj.nocMeta || null,
+      referenceNumber: obj.referenceNumber,
+      status: obj.status,
+      nocMeta: obj.nocMeta || null,
       entries,
       summary: {
-        totalEntries:   entries.length,
+        totalEntries: entries.length,
         totalExported,
-        draftCount:     entries.filter(e => e.status === 'Draft').length,
+        draftCount: entries.filter(e => e.status === 'Draft').length,
         submittedCount: entries.filter(e => e.status === 'Submitted').length,
-        releasedCount:  entries.filter(e => e.status === 'Released').length,
+        releasedCount: entries.filter(e => e.status === 'Released').length,
       },
     });
   } catch (err) {
@@ -1548,7 +1554,7 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
 
     // Only allow if NOC is approved / active
     if (!['Approved', 'Under Review', 'Submitted', 'Verified'].includes(app.status) &&
-        app.status !== 'Approved') {
+      app.status !== 'Approved') {
       // Allow for testing when status is any non-Draft — gate loosely
     }
 
@@ -1564,7 +1570,7 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
       if (productType === 'api') {
         const months = residualShelfLifeMonths(b.expiryDate);
         pct = residualShelfLifePct(b.mfgDate, b.expiryDate);
-        if (months !== null && months < 3)  shelfLifeStatus = 'destroy';
+        if (months !== null && months < 3) shelfLifeStatus = 'destroy';
         else if (months !== null && months < 6) shelfLifeStatus = 'warning';
       } else {
         pct = residualShelfLifePct(b.mfgDate, b.expiryDate);
@@ -1574,9 +1580,9 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
     }
 
     // Compute leftUnpackedQty  
-    const nocQty    = parseFloat(b.nocQty || app.nocMeta?.sanctionedQty || 0);
-    const batchQty  = parseFloat(b.batchQtyManufactured || 0);
-    const packed    = parseFloat(b.packedExportedQty || 0);
+    const nocQty = parseFloat(b.nocQty || app.nocMeta?.sanctionedQty || 0);
+    const batchQty = parseFloat(b.batchQtyManufactured || 0);
+    const packed = parseFloat(b.packedExportedQty || 0);
     const leftUnpackedQty = batchQty > 0 ? String(Math.max(0, batchQty - packed)) : '';
 
     // Persist optional document
@@ -1585,7 +1591,7 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
       const appDir = path.join(UPLOADS_DIR, String(app.applicationNumber), 'reconciliation');
       fs.mkdirSync(appDir, { recursive: true });
       const extMatch = (req.file.originalname || '').match(/\.[a-zA-Z0-9]{1,8}$/);
-      const ext      = extMatch ? extMatch[0] : '.pdf';
+      const ext = extMatch ? extMatch[0] : '.pdf';
       const fileName = `recon_${entryId}${ext}`;
       const filePath = path.join(appDir, fileName);
       fs.writeFileSync(filePath, req.file.buffer);
@@ -1597,29 +1603,29 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
 
     const entry = {
       entryId,
-      nocQty:              b.nocQty || (app.nocMeta?.sanctionedQty || ''),
-      batchQtyManufactured:b.batchQtyManufactured || '',
-      packedExportedQty:   b.packedExportedQty || '',
+      nocQty: b.nocQty || (app.nocMeta?.sanctionedQty || ''),
+      batchQtyManufactured: b.batchQtyManufactured || '',
+      packedExportedQty: b.packedExportedQty || '',
       leftUnpackedQty,
-      countryExported:     b.countryExported || '',
-      customerName:        b.customerName || '',
-      customerAddress:     b.customerAddress || '',
-      poNumber:            b.poNumber || '',
-      eiNumber:            b.eiNumber || '',
-      sbNumber:            b.sbNumber || '',
-      poDate:              b.poDate || '',
-      eiDate:              b.eiDate || '',
-      sbDate:              b.sbDate || '',
-      productRef:          b.productRef || '',
-      productName:         b.productName || '',
-      batchNumber:         b.batchNumber || '',
+      countryExported: b.countryExported || '',
+      customerName: b.customerName || '',
+      customerAddress: b.customerAddress || '',
+      poNumber: b.poNumber || '',
+      eiNumber: b.eiNumber || '',
+      sbNumber: b.sbNumber || '',
+      poDate: b.poDate || '',
+      eiDate: b.eiDate || '',
+      sbDate: b.sbDate || '',
+      productRef: b.productRef || '',
+      productName: b.productName || '',
+      batchNumber: b.batchNumber || '',
       productType,
-      mfgDate:             b.mfgDate || '',
-      expiryDate:          b.expiryDate || '',
+      mfgDate: b.mfgDate || '',
+      expiryDate: b.expiryDate || '',
       residualShelfLifePct: pct,
       shelfLifeStatus,
       docName, docPath, docType, docSize,
-      status:      b.status === 'Submitted' ? 'Submitted' : 'Draft',
+      status: b.status === 'Submitted' ? 'Submitted' : 'Draft',
       submittedBy: b.submittedBy || 'applicant',
       submittedAt: new Date(),
     };
@@ -1631,7 +1637,7 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
     app.auditLog.push({
       action: 'reconciliation_entry',
       detail: `Reconciliation entry added (${entry.status}): ${entry.productName || 'product'} → ${entry.countryExported}, Qty: ${entry.packedExportedQty}`,
-      user:   b.submittedBy || 'applicant',
+      user: b.submittedBy || 'applicant',
       timestamp: new Date(),
     });
 
@@ -1670,13 +1676,13 @@ router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'),
     let shelfLifeStatus = existing.shelfLifeStatus || 'ok';
     let pct = existing.residualShelfLifePct;
     const expiryDate = b.expiryDate || existing.expiryDate;
-    const mfgDate    = b.mfgDate    || existing.mfgDate;
+    const mfgDate = b.mfgDate || existing.mfgDate;
 
     if (expiryDate) {
       if (productType === 'api') {
         const months = residualShelfLifeMonths(expiryDate);
         pct = residualShelfLifePct(mfgDate, expiryDate);
-        if (months !== null && months < 3)  shelfLifeStatus = 'destroy';
+        if (months !== null && months < 3) shelfLifeStatus = 'destroy';
         else if (months !== null && months < 6) shelfLifeStatus = 'warning';
         else shelfLifeStatus = 'ok';
       } else {
@@ -1688,7 +1694,7 @@ router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'),
     }
 
     const batchQty = parseFloat(b.batchQtyManufactured || existing.batchQtyManufactured || 0);
-    const packed   = parseFloat(b.packedExportedQty    || existing.packedExportedQty    || 0);
+    const packed = parseFloat(b.packedExportedQty || existing.packedExportedQty || 0);
     const leftUnpackedQty = batchQty > 0 ? String(Math.max(0, batchQty - packed)) : existing.leftUnpackedQty;
 
     // Handle optional new doc
@@ -1697,7 +1703,7 @@ router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'),
     if (req.file) {
       const appDir = path.join(UPLOADS_DIR, String(app.applicationNumber), 'reconciliation');
       fs.mkdirSync(appDir, { recursive: true });
-      const ext      = (req.file.originalname || '').match(/\.[a-zA-Z0-9]{1,8}$/)?.[0] || '.pdf';
+      const ext = (req.file.originalname || '').match(/\.[a-zA-Z0-9]{1,8}$/)?.[0] || '.pdf';
       const fileName = `recon_${existing.entryId}_v2${ext}`;
       fs.writeFileSync(path.join(appDir, fileName), req.file.buffer);
       docName = req.file.originalname;
@@ -1721,7 +1727,7 @@ router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'),
     app.auditLog.push({
       action: 'reconciliation_update',
       detail: `Reconciliation ${req.params.entryId} updated → status: ${updated.status}`,
-      user:   b.updatedBy || 'applicant',
+      user: b.updatedBy || 'applicant',
       timestamp: new Date(),
     });
     await app.save();
@@ -1770,7 +1776,7 @@ router.get('/:id/reconciliation/:entryId/doc', async (req, res) => {
     if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) return res.status(400).json({ error: 'Invalid path' });
     if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing on disk' });
     res.set({
-      'Content-Type':        inferMimeType(entry.docName, entry.docType),
+      'Content-Type': inferMimeType(entry.docName, entry.docType),
       'Content-Disposition': `inline; filename="${entry.docName || 'document'}"`,
     });
     fs.createReadStream(resolved).pipe(res);
@@ -1796,15 +1802,15 @@ router.post('/:id/noc-meta', async (req, res) => {
       nocExpiryDate: expiryDate,
       sanctionedQty: sanctionedQty || '',
       qtyUnit,
-      qtyExported:  '0',
+      qtyExported: '0',
       qtyRemaining: sanctionedQty || '',
-      nocStatus:    'Active',
+      nocStatus: 'Active',
     };
     app.markModified('nocMeta');
     app.auditLog.push({
       action: 'noc_meta_set',
       detail: `NOC issued: qty=${sanctionedQty} ${qtyUnit}, valid until ${expiryDate.toLocaleDateString('en-IN')}`,
-      user:   req.body.officer || 'reviewer',
+      user: req.body.officer || 'reviewer',
       timestamp: new Date(),
     });
     await app.save();

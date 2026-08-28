@@ -146,12 +146,12 @@ export default function ReviewDashboard() {
   /* ── Derived data ───────────────────────────────────────────────────── */
   const stats = useMemo(() => ({
     total: apps.length,
-    submitted: apps.filter(a => a.status === 'Submitted').length,
+    submitted: apps.filter(a => isNewUnseen(a, openedApps)).length,
     underReview: apps.filter(a => a.status === 'Under Review').length,
     queryRaised: apps.filter(a => a.status === 'Query Raised').length,
     approved: apps.filter(a => a.status === 'Approved').length,
     rejected: apps.filter(a => a.status === 'Rejected').length,
-  }), [apps]);
+  }), [apps, openedApps]);
 
   const filtered = useMemo(() => apps.filter(a => {
     if (filterStatus !== 'All' && a.status !== filterStatus) return false;

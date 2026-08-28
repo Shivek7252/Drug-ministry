@@ -8,40 +8,40 @@ const MAX_DOCUMENT_SIZE = 5 * 1024 * 1024;
 const newRef = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e5).toString(36)}`;
 
 const emptyCompany = () => ({
-  companyRef:           newRef('co'),
-  name:                 '',
-  licenseNo:            '',
-  factoryAddress:       '',
-  manufacturingSite:    '',
-  contactPerson:        '',
-  contactNumber:        '',
-  email:                '',
-  signatoryName:        '',
+  companyRef: newRef('co'),
+  name: '',
+  licenseNo: '',
+  factoryAddress: '',
+  manufacturingSite: '',
+  contactPerson: '',
+  contactNumber: '',
+  email: '',
+  signatoryName: '',
   signatoryDesignation: '',
 });
 
 const emptyConsignee = () => ({
-  consigneeRef:  newRef('cn'),
-  name:          '',
-  organisation:  '',
-  addressLine1:  '',
-  addressLine2:  '',
-  city:          '',
-  state:         '',
-  country:       '',
-  postalCode:    '',
+  consigneeRef: newRef('cn'),
+  name: '',
+  organisation: '',
+  addressLine1: '',
+  addressLine2: '',
+  city: '',
+  state: '',
+  country: '',
+  postalCode: '',
   contactPerson: '',
-  phone:         '',
-  email:         '',
+  phone: '',
+  email: '',
 });
 
 const emptyShipment = () => ({
-  shipmentRef:  newRef('sh'),
-  companyRef:   '',
-  productRef:   '',
+  shipmentRef: newRef('sh'),
+  companyRef: '',
+  productRef: '',
   consigneeRef: '',
-  quantity:     '',
-  packSize:     '',
+  quantity: '',
+  packSize: '',
   batchNumbers: [],
 });
 
@@ -78,7 +78,7 @@ const initialFormData = {
   signatoryName: '',
   signatoryDesignation: '',
   // NEW multi-row arrays
-  companies:  [emptyCompany()],
+  companies: [emptyCompany()],
   consignees: [emptyConsignee()],
   products: [],
   shipments: [],
@@ -95,22 +95,41 @@ const initialFormData = {
 export { emptyCompany, emptyConsignee, emptyShipment, newRef };
 
 export function AppProvider({ children }) {
-  const [formData, setFormData]         = useState(initialFormData);
-  const [currentStep, setCurrentStep]   = useState(1);
-  const [submitted, setSubmitted]       = useState(false);
-  const [draftSaved, setDraftSaved]     = useState(false);
-  const [notifOpen, setNotifOpen]       = useState(false);
-  const [submittedAppNo, setSubmittedAppNo]   = useState('');
-  const [submittedRefNo, setSubmittedRefNo]   = useState('');
-  const [drugWarnings, setDrugWarnings]       = useState([]);   // warnings from CDSCO approval check
+  const [formData, setFormData] = useState(initialFormData);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [submitted, setSubmitted] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [submittedAppNo, setSubmittedAppNo] = useState('');
+  const [submittedRefNo, setSubmittedRefNo] = useState('');
+  const [drugWarnings, setDrugWarnings] = useState([]);   // warnings from CDSCO approval check
   const [allDrugsApproved, setAllDrugsApproved] = useState(true);
   const autoSaveTimer = useRef(null);
 
   // ── Auth ──────────────────────────────────────────────
-  const [isLoggedIn, setIsLoggedIn]   = useState(false);
-  const [loginOpen, setLoginOpen]     = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole]       = useState('applicant'); // 'applicant' | 'reviewer'
+  // Initialise from sessionStorage so a hard-refresh keeps the user logged in.
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('reviewer_identity');
+      if (stored) { const p = JSON.parse(stored); return !!(p.username && p.role); }
+    } catch (_) { }
+    return false;
+  });
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('reviewer_identity');
+      if (stored) { const p = JSON.parse(stored); return p.username || null; }
+    } catch (_) { }
+    return null;
+  });
+  const [userRole, setUserRole] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('reviewer_identity');
+      if (stored) { const p = JSON.parse(stored); return p.role || 'applicant'; }
+    } catch (_) { }
+    return 'applicant';
+  });
 
   const login = (username, role = 'applicant') => {
     setIsLoggedIn(true);
@@ -121,14 +140,14 @@ export function AppProvider({ children }) {
     // read the correct user name / role without re-authenticating.
     try {
       sessionStorage.setItem('reviewer_identity', JSON.stringify({ username, role }));
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setUserRole('applicant');
-    try { sessionStorage.removeItem('reviewer_identity'); } catch (_) {}
+    try { sessionStorage.removeItem('reviewer_identity'); } catch (_) { }
     resetForm();
   };
 
@@ -250,28 +269,28 @@ export function AppProvider({ children }) {
     return {
       ...fd,
       // manufacturer mirror
-      manufacturerName:     co.name                 || fd.manufacturerName,
-      mfgLicenseNo:         co.licenseNo            || fd.mfgLicenseNo,
-      factoryAddress:       co.factoryAddress       || fd.factoryAddress,
-      manufacturingSite:    co.manufacturingSite    || fd.manufacturingSite,
-      mfgContactPerson:     co.contactPerson        || fd.mfgContactPerson,
-      mfgContactNumber:     co.contactNumber        || fd.mfgContactNumber,
-      mfgEmail:             co.email                || fd.mfgEmail,
-      signatoryName:        co.signatoryName        || fd.signatoryName,
+      manufacturerName: co.name || fd.manufacturerName,
+      mfgLicenseNo: co.licenseNo || fd.mfgLicenseNo,
+      factoryAddress: co.factoryAddress || fd.factoryAddress,
+      manufacturingSite: co.manufacturingSite || fd.manufacturingSite,
+      mfgContactPerson: co.contactPerson || fd.mfgContactPerson,
+      mfgContactNumber: co.contactNumber || fd.mfgContactNumber,
+      mfgEmail: co.email || fd.mfgEmail,
+      signatoryName: co.signatoryName || fd.signatoryName,
       signatoryDesignation: co.signatoryDesignation || fd.signatoryDesignation,
       // consignee mirror
-      consigneeName:    cn.name         || fd.consigneeName,
-      consigneeOrg:     cn.organisation || fd.consigneeOrg,
-      addressLine1:     cn.addressLine1 || fd.addressLine1,
-      addressLine2:     cn.addressLine2 || fd.addressLine2,
-      city:             cn.city         || fd.city,
-      state:            cn.state        || fd.state,
-      consigneeCountry: cn.country      || fd.consigneeCountry,
-      destinationCountry: cn.country    || fd.destinationCountry,
-      postalCode:       cn.postalCode   || fd.postalCode,
-      contactPerson:    cn.contactPerson|| fd.contactPerson,
-      consigneePhone:   cn.phone        || fd.consigneePhone,
-      consigneeEmail:   cn.email        || fd.consigneeEmail,
+      consigneeName: cn.name || fd.consigneeName,
+      consigneeOrg: cn.organisation || fd.consigneeOrg,
+      addressLine1: cn.addressLine1 || fd.addressLine1,
+      addressLine2: cn.addressLine2 || fd.addressLine2,
+      city: cn.city || fd.city,
+      state: cn.state || fd.state,
+      consigneeCountry: cn.country || fd.consigneeCountry,
+      destinationCountry: cn.country || fd.destinationCountry,
+      postalCode: cn.postalCode || fd.postalCode,
+      contactPerson: cn.contactPerson || fd.contactPerson,
+      consigneePhone: cn.phone || fd.consigneePhone,
+      consigneeEmail: cn.email || fd.consigneeEmail,
     };
   };
 
