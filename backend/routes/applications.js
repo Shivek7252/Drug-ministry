@@ -524,6 +524,10 @@ function persistDocsToDisk(appNumber, docs) {
     }
 
     if (b64) {
+      const decodedSize = Buffer.byteLength(b64, 'base64');
+      if (decodedSize > MAX_FILE_SIZE || Number(doc.size) > MAX_FILE_SIZE) {
+        throw new Error(`${doc.name || docId} exceeds the 5 MB file size limit.`);
+      }
       // Pick safe filename: `${docId}.<ext>`
       const extMatch = (doc.name || '').match(/\.[a-zA-Z0-9]{1,8}$/);
       const ext = extMatch ? extMatch[0] : '.pdf';
