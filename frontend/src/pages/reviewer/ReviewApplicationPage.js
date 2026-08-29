@@ -11,7 +11,10 @@ import {
   getQueryHistory,
 } from '../../api/applicationService';
 import DocViewerModal from '../../components/shared/DocViewerModal';
-import NocChecklistPage from '../../components/checklist/NocChecklistPage';
+import DrugComplianceAlert from '../../components/wizard/DrugComplianceAlert';
+import { loadApprovedDrugs } from '../../data/approvedDrugs';
+import { loadBannedDrugs } from '../../data/bannedDrugs';
+import { resolveSeverity } from '../../hooks/useCdscoLookup';
 import ShipmentsTab from './ShipmentsTab';
 import SummaryPanel from './SummaryPanel';
 import './ReviewApplicationPage.css';
@@ -23,7 +26,7 @@ import './ReviewApplicationPage.css';
 
    Composed of a sticky topbar, a hero card, a KPI strip, and a two-column
    body (sidebar navigation + main content). Reuses ShipmentsTab,
-   NocChecklistPage, SummaryPanel and DocViewerModal.
+   SummaryPanel and DocViewerModal.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* Doc slots the applicant uploads to. Same list the queue-side modal used. */
@@ -41,7 +44,6 @@ const SECTIONS = [
   { id: 'details', label: 'Application', icon: '📋' },
   { id: 'docs', label: 'Documents', icon: '📁' },
   { id: 'shipments', label: 'Shipments', icon: '🚚' },
-  { id: 'checklist', label: 'Checklist Query', icon: '🔍' },
   { id: 'queryHistory', label: 'Query History', icon: '?' },
 ];
 
@@ -427,7 +429,7 @@ export default function ReviewApplicationPage() {
           label="Compliance"
           value={compliance ? `${compliance.pct}%` : '—'}
           hint={compliance ? `${compliance.counts.ok}/${compliance.total} checklist items OK` : 'Loading…'}
-          onClick={() => setActiveSection('checklist')}
+          onClick={() => setActiveSection('docs')}
         />
         <KpiCard
           tone="neutral" icon="📎"
@@ -503,7 +505,6 @@ export default function ReviewApplicationPage() {
           {activeSection === 'details' && <DetailsSection data={data} />}
           {activeSection === 'docs' && <DocumentsSection data={data} docVerdict={docVerdict} aiCheckLoading={aiCheckLoading} onDocClick={handleDocClick} />}
           {activeSection === 'shipments' && <ShipmentsTab data={data} actionBusy={lineBusy} onLineAction={handleLineAction} />}
-          {activeSection === 'checklist' && <NocChecklistPage applicationNumber={data.applicationNumber} role="reviewer" />}
           {activeSection === 'queryHistory' && <QueryHistorySection queries={queryHistory} error={queryHistoryError} onRetry={load} />}
         </main>
       </div>
@@ -612,6 +613,25 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
       .catch(() => { });
   }, []);
 
+  // Section 26A prohibition check — same resolver the applicant wizard uses, so
+  // the reviewer sees exactly the flag the applicant was shown.
+  const [complianceReady, setComplianceReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([loadApprovedDrugs(), loadBannedDrugs()])
+      .then(() => { if (alive) setComplianceReady(true); });
+    return () => { alive = false; };
+  }, []);
+
+  const drugCompliance = complianceReady
+    ? products.map(p => ({ product: p, ...resolveSeverity(p.genericName) }))
+    : [];
+  const prohibited = drugCompliance.filter(c => c.severity === 'banned');
+  const restricted = drugCompliance.filter(c => c.severity === 'restricted');
+  const flaggedByName = new Map(
+    [...prohibited, ...restricted].map(c => [c.product.genericName, c])
+  );
+
   const findApproval = (genericName) => {
     if (!genericName || !approvedDrugs.length) return null;
     const q = genericName.trim().toLowerCase();
@@ -624,11 +644,86 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
 
   return (
     <div className="rap-section">
+      {/* A Section 26A prohibition outranks every other overview signal. */}
+      {prohibited.length > 0 && (
+        <div className="rap-banned-card" role="alert">
+          <div className="rap-banned-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" /><line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
+            </svg>
+          </div>
+          <div className="rap-banned-main">
+            <div className="rap-banned-eyebrow">Prohibited drug detected</div>
+            <h3 className="rap-banned-title">
+              {prohibited.length === 1
+                ? `${prohibited[0].product.genericName} is banned for manufacture and sale in India`
+                : `${prohibited.length} drugs on this application are banned in India`}
+            </h3>
+            <p className="rap-banned-lede">
+              Prohibited under Section 26A of the Drugs &amp; Cosmetics Act, 1940. Do not approve
+              this application without verifying a valid exemption order.
+            </p>
+            <ul className="rap-banned-list">
+              {prohibited.map(({ product, gazette }, i) => (
+                <li key={i}>
+                  <span className="rap-banned-drug">{product.genericName}</span>
+                  <span className="rap-banned-sep">/</span>
+                  <span>{product.productName || 'Unnamed product'}</span>
+                  <span className="rap-banned-sep">/</span>
+                  <span>Sr. No. {gazette.sr}</span>
+                  <span className="rap-banned-sep">/</span>
+                  <span>{gazette.notification}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="rap-banned-ack">
+              {prohibited.every(c => c.product.exemptionAcknowledged)
+                ? 'Applicant confirmed they hold exemption documentation — verify it in Documents.'
+                : 'Applicant did not confirm exemption documentation.'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CDSCO approval is the first reviewer checkpoint in the overview. */}
       {products.length > 0 && (
         <SectionCard title="CDSCO Drug Approval Status" icon="💊">
           <div className="rap-cdsco-list">
             {products.map((p, i) => {
+              const flag = flaggedByName.get(p.genericName);
+              if (flag) {
+                return (
+                  <div key={i} className={`rap-cdsco-flagged sev-${flag.severity}`}>
+                    <div className="rap-cdsco-row-header">
+                      <div>
+                        <div className="rap-cdsco-product">
+                          <strong>{p.productName || p.genericName}</strong>
+                          {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
+                          {p.dosageForm && <span className="rap-chip-tag">{p.dosageForm}</span>}
+                        </div>
+                        <div className="rap-cdsco-generic">{p.genericName}</div>
+                      </div>
+                      <span className={`rap-cdsco-badge rap-cdsco-badge-${flag.severity}`}>
+                        {flag.severity === 'banned' ? 'BANNED — SECTION 26A' : 'RESTRICTED — SECTION 26A'}
+                      </span>
+                    </div>
+                    <DrugComplianceAlert
+                      readOnly
+                      severity={flag.severity}
+                      drug={flag.drug}
+                      gazette={flag.gazette}
+                    />
+                    <div className="rap-cdsco-details">
+                      <span>
+                        {p.exemptionAcknowledged
+                          ? '✓ Applicant confirmed exemption documentation'
+                          : '✗ Applicant did not confirm exemption documentation'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
               const drug = findApproval(p.genericName);
               const stored = p.cdscoApproved === true || p.cdscoApproved === 'true';
               const isApproved = drug || stored;
@@ -723,8 +818,8 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
               </div>
               <div className="rap-glance-list">
                 <GlanceRow label="Correct documents" count={compliance.counts.ok} tone="ok" />
-                <GlanceRow label="Missing documents" count={compliance.counts.missing} tone="missing" onClick={compliance.counts.missing > 0 ? () => onNavigate('checklist') : null} />
-                <GlanceRow label="Wrong documents" count={compliance.counts.wrong} tone="wrong" onClick={compliance.counts.wrong > 0 ? () => onNavigate('checklist') : null} />
+                <GlanceRow label="Missing documents" count={compliance.counts.missing} tone="missing" onClick={compliance.counts.missing > 0 ? () => onNavigate('docs') : null} />
+                <GlanceRow label="Wrong documents" count={compliance.counts.wrong} tone="wrong" onClick={compliance.counts.wrong > 0 ? () => onNavigate('docs') : null} />
                 <GlanceRow label="Not yet verified" count={compliance.counts.unchecked} tone="unchecked" onClick={compliance.counts.unchecked > 0 ? () => onNavigate('docs') : null} />
               </div>
             </div>

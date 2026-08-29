@@ -12,6 +12,7 @@ const { fillAllTemplates } = require('./templateFiller');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const APPROVED_DRUGS_WORKBOOK = path.join(__dirname, '..', 'approved_drugs.xlsx');
+const BANNED_DRUGS_FILE = path.join(__dirname, 'data', 'bannedDrugs.json');
 
 function decodeXml(value) {
   return value
@@ -76,6 +77,17 @@ readApprovedDrugsWorkbook()
   .catch(err => console.warn(`Could not load approved_drugs.xlsx: ${err.message}`));
 
 app.get('/api/approved-drugs', (_, res) => res.json({ drugs: approvedDrugs }));
+
+/* ── Drugs prohibited under Section 26A of the Drugs & Cosmetics Act, 1940 ── */
+let bannedDrugs = { title: '', source: '', entryCount: 0, statusNotes: {}, entries: [] };
+try {
+  bannedDrugs = JSON.parse(fs.readFileSync(BANNED_DRUGS_FILE, 'utf8'));
+  console.log(`Loaded ${bannedDrugs.entries.length} prohibited drugs from bannedDrugs.json`);
+} catch (err) {
+  console.warn(`Could not load bannedDrugs.json: ${err.message}`);
+}
+
+app.get('/api/banned-drugs', (_, res) => res.json(bannedDrugs));
 
 /* ─── Health check ─────────────────────────────────────────────────────── */
 app.get('/health', (_, res) => res.json({ status: 'ok', model: 'mistral-large-latest' }));

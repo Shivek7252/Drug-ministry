@@ -1,0 +1,301 @@
+/* ============================================================================
+   Review queue table.
+   Sticky header sits directly below the sticky filter bar: --h-filterbar.
+   ============================================================================ */
+
+.rq {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+/* ---- Toolbar ------------------------------------------------------------- */
+.rq-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.rq-heading {
+  margin: 0;
+  font-size: var(--fs-14);
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+}
+
+.rq-bulk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-13);
+}
+.rq-bulk-count { font-weight: var(--fw-bold); color: var(--text-primary); }
+.rq-bulk-sep { color: var(--border-strong); }
+.rq-bulk-action,
+.rq-bulk-clear {
+  background: none;
+  border: none;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.rq-bulk-action { color: var(--c-navy-800); }
+.rq-bulk-clear { color: var(--text-muted); }
+.rq-bulk-action:hover:not(:disabled),
+.rq-bulk-clear:hover { background: var(--surface-sunken); }
+.rq-bulk-action:disabled { opacity: 0.55; cursor: not-allowed; }
+.rq-bulk-action:focus-visible,
+.rq-bulk-clear:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.rq-density {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-muted);
+}
+.rq-density button {
+  padding: var(--sp-1) var(--sp-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: var(--fs-12);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.rq-density button.is-active {
+  background: var(--c-navy-050);
+  border-color: var(--c-navy-100);
+  color: var(--c-navy-800);
+  font-weight: var(--fw-bold);
+}
+.rq-density button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* ---- Table ---------------------------------------------------------------
+   position:relative makes this the containing block for the sticky <th>.
+   Without it the sticky header escapes the scroller's clipping and its full
+   table width leaks into documentElement.scrollWidth, giving the whole page a
+   horizontal scrollbar at high zoom (WCAG 2.1 AA 1.4.10 Reflow).
+   Measured: 234px document overflow at 200% zoom before, 0 after.
+   -------------------------------------------------------------------------- */
+.rq-scroll {
+  overflow-x: auto;
+  position: relative;
+}
+
+.rq-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-13);
+}
+
+.rq-table thead th {
+  position: sticky;
+  top: var(--h-filterbar-actual, var(--h-filterbar));  /* real, wrapped height */
+  z-index: 10;
+  background: var(--surface-sunken);
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-strong);
+}
+.rq-table th.rq-num,
+.rq-table td.rq-num { text-align: right; }
+
+.rq-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.rq-sort:hover { color: var(--c-navy-800); }
+.rq-sort:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r-sm); }
+
+.rq-table tbody td {
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+.rq-table.is-compact tbody td { padding: var(--sp-2) var(--sp-3); }
+.rq-table tbody tr:last-child td { border-bottom: none; }
+
+/* Hover is a 1px left accent rail, not a full-row flood. */
+.rq-row { cursor: pointer; }
+.rq-row td:first-child { box-shadow: inset 2px 0 0 transparent; }
+.rq-row:hover td:first-child { box-shadow: inset 2px 0 0 var(--c-navy-800); }
+.rq-row:hover td { background: var(--c-navy-050); }
+.rq-row.is-selected td { background: var(--c-navy-050); }
+.rq-row.is-unseen .rq-appno::after {
+  content: 'NEW';
+  margin-left: var(--sp-2);
+  padding: 1px var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--st-submitted-bg);
+  color: var(--st-submitted-fg);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+}
+
+.rq-check { width: 1%; padding-right: 0 !important; }
+.rq-check input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--c-navy-800); }
+.rq-check input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.rq-appno { font-weight: var(--fw-bold); color: var(--text-primary); white-space: nowrap; }
+.rq-ref { font-size: var(--fs-12); color: var(--text-muted); }
+.rq-applicant { display: block; color: var(--text-primary); font-weight: var(--fw-medium); }
+.rq-email { display: block; font-size: var(--fs-11); color: var(--text-muted); }
+.rq-muted { color: var(--text-muted); }
+
+/* Category: full text, wraps rather than truncating (audit item 9).
+   break-word (not anywhere) so it breaks at word boundaries first; measured
+   at 66px wide with `anywhere` it shattered "Homeopathic Products" across
+   4.4 lines. The column is given room so two words fit on two lines. */
+.rq-table td:nth-child(6) { min-width: 132px; }
+.rq-chip {
+  display: inline-block;
+  max-width: 200px;
+  padding: 2px var(--sp-2);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-12);
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
+}
+
+.rq-age { display: inline-flex; align-items: center; gap: var(--sp-1); justify-content: flex-end; }
+.rq-age.is-overdue { color: var(--st-overdue-fg); font-weight: var(--fw-bold); }
+.rq-age-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--st-overdue-fg);
+  flex: none;
+}
+
+.rq-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
+  border: 1px solid;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+  background: var(--surface-card);
+}
+.rq-pill-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+
+.rq-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--c-navy-800);
+  border: 1px solid var(--c-navy-800);
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-medium);
+  color: var(--text-inverse);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rq-open:hover { background: var(--c-navy-900); }
+.rq-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ---- States -------------------------------------------------------------- */
+.rq-state {
+  padding: var(--sp-10) var(--sp-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--fs-13);
+}
+.rq-state-error { color: var(--c-danger); }
+
+.rq-skel {
+  display: block;
+  height: 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-sunken);
+  animation: rq-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rq-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+/* ---- Pagination ---------------------------------------------------------- */
+.rq-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border-default);
+}
+.rq-perpage { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rq-perpage span {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.rq-perpage select {
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--surface-card);
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: var(--fs-13);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.rq-perpage select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.rq-range { margin: 0; font-size: var(--fs-12); color: var(--text-muted); }
+
+.rq-pager { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.rq-pager button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.rq-pager button:hover:not(:disabled) { background: var(--surface-sunken); color: var(--text-primary); }
+.rq-pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+.rq-pager button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.rq-pageno { font-size: var(--fs-12); color: var(--text-secondary); padding: 0 var(--sp-2); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) { .rq-skel { animation: none; } }

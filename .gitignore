@@ -35,3 +35,9 @@ Thumbs.db
 # Excel temporary/lock files
 ~$*.xlsx
 ~$*.xls
+# Agent skill installs (uizze / skills CLI)
+.agents/
+.claude/
+.kiro/
+.qoder/
+skills-lock.json

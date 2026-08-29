@@ -3,10 +3,19 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { NOTIFICATIONS } from '../../data/mockData';
 import LoginModal from '../auth/LoginModal';
+import Icon from '../ui/Icon';
+import useTextScale from '../../hooks/useTextScale';
 import './Navbar.css';
 
-// Font-size levels: 0 = small (A-), 1 = normal (A), 2 = large (A+)
-const FONT_SIZES = [14, 16, 18]; // px values applied to <html>
+/* Announcement dismissal persists per browser (Part 3A). */
+const ANNOUNCE_KEY = 'cdsco_announcement_dismissed';
+const ANNOUNCE_ID = 'gsr-50e-2026-04-21';   // bump to re-show a new notice
+
+const TEXT_SCALE_BUTTONS = [
+  { label: 'A-', scale: 'sm', title: 'Decrease text size' },
+  { label: 'A', scale: 'md', title: 'Default text size' },
+  { label: 'A+', scale: 'lg', title: 'Increase text size' },
+];
 
 export default function Navbar() {
   const location  = useLocation();
@@ -14,20 +23,36 @@ export default function Navbar() {
   const { notifOpen, setNotifOpen, isLoggedIn, setLoginOpen, logout, currentUser } = useApp();
   const [mobileMenu,   setMobileMenu]   = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [fontSize,     setFontSize]     = useState(1); // default = normal (index 1)
   const unread = NOTIFICATIONS.filter(n => !n.read).length;
 
-  // Apply font size to <html> whenever it changes
+  /* Drives the root rem class from tokens.css, on BOTH portals, and persists.
+     Replaces an inline html.style.fontSize that was not persisted and would
+     have overridden the token classes. */
+  const { scale, setScale } = useTextScale();
+
+  /* Anything positioned below the chrome (e.g. the login modal) needs the
+     strip's CURRENT height, which is 0 once dismissed. */
+  const [announceOpen, setAnnounceOpen] = useState(() => {
+    try { return localStorage.getItem(ANNOUNCE_KEY) !== ANNOUNCE_ID; }
+    catch { return true; }
+  });
+  const dismissAnnouncement = () => {
+    setAnnounceOpen(false);
+    try { localStorage.setItem(ANNOUNCE_KEY, ANNOUNCE_ID); } catch { /* private mode */ }
+  };
+
   useEffect(() => {
-    document.documentElement.style.fontSize = FONT_SIZES[fontSize] + 'px';
-  }, [fontSize]);
+    document.documentElement.style.setProperty(
+      '--h-announce-current', announceOpen ? 'var(--h-announce)' : '0px'
+    );
+  }, [announceOpen]);
 
   const navLinks = [
-    { path: '/',        label: 'Dashboard',        icon: '⊞' },
-    { path: '/apply',   label: 'Export NOC',        icon: '📋' },
-    { path: '/track',   label: 'Track Application', icon: '🔍' },
-    { path: '/help',    label: 'Help',              icon: '❓' },
-    { path: '/contact', label: 'Contact',           icon: '📞' },
+    { path: '/',        label: 'Dashboard',        icon: 'grid' },
+    { path: '/apply',   label: 'Export NOC',        icon: 'fileText' },
+    { path: '/track',   label: 'Track Application', icon: 'search' },
+    { path: '/help',    label: 'Help',              icon: 'helpCircle' },
+    { path: '/contact', label: 'Contact',           icon: 'phone' },
   ];
 
   const handleNavClick = (e, path) => {
@@ -48,39 +73,50 @@ export default function Navbar() {
 
   return (
     <>
-      {/* ── Top strip ── */}
-      <div className="top-strip">
-        <div className="top-strip-inner">
-          <div className="top-strip-left">
-            <span className="strip-bell">🔔</span>
-            <span className="strip-notice">G.S.R. 50(E) is live on the SUGAM Portal (21 April 2026)</span>
-          </div>
-          <div className="top-strip-right">
-            <span className="strip-link">Skip to Main Content</span>
-            <span className="strip-sep">|</span>
-            <span className="strip-link">Screen Reader Access</span>
-            <span className="strip-sep">|</span>
+      {/* ── Announcement strip (32px, dismissible) ── */}
+      {announceOpen && (
+        <div className="top-strip">
+          <div className="top-strip-inner">
+            <div className="top-strip-left">
+              <Icon name="megaphone" size={14} />
+              <span className="strip-notice">G.S.R. 50(E) is live on the SUGAM Portal (21 April 2026)</span>
+            </div>
+            <div className="top-strip-right">
+              {/* Visibly rendered at all widths, matching the original header and
+                  the GIGW convention on Indian government portals. Kept as real
+                  anchors rather than the original spans so they actually work. */}
+              <a className="strip-link" href="#main-content">Skip to Main Content</a>
+              <span className="strip-sep" aria-hidden="true">|</span>
+              <a className="strip-link" href="#main-content">Screen Reader Access</a>
+              <span className="strip-sep" aria-hidden="true">|</span>
 
-            {/* Font-size group */}
-            <div className="font-size-group">
-              {[
-                { label: 'A-', idx: 0, title: 'Decrease font size' },
-                { label: 'A',  idx: 1, title: 'Default font size'  },
-                { label: 'A+', idx: 2, title: 'Increase font size' },
-              ].map(({ label, idx, title }) => (
-                <button
-                  key={label}
-                  className={`font-size-btn ${fontSize === idx ? 'font-size-active' : ''}`}
-                  onClick={() => setFontSize(idx)}
-                  title={title}
-                >
-                  {label}
-                </button>
-              ))}
+              <div className="font-size-group" role="group" aria-label="Text size">
+                {TEXT_SCALE_BUTTONS.map(({ label, scale: s2, title }) => (
+                  <button
+                    key={s2}
+                    type="button"
+                    className={`font-size-btn ${scale === s2 ? 'font-size-active' : ''}`}
+                    onClick={() => setScale(s2)}
+                    aria-pressed={scale === s2}
+                    title={title}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className="strip-dismiss"
+                onClick={dismissAnnouncement}
+                aria-label="Dismiss announcement"
+              >
+                <Icon name="x" size={14} />
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Header ── */}
       <header className="site-header">
@@ -104,15 +140,15 @@ export default function Navbar() {
           <div className="header-actions">
             <div className="header-nav-icons">
               {[
-                { icon: '🏠', label: 'Home' },
-                { icon: 'ℹ️', label: 'About Us' },
-                { icon: '⬇️', label: 'Downloads' },
-                { icon: '💊', label: 'Drugs' },
-                { icon: '🏷️', label: 'Brands' },
-                { icon: '📞', label: 'Contact Us' },
+                { icon: 'home', label: 'Home' },
+                { icon: 'info', label: 'About Us' },
+                { icon: 'download', label: 'Downloads' },
+                { icon: 'pill', label: 'Drugs' },
+                { icon: 'tag', label: 'Brands' },
+                { icon: 'phone', label: 'Contact Us' },
               ].map(item => (
                 <div key={item.label} className="nav-icon-item">
-                  <span className="nav-icon">{item.icon}</span>
+                  <Icon name={item.icon} size={18} className="nav-icon" />
                   <span>{item.label}</span>
                 </div>
               ))}
@@ -121,34 +157,34 @@ export default function Navbar() {
             <div className="header-right-actions">
               {isLoggedIn && (
                 <button className="notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
-                  🔔
-                  {unread > 0 && <span className="notif-badge">{unread}</span>}
+                  <Icon name="megaphone" size={18} title="Notifications" />
+                  {unread > 0 && <span className="notif-badge tnum">{unread}</span>}
                 </button>
               )}
 
               {isLoggedIn ? (
                 <div className="user-menu-wrap">
                   <button className="user-btn" onClick={() => setUserMenuOpen(o => !o)}>
-                    <span className="user-avatar">👤</span>
+                    <span className="user-avatar"><Icon name="info" size={14} /></span>
                     <span className="user-name">{currentUser}</span>
-                    <span className="user-arrow">▾</span>
+                    <Icon name="chevronDown" size={14} className="user-arrow" />
                   </button>
                   {userMenuOpen && (
                     <>
                       <div className="user-dropdown fade-in">
                         <div className="user-dropdown-header">
-                          <div className="ud-avatar">👤</div>
+                          <div className="ud-avatar"><Icon name="info" size={16} /></div>
                           <div>
                             <div className="ud-name">{currentUser}</div>
                             <div className="ud-role">Registered User</div>
                           </div>
                         </div>
                         <div className="ud-divider" />
-                        <button className="ud-item" onClick={() => { setUserMenuOpen(false); navigate('/apply'); }}>📋 My Applications</button>
-                        <button className="ud-item" onClick={() => { setUserMenuOpen(false); navigate('/track'); }}>🔍 Track Application</button>
-                        <button className="ud-item" onClick={() => { setUserMenuOpen(false); navigate('/help'); }}>❓ Help</button>
+                        <button className="ud-item" onClick={() => { setUserMenuOpen(false); navigate('/apply'); }}><Icon name="fileText" size={15} /> My Applications</button>
+                        <button className="ud-item" onClick={() => { setUserMenuOpen(false); navigate('/track'); }}><Icon name="search" size={15} /> Track Application</button>
+                        <button className="ud-item" onClick={() => { setUserMenuOpen(false); navigate('/help'); }}><Icon name="helpCircle" size={15} /> Help</button>
                         <div className="ud-divider" />
-                        <button className="ud-item ud-logout" onClick={handleLogout}>🚪 Logout</button>
+                        <button className="ud-item ud-logout" onClick={handleLogout}><Icon name="externalLink" size={15} /> Logout</button>
                       </div>
                       <div className="user-dropdown-overlay" onClick={() => setUserMenuOpen(false)} />
                     </>
@@ -168,7 +204,7 @@ export default function Navbar() {
       <nav className="main-nav">
         <div className="main-nav-inner">
           <button className="mobile-menu-btn" onClick={() => setMobileMenu(!mobileMenu)}>
-            ☰ Menu
+            <Icon name="rows" size={16} /> Menu
           </button>
           <ul className={`nav-links ${mobileMenu ? 'open' : ''}`}>
             {navLinks.map(link => {
@@ -182,19 +218,16 @@ export default function Navbar() {
                     className={`${isActive ? 'active' : ''} ${!isLoggedIn ? 'nav-locked' : ''}`}
                     onClick={(e) => handleNavClick(e, link.path)}
                   >
-                    <span className="nav-link-icon">{link.icon}</span>
+                    <Icon name={link.icon} size={16} className="nav-link-icon" />
                     {link.label}
-                    {!isLoggedIn && <span className="nav-lock-icon">🔒</span>}
+                    {!isLoggedIn && (
+                      <Icon name="lock" size={12} className="nav-lock-icon" title="Sign in required" />
+                    )}
                   </Link>
                 </li>
               );
             })}
           </ul>
-          <div className="nav-right-info">
-            <span className="nav-info-text">
-              📌 Application for Written Confirmation Certificate &amp; Guidelines for uploading Manufacturing and Formulation data
-            </span>
-          </div>
         </div>
       </nav>
 
@@ -203,7 +236,7 @@ export default function Navbar() {
         <div className="notif-panel fade-in">
           <div className="notif-header">
             <span>Notifications</span>
-            <button onClick={() => setNotifOpen(false)}>✕</button>
+            <button onClick={() => setNotifOpen(false)} aria-label="Close notifications"><Icon name="x" size={16} /></button>
           </div>
           <div className="notif-list">
             {NOTIFICATIONS.map(n => (

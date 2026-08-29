@@ -22,6 +22,25 @@
   --shadow-md: 0 4px 16px rgba(0,53,128,0.14);
   --radius: 6px;
   --radius-lg: 10px;
+
+  /* ===== Drug compliance severity tokens =====
+     Consumed by DrugComplianceAlert and the CDSCO lookup chip. Severity order:
+     banned > restricted > notFound > approved. */
+  --sev-banned-bg: #FEF2F2;
+  --sev-banned-border: #DC2626;
+  --sev-banned-text: #991B1B;
+
+  --sev-restricted-bg: #FFFBEB;
+  --sev-restricted-border: #D97706;
+  --sev-restricted-text: #92400E;
+
+  --sev-notFound-bg: #F8FAFC;
+  --sev-notFound-border: #94A3B8;
+  --sev-notFound-text: #475569;
+
+  --sev-approved-bg: #F0FDF4;
+  --sev-approved-border: #16A34A;
+  --sev-approved-text: #166534;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

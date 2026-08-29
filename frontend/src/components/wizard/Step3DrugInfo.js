@@ -6,6 +6,9 @@ import {
   searchApprovedDrugs,
   findApprovedDrug,
 } from '../../data/approvedDrugs';
+import { loadBannedDrugs, checkBannedDrug } from '../../data/bannedDrugs';
+import useCdscoLookup, { resolveSeverity } from '../../hooks/useCdscoLookup';
+import DrugComplianceAlert from './DrugComplianceAlert';
 import './WizardStep.css';
 
 const emptyProduct = {
@@ -16,7 +19,10 @@ const emptyProduct = {
 /* ── Inline styles for autocomplete dropdown ─────────────────────────────── */
 const dropdownStyles = {
   wrapper: {
+    // Own stacking context so the absolutely positioned listbox always paints
+    // above the alert region that follows it in the grid.
     position: 'relative',
+    zIndex: 2,
   },
   dropdown: {
     position: 'absolute',
@@ -89,27 +95,33 @@ const dropdownStyles = {
     marginLeft: 6,
     verticalAlign: 'middle',
   },
-  approvalBox: {
-    padding: '8px 12px',
-    borderRadius: 8,
-    marginTop: 6,
-    fontSize: 12.5,
-    lineHeight: 1.6,
-  },
-  approvalBoxOk: {
-    background: '#E8F5E9',
-    border: '1px solid #C8E6C9',
-    color: '#1B5E20',
-  },
-  approvalBoxWarn: {
-    background: '#FFF8E1',
-    border: '1px solid #FFE082',
-    color: '#5D4037',
-  },
 };
 
 /* ── GenericNameAutocomplete component ───────────────────────────────────── */
-function GenericNameAutocomplete({ value, onChange, onSelect, error }) {
+const CHIP_TEXT = {
+  banned: '⛔ Prohibited',
+  restricted: '⚠ Restricted',
+  notFound: 'Not listed',
+};
+
+const LISTBOX_ID = 'generic-name-listbox';
+
+function CdscoChip({ status, severity }) {
+  const className = `cdsco-chip is-${status}${status === 'flagged' && severity ? ` sev-${severity}` : ''}`;
+  if (status === 'checking') {
+    return (
+      <span className={className}>
+        <span className="cdsco-spinner" aria-hidden="true" />
+        Checking…
+      </span>
+    );
+  }
+  if (status === 'matched') return <span className={className}>✓ CDSCO approved</span>;
+  if (status === 'flagged') return <span className={className}>{CHIP_TEXT[severity] || 'Flagged'}</span>;
+  return <span className={className}>🔍 CDSCO lookup</span>;
+}
+
+function GenericNameAutocomplete({ value, onChange, onSelect, error, describedBy }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState(-1);
@@ -166,9 +178,16 @@ function GenericNameAutocomplete({ value, onChange, onSelect, error }) {
   return (
     <div style={dropdownStyles.wrapper} ref={wrapperRef}>
       <input
+        id="genericName"
         type="text"
         className={`form-control ${error ? 'error' : ''}`}
         value={value}
+        aria-describedby={describedBy}
+        aria-expanded={showDropdown}
+        aria-controls={LISTBOX_ID}
+        aria-activedescendant={hoveredIdx >= 0 ? `${LISTBOX_ID}-${hoveredIdx}` : undefined}
+        aria-autocomplete="list"
+        role="combobox"
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         onFocus={() => {
@@ -178,13 +197,16 @@ function GenericNameAutocomplete({ value, onChange, onSelect, error }) {
         autoComplete="off"
       />
       {showDropdown && (
-        <div style={dropdownStyles.dropdown}>
+        <div style={dropdownStyles.dropdown} id={LISTBOX_ID} role="listbox">
           {suggestions.length === 0 ? (
             <div style={dropdownStyles.noResults}>No approved drug matches found</div>
           ) : (
             suggestions.map((drug, idx) => (
               <div
                 key={drug.id}
+                id={`${LISTBOX_ID}-${idx}`}
+                role="option"
+                aria-selected={idx === hoveredIdx}
                 style={{
                   ...dropdownStyles.item,
                   ...(idx === hoveredIdx ? dropdownStyles.itemHover : {}),
@@ -216,29 +238,6 @@ function GenericNameAutocomplete({ value, onChange, onSelect, error }) {
   );
 }
 
-/* ── ApprovalStatusInfo: shown below the generic name field after entry ──── */
-function ApprovalStatusInfo({ genericName }) {
-  if (!genericName || genericName.trim().length < 2) return null;
-  const drug = findApprovedDrug(genericName);
-
-  if (drug) {
-    return (
-      <div style={{ ...dropdownStyles.approvalBox, ...dropdownStyles.approvalBoxOk }}>
-        <strong>✅ CDSCO Approved</strong> — {drug.genericName}
-        {drug.approvalDate && <> | Approval Date: <strong>{drug.approvalDate}</strong></>}
-        {drug.indication && <> | Indication: {drug.indication}</>}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ ...dropdownStyles.approvalBox, ...dropdownStyles.approvalBoxWarn }}>
-      <strong>⚠ Not found in CDSCO approved list</strong> — This drug may require additional
-      justification. Ensure you have valid approval documentation before submitting.
-    </div>
-  );
-}
-
 /* ════════════════════════════════════════════════════════════════════════════
    Main Step3DrugInfo component
    ════════════════════════════════════════════════════════════════════════════ */
@@ -253,19 +252,39 @@ export default function Step3DrugInfo() {
   const [product, setProduct]     = useState(emptyProduct);
   const [errors, setErrors]       = useState({});
   const [tableError, setTableError] = useState('');
-  const [, setDrugsLoaded] = useState(false);
+  const [drugsLoaded, setDrugsLoaded] = useState(false);
+
+  // Debounced CDSCO + Section 26A lookup for the name currently being typed.
+  const lookup = useCdscoLookup(product.genericName);
+
+  // Acknowledgement is scoped to the name it was given for, so editing the
+  // generic name automatically invalidates a previous tick.
+  const ackKey = product.genericName.trim().toLowerCase();
+  const [ack, setAck] = useState({ key: '', value: false });
+  const exemptionAck = ack.key === ackKey && ack.value;
+  const setExemptionAck = value => setAck({ key: ackKey, value });
 
   useEffect(() => {
-    loadApprovedDrugs().then(() => setDrugsLoaded(true));
+    Promise.all([loadApprovedDrugs(), loadBannedDrugs()])
+      .then(() => setDrugsLoaded(true));
   }, []);
+
+  // Re-checked live (not just from the saved flag) so drafts restored before the
+  // prohibited list finished loading are still evaluated.
+  const flaggedProducts = drugsLoaded
+    ? formData.products
+        .map(item => ({ item, ...resolveSeverity(item.genericName) }))
+        .filter(entry => entry.severity === 'banned' || entry.severity === 'restricted')
+    : [];
+
 
   const validateProduct = () => {
     const e = {};
     if (!product.productName.trim())  e.productName  = 'Required';
+    // A name outside the CDSCO register is surfaced by the compliance alert as
+    // a 'notFound' notice, not blocked here — the applicant may still submit and
+    // let the reviewer verify the approval documentation.
     if (!product.genericName.trim())  e.genericName  = 'Required';
-    else if (!findApprovedDrug(product.genericName)) {
-      e.genericName = 'Select a generic name from the CDSCO approved list';
-    }
     if (!product.dosageForm)          e.dosageForm   = 'Required';
     if (!product.strength.trim())     e.strength     = 'Required';
     if (!product.batchNumber.trim())  e.batchNumber  = 'Required';
@@ -279,10 +298,17 @@ export default function Step3DrugInfo() {
     if (!validateProduct()) return;
     // Tag whether this generic name is CDSCO-approved
     const approved = findApprovedDrug(product.genericName);
+    const resolved = resolveSeverity(product.genericName);
     const productWithStatus = {
       ...product,
       cdscoApproved: !!approved,
       cdscoApprovalDate: approved?.approvalDate || '',
+      complianceSeverity: resolved.severity,
+      gazetteSr: resolved.gazette?.sr ?? null,
+      gazetteEntry: resolved.gazette?.name || '',
+      gazetteNotification: resolved.gazette?.notification || '',
+      gazetteStatus: resolved.gazette?.status || '',
+      exemptionAcknowledged: resolved.severity === 'banned' ? exemptionAck : false,
     };
     if (editId) {
       updateProduct(editId, productWithStatus);
@@ -297,6 +323,7 @@ export default function Step3DrugInfo() {
 
   const handleEdit = (p) => {
     setProduct({ ...p });
+    setAck({ key: (p.genericName || '').trim().toLowerCase(), value: !!p.exemptionAcknowledged });
     setEditId(p.id);
     setShowForm(true);
     setTableError('');
@@ -304,23 +331,15 @@ export default function Step3DrugInfo() {
 
   const handleCancel = () => {
     setProduct(emptyProduct);
+    setAck({ key: '', value: false });
     setEditId(null);
     setShowForm(false);
     setErrors({});
   };
 
   const handleNext = () => {
-    if (showForm && !findApprovedDrug(product.genericName)) {
-      setErrors(p => ({ ...p, genericName: 'Select a generic name from the CDSCO approved list' }));
-      setTableError('Please select an approved generic name before proceeding.');
-      return;
-    }
     if (formData.products.length === 0) {
       setTableError('Please add at least one drug/product before proceeding.');
-      return;
-    }
-    if (formData.products.some(item => !findApprovedDrug(item.genericName))) {
-      setTableError('Only CDSCO approved generic names can proceed to the next step.');
       return;
     }
     setCurrentStep(4);
@@ -362,6 +381,36 @@ export default function Step3DrugInfo() {
         </div>
       )}
 
+      {/* Section 26A summary for products already added to the table */}
+      {flaggedProducts.length > 0 && (
+        <div
+          className={`dca sev-${flaggedProducts.some(f => f.severity === 'banned') ? 'banned' : 'restricted'} mb-3`}
+          role="alert"
+        >
+          <svg className="dca-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" /><line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
+          </svg>
+          <div className="dca-body">
+            <p className="dca-headline">
+              {flaggedProducts.length} added product{flaggedProducts.length === 1 ? '' : 's'} flagged
+              under Section 26A
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+              {flaggedProducts.map(({ item, gazette, severity }) => (
+                <li key={item.id}>
+                  <strong>{item.productName || item.genericName}</strong> ({item.genericName}) —
+                  {' '}Sr. No. {gazette.sr}: {gazette.name} <em>({gazette.notification})</em>
+                  {severity === 'banned' && !item.exemptionAcknowledged && (
+                    <strong> — exemption not yet acknowledged</strong>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* ── Product Table ─────────────────────────────────────────────────── */}
       {formData.products.length > 0 && (
         <div className="card mb-3">
@@ -385,11 +434,16 @@ export default function Step3DrugInfo() {
                     <th>Mfg. Date</th>
                     <th>Expiry Date</th>
                     <th>CDSCO Status</th>
+                    <th>Section 26A</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {formData.products.map((p, i) => (
+                  {formData.products.map((p, i) => {
+                    const bannedCheck = drugsLoaded
+                      ? checkBannedDrug(p.genericName, 1)
+                      : { banned: false, primary: null };
+                    return (
                     <tr key={p.id}>
                       <td><strong>{i + 1}</strong></td>
                       <td><strong>{p.productName}</strong></td>
@@ -413,6 +467,18 @@ export default function Step3DrugInfo() {
                         )}
                       </td>
                       <td>
+                        {bannedCheck.banned ? (
+                          <span
+                            style={dropdownStyles.bannedBadge}
+                            title={`Sr. No. ${bannedCheck.primary.sr}: ${bannedCheck.primary.name} (${bannedCheck.primary.notification})`}
+                          >
+                            ⛔ Banned
+                          </span>
+                        ) : (
+                          <span style={{ color: '#90A4AE', fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+                      <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
                             className="btn btn-outline btn-sm"
@@ -429,7 +495,8 @@ export default function Step3DrugInfo() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -450,25 +517,17 @@ export default function Step3DrugInfo() {
             <div className="grid grid-3">
               {PF('productName', 'Product Name')}
 
-              {/* Generic Name with autocomplete */}
+              {/* Generic Name — cell holds only the input and its listbox, so the
+                  three column labels stay baseline-aligned */}
               <div className="form-group">
-                <label className="form-label">
+                <label className="form-label" htmlFor="genericName">
                   Generic Name<span className="required">*</span>
-                  <span style={{
-                    marginLeft: 8,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: '#1565C0',
-                    background: '#E3F2FD',
-                    padding: '1px 7px',
-                    borderRadius: 10,
-                  }}>
-                    🔍 CDSCO lookup
-                  </span>
+                  <CdscoChip status={lookup.status} severity={lookup.severity} />
                 </label>
                 <GenericNameAutocomplete
                   value={product.genericName}
                   error={!!errors.genericName}
+                  describedBy={lookup.severity ? lookup.alertId : undefined}
                   onChange={(val) => {
                     setProduct(p => ({ ...p, genericName: val }));
                     if (errors.genericName) setErrors(p => ({ ...p, genericName: '' }));
@@ -487,10 +546,26 @@ export default function Step3DrugInfo() {
                 {errors.genericName && (
                   <div className="form-error">⚠ {errors.genericName}</div>
                 )}
-                <ApprovalStatusInfo genericName={product.genericName} />
               </div>
 
               {PF('brandName', 'Brand Name', false)}
+
+              {/* Full-width alert row spanning all three columns. One card only:
+                  banned > restricted > notFound > approved. */}
+              <div
+                className={`dca-region${lookup.status === 'checking' || lookup.severity ? ' is-reserved' : ''}`}
+                role="alert"
+                aria-live="polite"
+              >
+                <DrugComplianceAlert
+                  severity={lookup.severity}
+                  drug={lookup.drug}
+                  gazette={lookup.gazette}
+                  acknowledged={exemptionAck}
+                  onAcknowledge={setExemptionAck}
+                  id={lookup.alertId}
+                />
+              </div>
             </div>
 
             {/* Row 2 */}
