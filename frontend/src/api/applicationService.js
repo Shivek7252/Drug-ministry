@@ -6,6 +6,16 @@
 
 const BASE = 'http://localhost:5001/api/applications';
 
+function reviewerHeaders() {
+  try {
+    const identity = JSON.parse(sessionStorage.getItem('reviewer_identity') || '{}');
+    if (identity.role === 'reviewer' && identity.username) {
+      return { 'X-User-Role': 'reviewer', 'X-Reviewer-Name': identity.username };
+    }
+  } catch (_) { }
+  return {};
+}
+
 /* ── helper ─────────────────────────────────────────────────────────────── */
 async function apiFetch(url, options = {}) {
   try {
@@ -102,13 +112,14 @@ export async function updateStatus(appNumber, status, note = '') {
 export async function reviewerAction(appNumber, { status, remarks, officer = 'reviewer' }) {
   return apiFetch(`${BASE}/${appNumber}/review`, {
     method: 'POST',
+    headers: reviewerHeaders(),
     body: JSON.stringify({ status, remarks, officer }),
   });
 }
 
 /* ── Reviewer: get full application with audit log ──────────────────────── */
 export async function getApplicationFull(id) {
-  return apiFetch(`${BASE}/${id}/full`);
+  return apiFetch(`${BASE}/${id}/full`, { headers: reviewerHeaders() });
 }
 
 /* ── Reviewer: pre-verify every uploaded document so the Documents tab can
@@ -134,6 +145,7 @@ export async function preVerifyDocs(appNumber, { force = false } = {}) {
 export async function shipmentAction(appNumber, shipmentIdx, { status, remarks = '', officer = 'reviewer' }) {
   return apiFetch(`${BASE}/${appNumber}/shipments/${shipmentIdx}/action`, {
     method: 'POST',
+    headers: reviewerHeaders(),
     body: JSON.stringify({ status, remarks, officer }),
   });
 }
@@ -146,8 +158,53 @@ export async function getChecklist(appNumber) {
 export async function raiseChecklistQuery(appNumber, itemId, { queryText, officer = 'reviewer' }) {
   return apiFetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/query`, {
     method: 'POST',
+    headers: reviewerHeaders(),
     body: JSON.stringify({ queryText, officer }),
   });
+}
+
+/* Reviewer queue: all filtering happens on the server before pagination. */
+export async function listReviewerApplications(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') params.set(key, value);
+  });
+  return apiFetch(`${BASE}/reviewer?${params}`, { headers: reviewerHeaders() });
+}
+
+export async function getReviewerFilterOptions() {
+  return apiFetch(`${BASE}/reviewer/options`, { headers: reviewerHeaders() });
+}
+
+export async function getQueryHistory(appNumber) {
+  return apiFetch(`${BASE}/${encodeURIComponent(appNumber)}/query-history`, { headers: reviewerHeaders() });
+}
+
+export async function exportReviewerApplications(filters = {}) {
+  try {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') params.set(key, value);
+    });
+    const res = await fetch(`${BASE}/reviewer/export?${params}`, {
+      headers: reviewerHeaders(),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const disposition = res.headers.get('content-disposition') || '';
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'reviewer-applications.csv';
+    return {
+      success: true,
+      blob: await res.blob(),
+      filename,
+      count: Number(res.headers.get('x-export-record-count') || 0),
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
 
 /* Applicant reply — multipart because it can include a document. */

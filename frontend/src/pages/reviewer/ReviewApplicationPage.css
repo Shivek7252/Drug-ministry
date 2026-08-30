@@ -353,7 +353,7 @@
 .rap-kpi-row {
   margin: 0 24px 16px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1421,3 +1421,133 @@
   gap: 4px;
   align-items: baseline;
 }
+
+/* ── Section 26A prohibition — the loudest signal on the reviewer overview ── */
+.rap-banned-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  background: var(--sev-banned-bg);
+  border: 1px solid color-mix(in srgb, var(--sev-banned-border) 40%, transparent);
+  border-left: 4px solid var(--sev-banned-border);
+  border-radius: 10px;
+  color: var(--sev-banned-text);
+}
+
+.rap-banned-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--sev-banned-border);
+  color: #fff;
+}
+.rap-banned-mark svg { width: 22px; height: 22px; }
+
+.rap-banned-main { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+
+.rap-banned-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sev-banned-border);
+}
+
+.rap-banned-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--sev-banned-text);
+}
+
+.rap-banned-lede {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 78ch;
+}
+
+.rap-banned-list {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.rap-banned-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+}
+.rap-banned-drug { font-weight: 800; }
+.rap-banned-sep { opacity: 0.4; }
+
+.rap-banned-ack {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* Flagged product entry inside the CDSCO section. */
+.rap-cdsco-flagged {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid;
+}
+.rap-cdsco-flagged.sev-banned {
+  background: var(--sev-banned-bg);
+  border-color: color-mix(in srgb, var(--sev-banned-border) 45%, transparent);
+}
+.rap-cdsco-flagged.sev-restricted {
+  background: var(--sev-restricted-bg);
+  border-color: color-mix(in srgb, var(--sev-restricted-border) 45%, transparent);
+}
+.rap-cdsco-flagged .dca { background: rgba(255, 255, 255, 0.72); }
+
+.rap-cdsco-badge-banned {
+  background: var(--sev-banned-border);
+  color: #fff;
+  border-color: var(--sev-banned-border);
+}
+.rap-cdsco-badge-restricted {
+  background: var(--sev-restricted-border);
+  color: #fff;
+  border-color: var(--sev-restricted-border);
+}
+
+@media (max-width: 640px) {
+  .rap-banned-card { grid-template-columns: 1fr; }
+}
+
+/* Complete application query timeline. */
+.rap-query-history { list-style: none; margin: 0; padding: 0; }
+.rap-query-entry { position: relative; display: flex; gap: 14px; padding: 0 0 20px; }
+.rap-query-entry:not(:last-child)::before { content: ''; position: absolute; left: 5px; top: 13px; bottom: 0; width: 2px; background: #e2e8f0; }
+.rap-query-marker { position: relative; z-index: 1; width: 12px; height: 12px; margin-top: 5px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 0 4px #fffbeb; flex: 0 0 auto; }
+.rap-query-content { min-width: 0; flex: 1; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+.rap-query-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.rap-query-head code { color: #1e40af; font-size: 11px; font-weight: 800; overflow-wrap: anywhere; }
+.rap-query-status { padding: 2px 8px; border-radius: 12px; background: #fff7ed; color: #c2410c; font-size: 10px; font-weight: 800; }
+.rap-query-responded { background: #f0fdf4; color: #15803d; }
+.rap-query-closed { background: #f1f5f9; color: #475569; }
+.rap-query-meta { margin-top: 6px; color: #64748b; font-size: 11px; }
+.rap-query-remarks { margin: 10px 0 0; color: #1e293b; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.rap-query-response { display: grid; gap: 5px; margin-top: 12px; padding: 10px 12px; border-left: 3px solid #22c55e; background: #f0fdf4; color: #166534; font-size: 12px; }
+.rap-query-response small { color: #64748b; }
+.rap-query-empty { padding: 30px; text-align: center; color: #64748b; }

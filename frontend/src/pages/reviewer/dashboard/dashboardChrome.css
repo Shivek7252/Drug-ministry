@@ -1,0 +1,250 @@
+/* ============================================================================
+   Page header, KPI filter row and filter bar.
+   Every value resolves from tokens.css.
+   ============================================================================ */
+
+/* --h-announce / --h-masthead / --h-nav are exported by Navbar.css. Fallbacks
+   keep this stylesheet usable if it is ever loaded without the shared chrome. */
+:root {
+  /* Base height of the filter bar. FilterBar publishes its MEASURED height to
+     --h-filterbar-actual; never write back into this one (feedback loop). */
+  --h-filterbar: 56px;
+  --h-chrome-total: calc(
+    var(--h-announce, 32px) + var(--h-masthead, 72px) + var(--h-nav, 48px)
+  );
+}
+
+/* ---- Page header (64px, flat, bottom border) ---------------------------- */
+.dh {
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-default);
+}
+.dh-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: var(--h-pageheader);
+  padding: var(--sp-2) var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+.dh-text { min-width: 0; }
+
+.dh-crumb ol {
+  list-style: none;
+  display: flex;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-11);
+  color: var(--text-muted);
+}
+.dh-crumb li + li::before { content: '/'; margin-right: var(--sp-1); opacity: 0.6; }
+.dh-crumb a { color: var(--text-muted); text-decoration: none; }
+.dh-crumb a:hover { color: var(--c-navy-800); text-decoration: underline; }
+.dh-crumb a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.dh-title {
+  margin: 2px 0 0;
+  font-size: var(--fs-20);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  color: var(--text-primary);
+}
+
+.dh-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-md);
+  color: var(--text-secondary);
+  flex: none;
+}
+.dh-identity-text { display: flex; flex-direction: column; line-height: var(--lh-tight); }
+.dh-officer { font-size: var(--fs-13); font-weight: var(--fw-bold); color: var(--text-primary); }
+.dh-designation { font-size: var(--fs-11); color: var(--text-muted); }
+
+/* ---- KPI filter row ------------------------------------------------------ */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0;
+}
+
+.kpi-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-1);
+  min-width: 0;
+  height: 72px;                 /* capped, per spec */
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-bottom: 3px solid transparent;
+  border-radius: var(--r-lg);
+  font: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.kpi-tile:hover { background: var(--surface-sunken); }
+.kpi-tile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.kpi-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.kpi-label {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Count and delta on one line so the tile holds 72px. */
+.kpi-figures {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.kpi-value {
+  font-size: var(--fs-20);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--text-primary);
+}
+.kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-11);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+}
+.kpi-delta.is-up { color: var(--c-info); }
+.kpi-delta.is-down { color: var(--text-muted); }
+
+/* Active: filled tint + 3px bottom rule, colour from the status token so the
+   tile and its status pill can never disagree. */
+.kpi-tile.is-active { border-bottom-color: currentColor; }
+
+.kpi-total.is-active    { background: var(--st-total-bg);     color: var(--st-total-fg);     border-color: var(--st-total-br); }
+.kpi-submitted.is-active{ background: var(--st-submitted-bg); color: var(--st-submitted-fg); border-color: var(--st-submitted-br); }
+.kpi-review.is-active   { background: var(--st-review-bg);    color: var(--st-review-fg);    border-color: var(--st-review-br); }
+.kpi-query.is-active    { background: var(--st-query-bg);     color: var(--st-query-fg);     border-color: var(--st-query-br); }
+.kpi-approved.is-active { background: var(--st-approved-bg);  color: var(--st-approved-fg);  border-color: var(--st-approved-br); }
+.kpi-rejected.is-active { background: var(--st-rejected-bg);  color: var(--st-rejected-fg);  border-color: var(--st-rejected-br); }
+.kpi-overdue.is-active  { background: var(--st-overdue-bg);   color: var(--st-overdue-fg);   border-color: var(--st-overdue-br); }
+
+.kpi-tile.is-active .kpi-value { color: inherit; }
+
+/* Overdue always carries urgency, selected or not. */
+.kpi-overdue .kpi-head { color: var(--st-overdue-fg); }
+
+/* ---- Filter bar (sticky under the page header) --------------------------- */
+.fb {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-default);
+}
+.fb-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: var(--h-filterbar);
+  padding: var(--sp-2) var(--sp-4);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.fb-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1 1 280px;
+  min-width: 0;
+  padding: 0 var(--sp-2);
+  background: var(--surface-card);
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+}
+.fb-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: var(--sp-2) 0;
+  font: inherit;
+  font-size: var(--fs-13);
+  color: var(--text-primary);
+}
+.fb-search input:focus { outline: none; }
+.fb-search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.fb-field { display: inline-flex; align-items: center; gap: var(--sp-2); flex: none; }
+.fb-field > span {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.fb-field select,
+.fb-field input[type='date'] {
+  padding: var(--sp-2);
+  background: var(--surface-card);
+  border: 1px solid var(--border-input);
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: var(--fs-13);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.fb-field select:focus-visible,
+.fb-field input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.fb-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.fb-clear:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.fb-clear:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 1200px) {
+  .kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kpi-tile { height: auto; min-height: 72px; }
+}
+@media (max-width: 720px) {
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dh-inner { flex-direction: column; align-items: flex-start; gap: var(--sp-2); padding-bottom: var(--sp-3); }
+  .fb-field { flex: 1 1 45%; }
+  .fb-field select { flex: 1; }
+}

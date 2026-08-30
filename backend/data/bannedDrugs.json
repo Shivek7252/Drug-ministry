@@ -1,0 +1,5235 @@
+{
+ "title": "List of drugs prohibited for manufacture and sale through gazette notifications under Section 26A of the Drugs & Cosmetics Act, 1940 by the Ministry of Health and Family Welfare",
+ "source": "banneddrugs.pdf",
+ "entryCount": 444,
+ "statusNotes": {
+  "sub-judice": "The notifications S.O. 705(E) to S.O. 1048(E) dated 10.03.2016 were quashed by the Hon'ble Delhi High Court vide its order dated 01.12.2016. The Union of India challenged that order before the Supreme Court by way of SLP."
+ },
+ "entries": [
+  {
+   "sr": 1,
+   "name": "Amidopyrine",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "substance",
+   "terms": [
+    "amidopyrine",
+    "aminopyrine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 2,
+   "name": "Fixed dose combinations of vitamins with anti-inflammatory agents and tranquilizers",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 3,
+   "name": "Fixed dose combinations of Atropine in Analgesics and Antipyretics",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 4,
+   "name": "Fixed dose combinations of Strychnine and Caffeine in tonics",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [
+    "strychnine",
+    "caffeine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 5,
+   "name": "Fixed dose combinations of Yohimbine and Strychnine with Testosterone and Vitamins",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [
+    "yohimbine",
+    "strychnine",
+    "testosterone"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 6,
+   "name": "Fixed dose combinations of Iron with Strychnine, Arsenic and Yohimbine",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [
+    "strychnine",
+    "arsenic",
+    "yohimbine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 7,
+   "name": "Fixed dose combinations of Sodium Bromide / Chloral Hydrate with other drugs",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 8,
+   "name": "Phenacetin",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "substance",
+   "terms": [
+    "phenacetin"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 9,
+   "name": "Fixed dose combinations of antihistaminic with antidiarrhoeals",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 10,
+   "name": "Fixed dose combinations of Penicillin with Sulphonamides",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [
+    "penicillin",
+    "sulphonamide"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 11,
+   "name": "Fixed dose combinations of Vitamins with Analgesics",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 12,
+   "name": "Fixed dose combinations of any other Tetracycline with Vitamin C",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [
+    "tetracycline",
+    "vitamin c"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 13,
+   "name": "Fixed dose combinations of Hydroxyquinoline group of drugs with any other drug except for preparations meant for external use",
+   "notification": "Substituted vide GSR No. 793(E) dated 13.12.1995",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 14,
+   "name": "Fixed dose combinations of Corticosteroids with any other drug for internal use except for preparations meant for metered dose inhalers and dry powder inhalers",
+   "notification": "Substituted vide GSR No. 738(E) dated 09.10.2009",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 15,
+   "name": "Fixed dose combinations of Chloramphenicol with any other drug for internal use",
+   "notification": "Substituted vide GSR No. 1057(E) dated 03.11.1988",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 16,
+   "name": "Fixed dose combinations of crude Ergot preparations except those containing Ergotamine, Caffeine, analgesics, antihistamines for the treatment of migraine, headaches",
+   "notification": "Substituted vide GSR No. 304(E) dated 07.06.1991",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 17,
+   "name": "Fixed dose combinations of Vitamins with Anti TB drugs except combination of Isoniazid with Pyridoxine Hydrochloride (Vitamin B6)",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 18,
+   "name": "Penicillin skin / eye Ointment",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "scope": "skin / eye ointment",
+   "status": "prohibited"
+  },
+  {
+   "sr": 19,
+   "name": "Tetracycline Liquid Oral preparations",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "rule",
+   "terms": [],
+   "scope": "liquid oral preparations",
+   "status": "prohibited"
+  },
+  {
+   "sr": 20,
+   "name": "Nialamide",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "substance",
+   "terms": [
+    "nialamide"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 21,
+   "name": "Practolol",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "substance",
+   "terms": [
+    "practolol"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 22,
+   "name": "Methapyrilene, its salts",
+   "notification": "GSR No. 578(E) dated 23.07.1983",
+   "type": "substance",
+   "terms": [
+    "methapyrilene"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 23,
+   "name": "Methaqualone",
+   "notification": "GSR No. 49(E) dated 31.01.1984",
+   "type": "substance",
+   "terms": [
+    "methaqualone"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 24,
+   "name": "Oxytetracycline Liquid Oral preparations",
+   "notification": "GSR No. 322(E) dated 03.05.1984",
+   "type": "rule",
+   "terms": [],
+   "scope": "liquid oral preparations",
+   "status": "prohibited"
+  },
+  {
+   "sr": 25,
+   "name": "Demeclocycline Liquid Oral preparations",
+   "notification": "GSR No. 322(E) dated 03.05.1984",
+   "type": "rule",
+   "terms": [],
+   "scope": "liquid oral preparations",
+   "status": "prohibited"
+  },
+  {
+   "sr": 26,
+   "name": "Combination of anabolic Steroids with other drugs",
+   "notification": "GSR No. 863(E) dated 22.11.1985",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 27,
+   "name": "Fixed dose combination of Oestrogen and Progestin (other than oral contraceptive) exceeding the prescribed content per tablet (Estrogen more than 50 mcg equivalent to Ethinyl Estradiol and Progestin more than 3 mg equivalent to Norethisterone Acetate), and all fixed dose combination injectable preparations containing synthetic Oestrogen and Progesterone",
+   "notification": "Substituted vide GSR No. 743(E) dated 10.08.1989",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 28,
+   "name": "Fixed dose combination of Sedatives / hypnotics / anxiolytics with analgesics-antipyretics",
+   "notification": "GSR No. 999(E) dated 26.12.1990",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 29,
+   "name": "Fixed dose combination of Rifampicin, Isoniazid and Pyrazinamide, except those which provide the prescribed daily adult dose (Rifampicin 450-600 mg, Isoniazid 300-400 mg, Pyrazinamide 1000-1500 mg)",
+   "notification": "Substituted vide GSR No. 100(E) dated 11.02.2003",
+   "type": "rule",
+   "terms": [
+    "rifampicin",
+    "isoniazid",
+    "pyrazinamide"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 30,
+   "name": "Fixed dose combination of Histamine H-2 receptor antagonists with antacids except for those combinations approved by Drugs Controller, India",
+   "notification": "GSR No. 999(E) dated 26.12.1990",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 31,
+   "name": "The patent and proprietary medicines of fixed dose combinations of essential oils with alcohol having percentage higher than 20% proof except preparations given in the Indian Pharmacopoeia",
+   "notification": "GSR No. 999(E) dated 26.12.1990",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 32,
+   "name": "All pharmaceutical preparations containing Chloroform exceeding 0.5% w/w or v/v whichever is appropriate",
+   "notification": "GSR No. 999(E) dated 26.12.1990",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 33,
+   "name": "Fixed dose combination of Ethambutol with INH (Isoniazid) other than INH 200 mg / Ethambutol 600 mg and INH 300 mg / Ethambutol 800 mg",
+   "notification": "GSR No. 69(E) dated 11.02.1991",
+   "type": "rule",
+   "terms": [
+    "ethambutol",
+    "isoniazid"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 34,
+   "name": "Fixed dose combination containing more than one antihistamine",
+   "notification": "GSR No. 69(E) dated 11.02.1991",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 35,
+   "name": "Fixed dose combination of any anthelmintic with cathartic / purgative except for Piperazine / Santonin",
+   "notification": "GSR No. 69(E) dated 11.02.1991",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 36,
+   "name": "Fixed dose combination of Salbutamol or any other bronchodilator with centrally acting anti-tussive and/or antihistamine",
+   "notification": "Substituted vide GSR No. 290(E) dated 16.04.2008",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 37,
+   "name": "Fixed dose combination of laxatives and/or anti-spasmodic drugs in enzyme preparations",
+   "notification": "GSR No. 69(E) dated 11.02.1991",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 38,
+   "name": "Fixed dose combination of Metoclopramide with systemically absorbed drugs except fixed dose combination of Metoclopramide with Aspirin / Paracetamol",
+   "notification": "Substituted vide GSR No. 603(E) dated 24.08.2001",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 39,
+   "name": "Fixed dose combination of centrally acting antitussive with antihistamine having high atropine like activity, in expectorants",
+   "notification": "GSR No. 395(E) dated 19.05.1999",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 40,
+   "name": "Preparations claiming to combat cough associated with asthma containing centrally acting antitussive and/or an antihistamine",
+   "notification": "GSR No. 395(E) dated 19.05.1999",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 41,
+   "name": "Liquid oral tonic preparations containing glycerophosphates and/or other phosphates and/or central nervous system stimulant, and such preparations containing alcohol more than 20% proof",
+   "notification": "GSR No. 395(E) dated 19.05.1999",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 42,
+   "name": "Fixed dose combination containing Pectin and/or Kaolin with any drug which is systemically absorbed from the GI tract, except for combinations of Pectin and/or Kaolin with drugs not systemically absorbed",
+   "notification": "GSR No. 395(E) dated 19.05.1999",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 43,
+   "name": "Chloral Hydrate as a drug",
+   "notification": "GSR No. 304(E) dated 07.06.1991",
+   "type": "substance",
+   "terms": [
+    "chloral hydrate"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 44,
+   "name": "Dovers Powder I.P.",
+   "notification": "GSR No. 612(E) dated 09.08.1994",
+   "type": "substance",
+   "terms": [
+    "dovers powder",
+    "dover's powder"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 45,
+   "name": "Dover's Powder Tablets I.P.",
+   "notification": "GSR No. 612(E) dated 09.08.1994",
+   "type": "substance",
+   "terms": [
+    "dover's powder tablets",
+    "dovers powder tablets"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 46,
+   "name": "Antidiarrhoeal formulations containing Kaolin or Pectin or Attapulgite or Activated Charcoal",
+   "notification": "GSR No. 731(E) dated 30.09.1994",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 47,
+   "name": "Antidiarrhoeal formulations containing Phthalyl Sulphathiazole or Sulphaguanidine or Succinyl Sulphathiazole",
+   "notification": "GSR No. 731(E) dated 30.09.1994",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 48,
+   "name": "Antidiarrhoeal formulations containing Neomycin or Streptomycin or Dihydrostreptomycin including their respective salts or esters",
+   "notification": "GSR No. 731(E) dated 30.09.1994",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 49,
+   "name": "Liquid Oral antidiarrhoeals or any other dosage form for pediatric use containing Diphenoxylate or Loperamide or Atropine or Belladonna including their salts or esters or metabolites, Hyoscyamine or their extracts or their alkaloids",
+   "notification": "GSR No. 731(E) dated 30.09.1994",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 50,
+   "name": "Liquid Oral antidiarrhoeals or any other dosage form for pediatric use containing halogenated hydroxyquinolines",
+   "notification": "GSR No. 731(E) dated 30.09.1994",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 51,
+   "name": "Fixed dose combination of antidiarrhoeals with electrolytes",
+   "notification": "GSR No. 731(E) dated 30.09.1994",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 52,
+   "name": "Patent and Proprietary Oral Rehydration Salts other than those conforming to the parameters prescribed in the notification",
+   "notification": "GSR No. 57(E) dated 07.02.1995",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 53,
+   "name": "Fixed dose combination of Oxyphenbutazone or Phenylbutazone with any other drug",
+   "notification": "GSR No. 633(E) dated 13.09.1995",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 54,
+   "name": "Fixed dose combination of Analgin with any other drug",
+   "notification": "GSR No. 405(E) dated 03.06.1996",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 55,
+   "name": "Fixed dose combination of Dextropropoxyphene with any other drug other than anti-spasmodics and/or non-steroidal anti-inflammatory drugs (NSAIDs)",
+   "notification": "GSR No. 633(E) dated 13.09.1995",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 56,
+   "name": "Fixed dose combination of a drug, standards of which are prescribed in the Second Schedule to the said Act, with an Ayurvedic, Siddha or Unani drug",
+   "notification": "GSR No. 633(E) dated 13.09.1995",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 57,
+   "name": "Mepacrine Hydrochloride (Quinacrine and its salts) in any dosage form for use for female sterilization or contraception",
+   "notification": "GSR No. 499(E) dated 14.08.1998",
+   "type": "substance",
+   "terms": [
+    "mepacrine",
+    "quinacrine"
+   ],
+   "scope": "female sterilization or contraception",
+   "status": "prohibited"
+  },
+  {
+   "sr": 58,
+   "name": "Fenfluramine",
+   "notification": "GSR No. 499(E) dated 14.08.1998",
+   "type": "substance",
+   "terms": [
+    "fenfluramine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 59,
+   "name": "Dexfenfluramine",
+   "notification": "GSR No. 499(E) dated 14.08.1998",
+   "type": "substance",
+   "terms": [
+    "dexfenfluramine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 60,
+   "name": "Fixed dose combination of Diazepam and Diphenhydramine Hydrochloride",
+   "notification": "GSR No. 169(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "diazepam",
+    "diphenhydramine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 61,
+   "name": "Cosmetics licensed as toothpaste / tooth powder containing tobacco",
+   "notification": "GSR No. 444(E) dated 30.04.1992",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 62,
+   "name": "Parenteral preparations - fixed dose combination of Streptomycin with Penicillin",
+   "notification": "GSR No. 93(E) dated 25.02.1997",
+   "type": "rule",
+   "terms": [
+    "streptomycin",
+    "penicillin"
+   ],
+   "scope": "parenteral preparations",
+   "status": "prohibited"
+  },
+  {
+   "sr": 63,
+   "name": "Fixed dose combination of Vitamin B1, Vitamin B6 and Vitamin B12 for human use",
+   "notification": "GSR No. 702(E) dated 14.10.1999",
+   "type": "rule",
+   "terms": [
+    "vitamin b1",
+    "vitamin b6",
+    "vitamin b12"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 64,
+   "name": "Fixed dose combination of haemoglobin in any form (natural or synthetic)",
+   "notification": "GSR No. 814(E) dated 16.12.1999",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 65,
+   "name": "Fixed dose combination of Pancreatin or Pancrelipase containing amylase, protease and lipase with any other enzyme",
+   "notification": "GSR No. 814(E) dated 16.12.1999",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 66,
+   "name": "Fixed dose combination of Nitrofurantoin and Trimethoprim",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "nitrofurantoin",
+    "trimethoprim"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 67,
+   "name": "Fixed dose combination of Phenobarbitone with any anti-asthmatic drugs",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 68,
+   "name": "Fixed dose combination of Phenobarbitone with Hyoscine and/or Hyoscyamine",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "phenobarbitone",
+    "hyosc"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 69,
+   "name": "Fixed dose combination of Phenobarbitone with Ergotamine and/or Belladonna",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "phenobarbitone",
+    "ergotamine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 70,
+   "name": "Fixed dose combination of Haloperidol with any anti-cholinergic agent including Propantheline Bromide",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "haloperidol",
+    "propantheline"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 71,
+   "name": "Fixed dose combination of Nalidixic Acid with any anti-amoebic including Metronidazole",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "nalidixic",
+    "metronidazole"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 72,
+   "name": "Fixed dose combination of Loperamide Hydrochloride with Furazolidone",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "loperamide",
+    "furazolidone"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 73,
+   "name": "Fixed dose combination of Cyproheptadine with Lysine or Peptone",
+   "notification": "GSR No. 170(E) dated 12.03.2001",
+   "type": "rule",
+   "terms": [
+    "cyproheptadine",
+    "lysine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 74,
+   "name": "Astemizole",
+   "notification": "GSR No. 191(E) dated 05.03.2003",
+   "type": "substance",
+   "terms": [
+    "astemizole"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 75,
+   "name": "Terfenadine",
+   "notification": "GSR No. 191(E) dated 05.03.2003",
+   "type": "substance",
+   "terms": [
+    "terfenadine",
+    "terfinadine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 76,
+   "name": "Phenformin",
+   "notification": "GSR No. 780(E) dated 01.10.2003",
+   "type": "substance",
+   "terms": [
+    "phenformin"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 77,
+   "name": "Rofecoxib and its formulations",
+   "notification": "GSR No. 810(E) dated 13.12.2004",
+   "type": "substance",
+   "terms": [
+    "rofecoxib"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 78,
+   "name": "Valdecoxib and its formulations",
+   "notification": "GSR No. 510(E) dated 28.07.2005",
+   "type": "substance",
+   "terms": [
+    "valdecoxib"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 79,
+   "name": "Diclofenac and its formulations (for animal use)",
+   "notification": "GSR No. 499(E) dated 04.07.2008",
+   "type": "substance",
+   "terms": [
+    "diclofenac"
+   ],
+   "scope": "veterinary / animal use only",
+   "status": "prohibited"
+  },
+  {
+   "sr": 80,
+   "name": "Rimonabant",
+   "notification": "GSR No. 884(E) dated 11.12.2009",
+   "type": "substance",
+   "terms": [
+    "rimonabant"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 81,
+   "name": "Rosiglitazone",
+   "notification": "GSR No. 910(E) dated 12.11.2010",
+   "type": "substance",
+   "terms": [
+    "rosiglitazone"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 82,
+   "name": "Nimesulide formulations for human use in children below 12 years of age",
+   "notification": "GSR No. 82(E) dated 10.02.2011",
+   "type": "substance",
+   "terms": [
+    "nimesulide"
+   ],
+   "scope": "human use in children below 12 years of age",
+   "status": "prohibited"
+  },
+  {
+   "sr": 83,
+   "name": "Cisapride and its formulations for human use",
+   "notification": "GSR No. 82(E) dated 10.02.2011",
+   "type": "substance",
+   "terms": [
+    "cisapride"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 84,
+   "name": "Phenylpropanolamine and its formulations for human use",
+   "notification": "GSR No. 82(E) dated 10.02.2011",
+   "type": "substance",
+   "terms": [
+    "phenylpropanolamine"
+   ],
+   "status": "stayed",
+   "statusNote": "Presently stayed by the Hon'ble High Court of Madras."
+  },
+  {
+   "sr": 85,
+   "name": "Human Placental Extract and its formulations for human use, except (1) topical application for wound healing and (2) injection for pelvic inflammatory disease",
+   "notification": "Substituted vide GSR No. 418(E) dated 30.05.2011",
+   "type": "substance",
+   "terms": [
+    "human placental extract",
+    "placental extract"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 86,
+   "name": "Sibutramine and its formulations for human use",
+   "notification": "GSR No. 82(E) dated 10.02.2011",
+   "type": "substance",
+   "terms": [
+    "sibutramine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 87,
+   "name": "R-Sibutramine and its formulations for human use",
+   "notification": "GSR No. 82(E) dated 10.02.2011",
+   "type": "substance",
+   "terms": [
+    "r-sibutramine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 88,
+   "name": "Gatifloxacin formulation for systemic use in human by any route including oral and injectable",
+   "notification": "GSR No. 218(E) dated 16.03.2011",
+   "type": "substance",
+   "terms": [
+    "gatifloxacin"
+   ],
+   "scope": "systemic use (oral / injectable)",
+   "status": "prohibited"
+  },
+  {
+   "sr": 89,
+   "name": "Tegaserod and its formulations",
+   "notification": "GSR No. 218(E) dated 16.03.2011",
+   "type": "substance",
+   "terms": [
+    "tegaserod"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 90,
+   "name": "Letrozole for induction of ovulation in anovulatory infertility",
+   "notification": "GSR No. 752(E) dated 12.10.2011",
+   "type": "substance",
+   "terms": [
+    "letrozole"
+   ],
+   "scope": "induction of ovulation in anovulatory infertility",
+   "status": "prohibited"
+  },
+  {
+   "sr": 91,
+   "name": "Serodiagnostic test kits for diagnosis of tuberculosis",
+   "notification": "GSR 432(E) and GSR 433(E) dated 07.06.2012",
+   "type": "rule",
+   "terms": [],
+   "status": "prohibited"
+  },
+  {
+   "sr": 92,
+   "name": "Dextropropoxyphene and formulations containing Dextropropoxyphene for human use",
+   "notification": "G.S.R. 332(E) dated 23.05.2013",
+   "type": "substance",
+   "terms": [
+    "dextropropoxyphene"
+   ],
+   "status": "conditional",
+   "statusNote": "The prohibition was revoked with conditions vide G.S.R. No. 367(E) dated 13.04.2017 - permitted for cancer pain only, daily administered dose not exceeding 300 mg per day, with the prescribed package-insert and container labelling."
+  },
+  {
+   "sr": 93,
+   "name": "Fixed dose combination of Flupenthixol + Melitracen for human use",
+   "notification": "G.S.R. 377(E) dated 18.06.2013 and G.S.R. 498(E) dated 11.07.2014",
+   "type": "fdc",
+   "terms": [
+    "flupenthixol",
+    "melitracen"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 94,
+   "name": "Analgin and all formulations containing Analgin for human use",
+   "notification": "G.S.R. No. 378(E) dated 18.06.2013",
+   "type": "substance",
+   "terms": [
+    "analgin",
+    "metamizole"
+   ],
+   "status": "conditional",
+   "statusNote": "The initial suspension vide G.S.R. No. 378(E) dated 18.06.2013 was revoked, allowing use of the drug subject to certain conditions, vide G.S.R. No. 86(E) dated 13.02.2014."
+  },
+  {
+   "sr": 95,
+   "name": "Pioglitazone and all formulations containing Pioglitazone for human use",
+   "notification": "G.S.R. No. 379(E) dated 18.06.2013",
+   "type": "substance",
+   "terms": [
+    "pioglitazone"
+   ],
+   "status": "conditional",
+   "statusNote": "The initial suspension vide G.S.R. No. 379(E) dated 18.06.2013 was revoked, allowing use of the drug subject to certain conditions, vide G.S.R. No. 520(E) dated 31.07.2013."
+  },
+  {
+   "sr": 96,
+   "name": "Aceclofenac + Paracetamol + Rabeprazole",
+   "notification": "S.O. 705(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "aceclofenac",
+    "paracetamol",
+    "rabeprazole"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 97,
+   "name": "Nimesulide + Diclofenac",
+   "notification": "S.O. 706(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "diclofenac"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 98,
+   "name": "Nimesulide + Cetirizine + Caffeine",
+   "notification": "S.O. 707(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "cetirizine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 99,
+   "name": "Nimesulide + Tizanidine",
+   "notification": "S.O. 708(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "tizanidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 100,
+   "name": "Paracetamol + Cetrizine + Caffeine",
+   "notification": "S.O. 709(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "cetirizine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 101,
+   "name": "Diclofenac + Tramadol + Chlorzoxazone",
+   "notification": "S.O. 710(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "tramadol",
+    "chlorzoxazone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 102,
+   "name": "Dicyclomine + Paracetamol + Domperidone",
+   "notification": "S.O. 711(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dicyclomine",
+    "paracetamol",
+    "domperidone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 103,
+   "name": "Nimesulide + Paracetamol dispersible tablets",
+   "notification": "S.O. 712(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "paracetamol"
+   ],
+   "scope": "dispersible tablets",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 104,
+   "name": "Paracetamol + Phenylephrine + Caffeine",
+   "notification": "S.O. 713(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 105,
+   "name": "Diclofenac + Tramadol + Paracetamol",
+   "notification": "S.O. 714(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "tramadol",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 106,
+   "name": "Diclofenac + Paracetamol + Chlorzoxazone + Famotidine",
+   "notification": "S.O. 715(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "paracetamol",
+    "chlorzoxazone",
+    "famotidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 107,
+   "name": "Naproxen + Paracetamol",
+   "notification": "S.O. 716(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "naproxen",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 108,
+   "name": "Nimesulide + Serratiopeptidase",
+   "notification": "S.O. 717(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "serratiopeptidase"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 109,
+   "name": "Paracetamol + Diclofenac + Famotidine",
+   "notification": "S.O. 718(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "diclofenac",
+    "famotidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 110,
+   "name": "Nimesulide + Pitofenone + Fenpiverinium + Benzyl alcohol",
+   "notification": "S.O. 719(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "pitofenone",
+    "fenpiverinium",
+    "benzyl alcohol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 111,
+   "name": "Omeprazole + Paracetamol + Diclofenac",
+   "notification": "S.O. 720(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "omeprazole",
+    "paracetamol",
+    "diclofenac"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 112,
+   "name": "Nimesulide + Paracetamol injection",
+   "notification": "S.O. 721(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "paracetamol"
+   ],
+   "scope": "injection",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 113,
+   "name": "Tamsulosin + Diclofenac",
+   "notification": "S.O. 722(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "tamsulosin",
+    "diclofenac"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 114,
+   "name": "Paracetamol + Phenylephrine + Chlorpheniramine + Dextromethorphan + Caffeine",
+   "notification": "S.O. 723(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "chlorpheniramine",
+    "dextromethorphan",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 115,
+   "name": "Diclofenac + Zinc Carnosine",
+   "notification": "S.O. 724(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "zinc carnosine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 116,
+   "name": "Diclofenac + Paracetamol + Chlorpheniramine maleate + Magnesium trisilicate",
+   "notification": "S.O. 725(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "paracetamol",
+    "chlorpheniramine maleate",
+    "magnesium trisilicate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 117,
+   "name": "Paracetamol + Pseudoephedrine + Cetrizine",
+   "notification": "S.O. 726(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "pseudoephedrine",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 118,
+   "name": "Phenylbutazone + Sodium Salicylate",
+   "notification": "S.O. 727(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "phenylbutazone",
+    "sodium salicylate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 119,
+   "name": "Lornoxicam + Paracetamol + Trypsin",
+   "notification": "S.O. 728(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "lornoxicam",
+    "paracetamol",
+    "trypsin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 120,
+   "name": "Paracetamol + Mefenamic Acid + Ranitidine + Dicyclomine",
+   "notification": "S.O. 729(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "mefenamic acid",
+    "ranitidine",
+    "dicyclomine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 121,
+   "name": "Nimesulide + Dicyclomine",
+   "notification": "S.O. 730(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "dicyclomine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 122,
+   "name": "Heparin + Diclofenac",
+   "notification": "S.O. 731(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "heparin",
+    "diclofenac"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 123,
+   "name": "Glucosamine + Methyl Sulfonyl Methane + Vitamin D3 + Manganese + Boron + Copper + Zinc",
+   "notification": "S.O. 732(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "glucosamine",
+    "methyl sulfonyl methane",
+    "vitamin d3",
+    "manganese",
+    "boron",
+    "copper",
+    "zinc"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 124,
+   "name": "Paracetamol + Tapentadol",
+   "notification": "S.O. 733(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "tapentadol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 125,
+   "name": "Tranexamic Acid + Proanthocyanidin",
+   "notification": "S.O. 734(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "tranexamic acid",
+    "proanthocyanidin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 126,
+   "name": "Benzoxonium Chloride + Lidocaine",
+   "notification": "S.O. 735(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "benzoxonium chloride",
+    "lignocaine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 127,
+   "name": "Lornoxicam + Paracetamol + Tramadol",
+   "notification": "S.O. 736(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "lornoxicam",
+    "paracetamol",
+    "tramadol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 128,
+   "name": "Lornoxicam + Paracetamol + Serratiopeptidase",
+   "notification": "S.O. 737(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "lornoxicam",
+    "paracetamol",
+    "serratiopeptidase"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 129,
+   "name": "Diclofenac + Paracetamol + Magnesium trisilicate",
+   "notification": "S.O. 738(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "paracetamol",
+    "magnesium trisilicate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 130,
+   "name": "Paracetamol + Domperidone + Caffeine",
+   "notification": "S.O. 739(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "domperidone",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 131,
+   "name": "Ammonium Chloride + Sodium Citrate + Chlorpheniramine Maleate + Menthol",
+   "notification": "S.O. 740(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ammonium chloride",
+    "sodium citrate",
+    "chlorpheniramine maleate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 132,
+   "name": "Paracetamol + Prochlorperazine Maleate",
+   "notification": "S.O. 741(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "prochlorperazine maleate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 133,
+   "name": "Combikit of 3 tablets of Serratiopeptidase (enteric coated 20000 units) + Diclofenac Potassium & 2 tablets of Doxycycline",
+   "notification": "S.O. 742(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "serratiopeptidase",
+    "diclofenac potassium",
+    "doxycycline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 134,
+   "name": "Nimesulide + Paracetamol suspension",
+   "notification": "S.O. 743(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "paracetamol"
+   ],
+   "scope": "suspension",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 135,
+   "name": "Aceclofenac + Paracetamol + Famotidine",
+   "notification": "S.O. 744(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "aceclofenac",
+    "paracetamol",
+    "famotidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 136,
+   "name": "Aceclofenac + Zinc Carnosine",
+   "notification": "S.O. 745(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "aceclofenac",
+    "zinc carnosine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 137,
+   "name": "Paracetamol + Disodium Hydrogen Citrate + Caffeine",
+   "notification": "S.O. 746(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "disodium hydrogen citrate",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 138,
+   "name": "Paracetamol + DL Methionine",
+   "notification": "S.O. 747(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "dl methionine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 139,
+   "name": "Disodium Hydrogen Citrate + Paracetamol",
+   "notification": "S.O. 748(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "disodium hydrogen citrate",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 140,
+   "name": "Paracetamol + Caffeine + Codeine Phosphate",
+   "notification": "S.O. 749(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "caffeine",
+    "codeine phosphate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 141,
+   "name": "Aceclofenac (SR) + Paracetamol",
+   "notification": "S.O. 750(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "aceclofenac",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 142,
+   "name": "Diclofenac + Paracetamol injection",
+   "notification": "S.O. 751(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diclofenac",
+    "paracetamol"
+   ],
+   "scope": "injection",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 143,
+   "name": "Azithromycin + Cefixime",
+   "notification": "S.O. 752(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "cefixime"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 144,
+   "name": "Amoxicillin + Dicloxacillin",
+   "notification": "S.O. 753(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "amoxicillin",
+    "dicloxacillin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 145,
+   "name": "Amoxicillin 250 mg + Potassium Clavulanate Diluted 62.5 mg",
+   "notification": "S.O. 754(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "amoxicillin",
+    "potassium clavulanate diluted"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 146,
+   "name": "Azithromycin + Levofloxacin",
+   "notification": "S.O. 755(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "levofloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 147,
+   "name": "Cefixime + Linezolid",
+   "notification": "S.O. 756(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cefixime",
+    "linezolid"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 148,
+   "name": "Amoxicillin + Cefixime + Potassium Clavulanic Acid",
+   "notification": "S.O. 757(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "amoxicillin",
+    "cefixime",
+    "potassium clavulanic acid"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 149,
+   "name": "Ofloxacin + Nitazoxanide",
+   "notification": "S.O. 758(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ofloxacin",
+    "nitazoxanide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 150,
+   "name": "Cefpodoxime Proxetil + Levofloxacin",
+   "notification": "S.O. 759(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cefpodoxime proxetil",
+    "levofloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 151,
+   "name": "Combikit of Azithromycin dihydrate, Secnidazole and Fluconazole",
+   "notification": "S.O. 760(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "secnidazole",
+    "fluconazole"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 152,
+   "name": "Levofloxacin + Ornidazole + Alpha Tocopherol Acetate",
+   "notification": "S.O. 761(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levofloxacin",
+    "ornidazole",
+    "alpha tocopherol acetate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 153,
+   "name": "Nimorazole + Ofloxacin",
+   "notification": "S.O. 762(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimorazole",
+    "ofloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 154,
+   "name": "Azithromycin + Ofloxacin",
+   "notification": "S.O. 763(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "ofloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 155,
+   "name": "Amoxycillin + Tinidazole",
+   "notification": "S.O. 764(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "amoxicillin",
+    "tinidazole"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 156,
+   "name": "Doxycycline + Serratiopeptidase",
+   "notification": "S.O. 765(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "doxycycline",
+    "serratiopeptidase"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 157,
+   "name": "Cefixime + Levofloxacin",
+   "notification": "S.O. 766(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cefixime",
+    "levofloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 158,
+   "name": "Ofloxacin + Metronidazole + Zinc Acetate",
+   "notification": "S.O. 767(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ofloxacin",
+    "metronidazole",
+    "zinc acetate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 159,
+   "name": "Diphenoxylate + Atropine + Furazolidone",
+   "notification": "S.O. 768(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diphenoxylate",
+    "atropine",
+    "furazolidone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 160,
+   "name": "Combikit of Fluconazole Tablet, Azithromycin Tablet and Ornidazole Tablets",
+   "notification": "S.O. 769(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "fluconazole",
+    "azithromycin",
+    "ornidazole"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 161,
+   "name": "Ciprofloxacin + Phenazopyridine",
+   "notification": "S.O. 770(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ciprofloxacin",
+    "phenazopyridine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 162,
+   "name": "Amoxycillin + Dicloxacillin + Serratiopeptidase",
+   "notification": "S.O. 771(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "amoxicillin",
+    "dicloxacillin",
+    "serratiopeptidase"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 163,
+   "name": "Azithromycin + Cefpodoxime",
+   "notification": "S.O. 772(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "cefpodoxime"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 164,
+   "name": "Lignocaine + Clotrimazole + Ofloxacin + Beclomethasone",
+   "notification": "S.O. 773(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "lignocaine",
+    "clotrimazole",
+    "ofloxacin",
+    "beclomethasone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 165,
+   "name": "Cefuroxime + Linezolid",
+   "notification": "S.O. 774(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cefuroxime",
+    "linezolid"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 166,
+   "name": "Ofloxacin + Ornidazole + Zinc bisglycinate",
+   "notification": "S.O. 775(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ofloxacin",
+    "ornidazole",
+    "zinc bisglycinate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 167,
+   "name": "Metronidazole + Norfloxacin",
+   "notification": "S.O. 776(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metronidazole",
+    "norfloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 168,
+   "name": "Amoxicillin + Bromhexine",
+   "notification": "S.O. 777(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "amoxicillin",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 169,
+   "name": "Ciprofloxacin + Fluticasone + Clotrimazole + Neomycin",
+   "notification": "S.O. 778(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ciprofloxacin",
+    "fluticasone",
+    "clotrimazole",
+    "neomycin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 170,
+   "name": "Metronidazole + Tetracycline",
+   "notification": "S.O. 779(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metronidazole",
+    "tetracycline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 171,
+   "name": "Cephalexin + Neomycin + Prednisolone",
+   "notification": "S.O. 780(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cephalexin",
+    "neomycin",
+    "prednisolone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 172,
+   "name": "Azithromycin + Ambroxol",
+   "notification": "S.O. 781(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 173,
+   "name": "Cilnidipine + Metoprolol succinate + Metoprolol tartrate",
+   "notification": "S.O. 782(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cilnidipine",
+    "metoprolol succinate",
+    "metoprolol tartrate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 174,
+   "name": "L-Arginine + Sildenafil",
+   "notification": "S.O. 783(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "l-arginine",
+    "sildenafil"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 175,
+   "name": "Atorvastatin + Vitamin D3 + Folic acid + Vitamin B12 + Pyridoxine",
+   "notification": "S.O. 784(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "atorvastatin",
+    "vitamin d3",
+    "folic acid",
+    "vitamin b12",
+    "vitamin b6"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 176,
+   "name": "Metformin + Atorvastatin",
+   "notification": "S.O. 785(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "atorvastatin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 177,
+   "name": "Clindamycin + Telmisartan",
+   "notification": "S.O. 786(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clindamycin",
+    "telmisartan"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 178,
+   "name": "Olmesartan + Hydrochlorothiazide + Chlorthalidone",
+   "notification": "S.O. 787(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "olmesartan",
+    "hydrochlorothiazide",
+    "chlorthalidone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 179,
+   "name": "L-5-Methyltetrahydrofolate calcium + Escitalopram",
+   "notification": "S.O. 788(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "l-5-methyltetrahydrofolate calcium",
+    "escitalopram"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 180,
+   "name": "Pholcodine + Promethazine",
+   "notification": "S.O. 789(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pholcodine",
+    "promethazine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 181,
+   "name": "Paracetamol + Promethazine",
+   "notification": "S.O. 790(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "promethazine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 182,
+   "name": "Betahistine + Ginkgo Biloba Extract + Vinpocetine + Piracetam",
+   "notification": "S.O. 791(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "betahistine",
+    "ginkgo biloba extract",
+    "vinpocetine",
+    "piracetam"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 183,
+   "name": "Cetirizine Dihydrochloride + Diethyl Carbamazine",
+   "notification": "S.O. 792(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine dihydrochloride",
+    "diethyl carbamazine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 184,
+   "name": "Doxylamine + Pyridoxine + Mefenamic Acid + Paracetamol",
+   "notification": "S.O. 793(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "doxylamine",
+    "vitamin b6",
+    "mefenamic acid",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 185,
+   "name": "Drotaverine + Clidinium + Chlordiazepoxide",
+   "notification": "S.O. 794(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "drotaverine",
+    "clidinium",
+    "chlordiazepoxide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 186,
+   "name": "Imipramine + Diazepam",
+   "notification": "S.O. 795(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "imipramine",
+    "diazepam"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 187,
+   "name": "Flupentixol + Escitalopram",
+   "notification": "S.O. 796(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "flupentixol",
+    "escitalopram"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 188,
+   "name": "Paracetamol + Prochlorperazine",
+   "notification": "S.O. 797(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "prochlorperazine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 189,
+   "name": "Gabapentin + Mecobalamin + Pyridoxine + Thiamine",
+   "notification": "S.O. 798(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "gabapentin",
+    "vitamin b12",
+    "vitamin b6",
+    "vitamin b1"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 190,
+   "name": "Imipramine + Chlordiazepoxide + Trifluoperazine + Trihexyphenidyl",
+   "notification": "S.O. 799(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "imipramine",
+    "chlordiazepoxide",
+    "trifluoperazine",
+    "trihexyphenidyl"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 191,
+   "name": "Chlorpromazine + Trihexyphenidyl",
+   "notification": "S.O. 800(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpromazine",
+    "trihexyphenidyl"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 192,
+   "name": "Ursodeoxycholic Acid + Silymarin",
+   "notification": "S.O. 801(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ursodeoxycholic acid",
+    "silymarin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 193,
+   "name": "Metformin 1000/1000/500/500mg + Pioglitazone 7.5/7.5/7.5/7.5mg + Glimepiride 1/2/1/2mg",
+   "notification": "S.O. 802(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "pioglitazone",
+    "glimepiride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 194,
+   "name": "Gliclazide 80 mg + Metformin 325 mg",
+   "notification": "S.O. 803(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "gliclazide",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 195,
+   "name": "Voglibose + Metformin + Chromium Picolinate",
+   "notification": "S.O. 804(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "voglibose",
+    "metformin",
+    "chromium picolinate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 196,
+   "name": "Pioglitazone 7.5/7.5mg + Metformin 500/1000mg",
+   "notification": "S.O. 805(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 197,
+   "name": "Glimepiride 1mg/2mg/3mg + Pioglitazone 15mg/15mg/15mg + Metformin 1000mg/1000mg/1000mg",
+   "notification": "S.O. 806(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "glimepiride",
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 198,
+   "name": "Glimepiride 1mg/2mg + Pioglitazone 15mg/15mg + Metformin 850mg/850mg",
+   "notification": "S.O. 807(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "glimepiride",
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 199,
+   "name": "Metformin 850mg + Pioglitazone 7.5 mg + Glimepiride 2mg",
+   "notification": "S.O. 808(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "pioglitazone",
+    "glimepiride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 200,
+   "name": "Metformin 850mg + Pioglitazone 7.5 mg + Glimepiride 1mg",
+   "notification": "S.O. 809(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "pioglitazone",
+    "glimepiride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 201,
+   "name": "Metformin 500mg/500mg + Gliclazide SR 30mg/60mg + Pioglitazone 7.5mg/7.5mg",
+   "notification": "S.O. 810(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "gliclazide",
+    "pioglitazone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 202,
+   "name": "Voglibose + Pioglitazone + Metformin",
+   "notification": "S.O. 811(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "voglibose",
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 203,
+   "name": "Metformin + Bromocriptine",
+   "notification": "S.O. 812(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "bromocriptine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 204,
+   "name": "Metformin + Glimepiride + Methylcobalamin",
+   "notification": "S.O. 813(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "glimepiride",
+    "vitamin b12"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 205,
+   "name": "Pioglitazone 30 mg + Metformin 500mg",
+   "notification": "S.O. 814(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 206,
+   "name": "Glimepiride + Pioglitazone + Metformin",
+   "notification": "S.O. 815(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "glimepiride",
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 207,
+   "name": "Glipizide 2.5mg + Metformin 400mg",
+   "notification": "S.O. 816(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "glipizide",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 208,
+   "name": "Pioglitazone 15mg + Metformin 850 mg",
+   "notification": "S.O. 817(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pioglitazone",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 209,
+   "name": "Metformin ER + Gliclazide MR + Voglibose",
+   "notification": "S.O. 818(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "gliclazide",
+    "voglibose"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 210,
+   "name": "Chromium Polynicotinate + Metformin Hydrochloride",
+   "notification": "S.O. 819(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chromium polynicotinate",
+    "metformin hydrochloride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 211,
+   "name": "Metformin Hydrochloride + Gliclazide + Pioglitazone + Chromium Polynicotinate",
+   "notification": "S.O. 820(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin hydrochloride",
+    "gliclazide",
+    "pioglitazone",
+    "chromium polynicotinate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 212,
+   "name": "Metformin + Gliclazide + Chromium Polynicotinate",
+   "notification": "S.O. 821(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "gliclazide",
+    "chromium polynicotinate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 213,
+   "name": "Glibenclamide + Metformin (SR) + Pioglitazone",
+   "notification": "S.O. 822(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "glibenclamide",
+    "metformin",
+    "pioglitazone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 214,
+   "name": "Metformin (sustained release) 500mg + Pioglitazone 15 mg + Glimepiride 3mg",
+   "notification": "S.O. 823(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "pioglitazone",
+    "glimepiride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 215,
+   "name": "Metformin (SR) 500mg + Pioglitazone 5mg",
+   "notification": "S.O. 824(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "metformin",
+    "pioglitazone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 216,
+   "name": "Chloramphenicol + Beclomethasone + Clotrimazole + Lignocaine",
+   "notification": "S.O. 825(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chloramphenicol",
+    "beclomethasone",
+    "clotrimazole",
+    "lignocaine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 217,
+   "name": "Clotrimazole + Ofloxacin + Lignocaine + Glycerine and Propylene glycol",
+   "notification": "S.O. 826(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clotrimazole",
+    "ofloxacin",
+    "lignocaine",
+    "glycerine",
+    "propylene glycol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 218,
+   "name": "Chloramphenicol + Lignocaine + Betamethasone + Clotrimazole + Ofloxacin + Antipyrine",
+   "notification": "S.O. 827(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chloramphenicol",
+    "lignocaine",
+    "betamethasone",
+    "clotrimazole",
+    "ofloxacin",
+    "antipyrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 219,
+   "name": "Ofloxacin + Clotrimazole + Betamethasone + Lignocaine",
+   "notification": "S.O. 828(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ofloxacin",
+    "clotrimazole",
+    "betamethasone",
+    "lignocaine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 220,
+   "name": "Gentamicin Sulphate + Clotrimazole + Betamethasone + Lignocaine",
+   "notification": "S.O. 829(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "gentamicin sulphate",
+    "clotrimazole",
+    "betamethasone",
+    "lignocaine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 221,
+   "name": "Clotrimazole + Beclomethasone + Ofloxacin + Lignocaine",
+   "notification": "S.O. 830(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clotrimazole",
+    "beclomethasone",
+    "ofloxacin",
+    "lignocaine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 222,
+   "name": "Beclomethasone + Clotrimazole + Chloramphenicol + Gentamycin + Lignocaine Ear drops",
+   "notification": "S.O. 831(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "beclomethasone",
+    "clotrimazole",
+    "chloramphenicol",
+    "gentamicin",
+    "lignocaine"
+   ],
+   "scope": "ear drops",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 223,
+   "name": "Flunarizine + Paracetamol + Domperidone",
+   "notification": "S.O. 832(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "flunarizine",
+    "paracetamol",
+    "domperidone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 224,
+   "name": "Rabeprazole + Zinc Carnosine",
+   "notification": "S.O. 833(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "rabeprazole",
+    "zinc carnosine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 225,
+   "name": "Magaldrate + Famotidine + Simethicone",
+   "notification": "S.O. 834(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "magaldrate",
+    "famotidine",
+    "simethicone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 226,
+   "name": "Cyproheptadine + Thiamine",
+   "notification": "S.O. 835(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cyproheptadine",
+    "vitamin b1"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 227,
+   "name": "Magaldrate + Ranitidine + Pancreatin + Domperidone",
+   "notification": "S.O. 836(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "magaldrate",
+    "ranitidine",
+    "pancreatin",
+    "domperidone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 228,
+   "name": "Ranitidine + Magaldrate + Simethicone",
+   "notification": "S.O. 837(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ranitidine",
+    "magaldrate",
+    "simethicone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 229,
+   "name": "Magaldrate + Papain + Fungal diastase + Simethicone",
+   "notification": "S.O. 838(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "magaldrate",
+    "papain",
+    "fungal diastase",
+    "simethicone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 230,
+   "name": "Rabeprazole + Zinc + Domperidone",
+   "notification": "S.O. 839(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "rabeprazole",
+    "zinc",
+    "domperidone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 231,
+   "name": "Famotidine + Oxetacaine + Magaldrate",
+   "notification": "S.O. 840(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "famotidine",
+    "oxetacaine",
+    "magaldrate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 232,
+   "name": "Ranitidine + Domperidone + Simethicone",
+   "notification": "S.O. 841(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ranitidine",
+    "domperidone",
+    "simethicone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 233,
+   "name": "Alginic Acid + Sodium Bicarbonate + Dried Aluminium Hydroxide + Magnesium Hydroxide",
+   "notification": "S.O. 842(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "alginic acid",
+    "sodium bicarbonate",
+    "dried aluminium hydroxide",
+    "magnesium hydroxide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 234,
+   "name": "Clidinium + Paracetamol + Dicyclomine + Activated Dimethicone",
+   "notification": "S.O. 843(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clidinium",
+    "paracetamol",
+    "dicyclomine",
+    "activated dimethicone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 235,
+   "name": "Furazolidone + Metronidazole + Loperamide",
+   "notification": "S.O. 844(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "furazolidone",
+    "metronidazole",
+    "loperamide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 236,
+   "name": "Rabeprazole + Diclofenac + Paracetamol",
+   "notification": "S.O. 845(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "rabeprazole",
+    "diclofenac",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 237,
+   "name": "Ranitidine + Magaldrate",
+   "notification": "S.O. 846(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ranitidine",
+    "magaldrate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 238,
+   "name": "Norfloxacin + Metronidazole + Zinc Acetate",
+   "notification": "S.O. 847(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "norfloxacin",
+    "metronidazole",
+    "zinc acetate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 239,
+   "name": "Zinc Carnosine + Oxetacaine",
+   "notification": "S.O. 848(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "zinc carnosine",
+    "oxetacaine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 240,
+   "name": "Oxetacaine + Magaldrate + Famotidine",
+   "notification": "S.O. 849(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "oxetacaine",
+    "magaldrate",
+    "famotidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 241,
+   "name": "Pantoprazole (as Enteric Coated Tablet) + Zinc Carnosine (as Film Coated Tablets)",
+   "notification": "S.O. 850(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pantoprazole",
+    "zinc carnosine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 242,
+   "name": "Zinc Carnosine + Magnesium Hydroxide + Dried Aluminium Hydroxide + Simethicone",
+   "notification": "S.O. 851(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "zinc carnosine",
+    "magnesium hydroxide",
+    "dried aluminium hydroxide",
+    "simethicone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 243,
+   "name": "Zinc Carnosine + Sucralfate",
+   "notification": "S.O. 852(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "zinc carnosine",
+    "sucralfate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 244,
+   "name": "Mebeverine Hydrochloride & Inner HPMC capsule (Streptococcus Faecalis + Clostridium butyricum + Bacillus mesentricus + Lactic Acid Bacillus)",
+   "notification": "S.O. 853(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "mebeverine",
+    "streptococcus faecalis",
+    "clostridium butyricum",
+    "bacillus mesentricus",
+    "lactic acid bacillus"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 245,
+   "name": "Clindamycin + Clotrimazole + Lactic Acid Bacillus",
+   "notification": "S.O. 854(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clindamycin",
+    "clotrimazole",
+    "lactic acid bacillus"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 246,
+   "name": "Sildenafil + Estradiol Valerate",
+   "notification": "S.O. 855(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "sildenafil",
+    "estradiol valerate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 247,
+   "name": "Clomifene Citrate + Ubidecarenone + Zinc + Folic Acid + Methylcobalamin + Pyridoxine + Lycopene + Selenium + Levocarnitine Tartrate + L-Arginine",
+   "notification": "S.O. 856(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clomifene citrate",
+    "ubidecarenone",
+    "zinc",
+    "folic acid",
+    "vitamin b12",
+    "vitamin b6",
+    "lycopene",
+    "selenium",
+    "levocarnitine tartrate",
+    "l-arginine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 248,
+   "name": "Thyroxine + Pyridoxine + Folic Acid",
+   "notification": "S.O. 857(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "thyroxine",
+    "vitamin b6",
+    "folic acid"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 249,
+   "name": "Gentamycin + Dexamethasone + Chloramphenicol + Tobramycin + Ofloxacin",
+   "notification": "S.O. 858(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "gentamicin",
+    "dexamethasone",
+    "chloramphenicol",
+    "tobramycin",
+    "ofloxacin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 250,
+   "name": "Dextromethorphan + Levocetirizine + Phenylephrine + Zinc",
+   "notification": "S.O. 859(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "levocetirizine",
+    "phenylephrine",
+    "zinc"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 251,
+   "name": "Nimesulide + Loratadine + Phenylephrine + Ambroxol",
+   "notification": "S.O. 860(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "loratadine",
+    "phenylephrine",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 252,
+   "name": "Bromhexine + Phenylephrine + Chlorpheniramine Maleate",
+   "notification": "S.O. 861(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "bromhexine",
+    "phenylephrine",
+    "chlorpheniramine maleate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 253,
+   "name": "Dextromethorphan + Bromhexine + Guaiphenesin",
+   "notification": "S.O. 862(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "bromhexine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 254,
+   "name": "Paracetamol + Loratadine + Phenylephrine + Dextromethorphan + Caffeine",
+   "notification": "S.O. 863(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "loratadine",
+    "phenylephrine",
+    "dextromethorphan",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 255,
+   "name": "Nimesulide + Phenylephrine + Caffeine + Levocetirizine",
+   "notification": "S.O. 864(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "phenylephrine",
+    "caffeine",
+    "levocetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 256,
+   "name": "Azithromycin + Acebrophylline",
+   "notification": "S.O. 865(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "azithromycin",
+    "acebrophylline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 257,
+   "name": "Diphenhydramine + Terpine + Ammonium Chloride + Sodium Chloride + Menthol",
+   "notification": "S.O. 866(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diphenhydramine",
+    "terpine",
+    "ammonium chloride",
+    "sodium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 258,
+   "name": "Nimesulide + Paracetamol + Cetrizine + Phenylephrine",
+   "notification": "S.O. 867(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "paracetamol",
+    "cetirizine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 259,
+   "name": "Paracetamol + Loratadine + Dextromethorphan + Pseudoephedrine + Caffeine",
+   "notification": "S.O. 868(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "loratadine",
+    "dextromethorphan",
+    "pseudoephedrine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 260,
+   "name": "Chlorpheniramine maleate + Dextromethorphan + Guaiphenesin + Ammonium chloride + Menthol",
+   "notification": "S.O. 869(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine maleate",
+    "dextromethorphan",
+    "guaifenesin",
+    "ammonium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 261,
+   "name": "Chlorpheniramine Maleate + Ammonium Chloride + Sodium Citrate",
+   "notification": "S.O. 870(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine maleate",
+    "ammonium chloride",
+    "sodium citrate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 262,
+   "name": "Cetirizine + Phenylephrine + Paracetamol + Zinc Gluconate",
+   "notification": "S.O. 871(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "phenylephrine",
+    "paracetamol",
+    "zinc gluconate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 263,
+   "name": "Ambroxol + Guaiphenesin + Ammonium Chloride + Phenylephrine + Chlorpheniramine Maleate + Menthol",
+   "notification": "S.O. 872(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ambroxol",
+    "guaifenesin",
+    "ammonium chloride",
+    "phenylephrine",
+    "chlorpheniramine maleate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 264,
+   "name": "Dextromethorphan + Bromhexine + Chlorpheniramine maleate + Guaiphenesin",
+   "notification": "S.O. 873(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "bromhexine",
+    "chlorpheniramine maleate",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 265,
+   "name": "Levocetirizine + Ambroxol + Phenylephrine + Guaiphenesin",
+   "notification": "S.O. 874(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "ambroxol",
+    "phenylephrine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 266,
+   "name": "Dextromethorphan + Chlorpheniramine + Chlorpheniramine maleate",
+   "notification": "S.O. 875(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "chlorpheniramine",
+    "chlorpheniramine maleate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 267,
+   "name": "Cetirizine + Ambroxol + Guaiphenesin + Ammonium chloride + Phenylephrine + Menthol",
+   "notification": "S.O. 876(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "ambroxol",
+    "guaifenesin",
+    "ammonium chloride",
+    "phenylephrine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 268,
+   "name": "Chlorpheniramine + Phenylephrine + Caffeine",
+   "notification": "S.O. 877(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "phenylephrine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 269,
+   "name": "Dextromethorphan + Triprolidine + Phenylephrine",
+   "notification": "S.O. 878(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "triprolidine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 270,
+   "name": "Terpin hydrate + Dextromethorphan + Menthol",
+   "notification": "S.O. 879(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "terpin hydrate",
+    "dextromethorphan",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 271,
+   "name": "Dextromethorphan + Phenylephrine + Zinc gluconate + Menthol",
+   "notification": "S.O. 880(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "zinc gluconate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 272,
+   "name": "Chlorpheniramine + Codeine + Sodium citrate + Menthol syrup",
+   "notification": "S.O. 881(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "codeine",
+    "sodium citrate",
+    "menthol"
+   ],
+   "scope": "syrup",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 273,
+   "name": "Enrofloxacin + Bromhexine",
+   "notification": "S.O. 882(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "enrofloxacin",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 274,
+   "name": "Bromhexine + Dextromethorphan + Phenylephrine + Menthol",
+   "notification": "S.O. 883(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "bromhexine",
+    "dextromethorphan",
+    "phenylephrine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 275,
+   "name": "Levofloxacin + Bromhexine",
+   "notification": "S.O. 884(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levofloxacin",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 276,
+   "name": "Levocetirizine + Ranitidine",
+   "notification": "S.O. 885(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "ranitidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 277,
+   "name": "Levocetirizine + Phenylephrine + Ambroxol + Guaiphenesin + Paracetamol",
+   "notification": "S.O. 886(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "phenylephrine",
+    "ambroxol",
+    "guaifenesin",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 278,
+   "name": "Cetirizine + Dextromethorphan + Phenylephrine + Zinc gluconate + Paracetamol + Menthol",
+   "notification": "S.O. 887(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "dextromethorphan",
+    "phenylephrine",
+    "zinc gluconate",
+    "paracetamol",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 279,
+   "name": "Paracetamol + Pseudoephedrine + Dextromethorphan + Cetirizine",
+   "notification": "S.O. 888(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "pseudoephedrine",
+    "dextromethorphan",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 280,
+   "name": "Diphenhydramine + Guaiphenesin + Ammonium chloride + Bromhexine",
+   "notification": "S.O. 889(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diphenhydramine",
+    "guaifenesin",
+    "ammonium chloride",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 281,
+   "name": "Chlorpheniramine + Dextromethorphan + Phenylephrine + Paracetamol",
+   "notification": "S.O. 890(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "dextromethorphan",
+    "phenylephrine",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 282,
+   "name": "Dextromethorphan + Promethazine",
+   "notification": "S.O. 891(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "promethazine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 283,
+   "name": "Diethylcarbamazine + Cetrizine + Guaiphenesin",
+   "notification": "S.O. 892(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diethylcarbamazine",
+    "cetirizine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 284,
+   "name": "Pseudoephedrine + Dextromethorphan + Cetirizine",
+   "notification": "S.O. 893(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pseudoephedrine",
+    "dextromethorphan",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 285,
+   "name": "Chlorpheniramine + Phenylephrine + Dextromethorphan + Menthol",
+   "notification": "S.O. 894(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "phenylephrine",
+    "dextromethorphan",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 286,
+   "name": "Ambroxol + Terbutaline + Dextromethorphan",
+   "notification": "S.O. 895(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ambroxol",
+    "terbutaline",
+    "dextromethorphan"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 287,
+   "name": "Dextromethorphan + Chlorpheniramine + Guaiphenesin",
+   "notification": "S.O. 896(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "chlorpheniramine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 288,
+   "name": "Terbutaline + Bromhexine + Guaiphenesin + Dextromethorphan",
+   "notification": "S.O. 897(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "terbutaline",
+    "bromhexine",
+    "guaifenesin",
+    "dextromethorphan"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 289,
+   "name": "Dextromethorphan + Triprolidine + Phenylephrine",
+   "notification": "S.O. 898(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "triprolidine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 290,
+   "name": "Paracetamol + Dextromethorphan + Chlorpheniramine",
+   "notification": "S.O. 899(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "dextromethorphan",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 291,
+   "name": "Pholcodine + Phenylephrine + Promethazine",
+   "notification": "S.O. 900(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pholcodine",
+    "phenylephrine",
+    "promethazine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 292,
+   "name": "Codeine + Levocetirizine + Menthol",
+   "notification": "S.O. 901(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "codeine",
+    "levocetirizine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 293,
+   "name": "Dextromethorphan + Ambroxol + Guaifenesin + Phenylephrine + Chlorpheniramine",
+   "notification": "S.O. 902(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "ambroxol",
+    "guaifenesin",
+    "phenylephrine",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 294,
+   "name": "Cetirizine + Phenylephrine + Dextromethorphan + Menthol",
+   "notification": "S.O. 903(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "phenylephrine",
+    "dextromethorphan",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 295,
+   "name": "Roxithromycin + Serratiopeptidase",
+   "notification": "S.O. 904(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "roxithromycin",
+    "serratiopeptidase"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 296,
+   "name": "Paracetamol + Phenylephrine + Triprolidine",
+   "notification": "S.O. 905(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "triprolidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 297,
+   "name": "Acetaminophen + Loratadine + Ambroxol + Phenylephrine",
+   "notification": "S.O. 906(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "loratadine",
+    "ambroxol",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 298,
+   "name": "Cetirizine + Acetaminophen + Dextromethorphan + Phenylephrine + Zinc gluconate",
+   "notification": "S.O. 907(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "paracetamol",
+    "dextromethorphan",
+    "phenylephrine",
+    "zinc gluconate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 299,
+   "name": "Diphenhydramine + Guaifenesin + Bromhexine + Ammonium Chloride + Menthol",
+   "notification": "S.O. 908(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diphenhydramine",
+    "guaifenesin",
+    "bromhexine",
+    "ammonium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 300,
+   "name": "Chlorpheniramine Maleate + Codeine syrup",
+   "notification": "S.O. 909(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine maleate",
+    "codeine"
+   ],
+   "scope": "syrup",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 301,
+   "name": "Cetirizine + Dextromethorphan + Zinc Gluconate + Menthol",
+   "notification": "S.O. 910(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "dextromethorphan",
+    "zinc gluconate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 302,
+   "name": "Paracetamol + Phenylephrine + Desloratadine + Zinc Gluconate + Ambroxol",
+   "notification": "S.O. 911(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "desloratadine",
+    "zinc gluconate",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 303,
+   "name": "Levocetirizine + Montelukast + Acebrophylline",
+   "notification": "S.O. 912(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "montelukast",
+    "acebrophylline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 304,
+   "name": "Dextromethorphan + Phenylephrine + Ammonium chloride + Menthol",
+   "notification": "S.O. 913(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "ammonium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 305,
+   "name": "Dextromethorphan + Bromhexine + Guaiphenesin + Menthol",
+   "notification": "S.O. 914(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "bromhexine",
+    "guaifenesin",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 306,
+   "name": "Acrivastine + Paracetamol + Caffeine + Phenylephrine",
+   "notification": "S.O. 915(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "acrivastine",
+    "paracetamol",
+    "caffeine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 307,
+   "name": "Naphazoline + Carboxy Methyl cellulose + Menthol + Camphor + Phenylephrine",
+   "notification": "S.O. 916(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "naphazoline",
+    "carboxy methyl cellulose",
+    "menthol",
+    "camphor",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 308,
+   "name": "Dextromethorphan + Cetirizine",
+   "notification": "S.O. 917(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 309,
+   "name": "Nimesulide + Paracetamol + Levocetirizine + Phenylephrine + Caffeine",
+   "notification": "S.O. 918(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "paracetamol",
+    "levocetirizine",
+    "phenylephrine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 310,
+   "name": "Terbutaline + Ambroxol + Guaiphenesin + Zinc + Menthol",
+   "notification": "S.O. 919(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "terbutaline",
+    "ambroxol",
+    "guaifenesin",
+    "zinc",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 311,
+   "name": "Codeine + Chlorpheniramine + Alcohol syrup",
+   "notification": "S.O. 920(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "codeine",
+    "chlorpheniramine",
+    "alcohol"
+   ],
+   "scope": "syrup",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 312,
+   "name": "Dextromethorphan + Phenylephrine + Guaifenesin + Triprolidine",
+   "notification": "S.O. 921(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "guaifenesin",
+    "triprolidine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 313,
+   "name": "Ammonium Chloride + Bromhexine + Dextromethorphan",
+   "notification": "S.O. 922(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ammonium chloride",
+    "bromhexine",
+    "dextromethorphan"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 314,
+   "name": "Diethylcarbamazine + Cetirizine + Ambroxol",
+   "notification": "S.O. 923(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diethylcarbamazine",
+    "cetirizine",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 315,
+   "name": "Ethylmorphine + Noscapine + Chlorpheniramine Maleate",
+   "notification": "S.O. 924(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ethylmorphine",
+    "noscapine",
+    "chlorpheniramine maleate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 316,
+   "name": "Cetirizine + Dextromethorphan + Ambroxol",
+   "notification": "S.O. 925(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "dextromethorphan",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 317,
+   "name": "Bromhexine + Dextromethorphan + Ammonium Chloride + Menthol",
+   "notification": "S.O. 926(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "bromhexine",
+    "dextromethorphan",
+    "ammonium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 318,
+   "name": "Ambroxol + Guaifenesin + Phenylephrine + Chlorpheniramine",
+   "notification": "S.O. 927(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ambroxol",
+    "guaifenesin",
+    "phenylephrine",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 319,
+   "name": "Paracetamol + Phenylephrine + Chlorpheniramine + Zinc Gluconate",
+   "notification": "S.O. 928(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "chlorpheniramine",
+    "zinc gluconate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 320,
+   "name": "Dextromethorphan + Phenylephrine + Cetirizine + Paracetamol + Caffeine",
+   "notification": "S.O. 929(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "cetirizine",
+    "paracetamol",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 321,
+   "name": "Dextromethorphan + Chlorpheniramine + Guaifenesin + Ammonium Chloride",
+   "notification": "S.O. 930(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "chlorpheniramine",
+    "guaifenesin",
+    "ammonium chloride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 322,
+   "name": "Levocetirizine + Dextromethorphan + Zinc",
+   "notification": "S.O. 931(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "dextromethorphan",
+    "zinc"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 323,
+   "name": "Paracetamol + Phenylephrine + Levocetirizine + Caffeine",
+   "notification": "S.O. 932(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "levocetirizine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 324,
+   "name": "Chlorpheniramine + Ammonium Chloride + Sodium Chloride",
+   "notification": "S.O. 933(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "ammonium chloride",
+    "sodium chloride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 325,
+   "name": "Paracetamol + Dextromethorphan + Bromhexine + Phenylephrine + Diphenhydramine",
+   "notification": "S.O. 934(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "dextromethorphan",
+    "bromhexine",
+    "phenylephrine",
+    "diphenhydramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 326,
+   "name": "Salbutamol + Bromhexine + Guaiphenesin + Menthol",
+   "notification": "S.O. 935(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "bromhexine",
+    "guaifenesin",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 327,
+   "name": "Chlorpheniramine + Ammonium Chloride + Noscapine + Sodium Citrate",
+   "notification": "S.O. 936(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "ammonium chloride",
+    "noscapine",
+    "sodium citrate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 328,
+   "name": "Cetirizine + Dextromethorphan + Bromhexine + Guaifenesin",
+   "notification": "S.O. 937(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "dextromethorphan",
+    "bromhexine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 329,
+   "name": "Diethyl Carbamazine + Chlorpheniramine + Guaifenesin",
+   "notification": "S.O. 938(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "diethyl carbamazine",
+    "chlorpheniramine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 330,
+   "name": "Ketotifen + Cetirizine",
+   "notification": "S.O. 939(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ketotifen",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 331,
+   "name": "Terbutaline + Bromhexine + Etofylline",
+   "notification": "S.O. 940(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "terbutaline",
+    "bromhexine",
+    "etofylline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 332,
+   "name": "Ketotifen + Theophylline",
+   "notification": "S.O. 941(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ketotifen",
+    "theophylline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 333,
+   "name": "Ambroxol + Salbutamol + Theophylline",
+   "notification": "S.O. 942(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ambroxol",
+    "salbutamol",
+    "theophylline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 334,
+   "name": "Cetirizine + Nimesulide + Phenylephrine",
+   "notification": "S.O. 943(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "nimesulide",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 335,
+   "name": "Chlorpheniramine + Phenylephrine + Paracetamol + Zinc Gluconate",
+   "notification": "S.O. 944(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "phenylephrine",
+    "paracetamol",
+    "zinc gluconate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 336,
+   "name": "Acetaminophen + Guaifenesin + Dextromethorphan + Chlorpheniramine",
+   "notification": "S.O. 945(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "guaifenesin",
+    "dextromethorphan",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 337,
+   "name": "Cetirizine + Dextromethorphan + Phenylephrine + Tulsi",
+   "notification": "S.O. 946(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "dextromethorphan",
+    "phenylephrine",
+    "tulsi"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 338,
+   "name": "Cetirizine + Phenylephrine + Paracetamol + Ambroxol + Caffeine",
+   "notification": "S.O. 947(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "phenylephrine",
+    "paracetamol",
+    "ambroxol",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 339,
+   "name": "Guaifenesin + Dextromethorphan",
+   "notification": "S.O. 948(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "guaifenesin",
+    "dextromethorphan"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 340,
+   "name": "Levocetirizine + Paracetamol + Phenylephrine + Caffeine",
+   "notification": "S.O. 949(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "paracetamol",
+    "phenylephrine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 341,
+   "name": "Caffeine + Paracetamol + Phenylephrine + Chlorpheniramine",
+   "notification": "S.O. 950(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "caffeine",
+    "paracetamol",
+    "phenylephrine",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 342,
+   "name": "Ketotifen + Levocetrizine",
+   "notification": "S.O. 951(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ketotifen",
+    "levocetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 343,
+   "name": "Paracetamol + Levocetirizine + Phenylephrine + Zinc Gluconate",
+   "notification": "S.O. 952(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "levocetirizine",
+    "phenylephrine",
+    "zinc gluconate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 344,
+   "name": "Paracetamol + Phenylephrine + Triprolidine + Caffeine",
+   "notification": "S.O. 953(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "triprolidine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 345,
+   "name": "Caffeine + Paracetamol + Phenylephrine + Cetirizine",
+   "notification": "S.O. 954(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "caffeine",
+    "paracetamol",
+    "phenylephrine",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 346,
+   "name": "Dextromethorphan + Phenylephrine + Guaifenesin",
+   "notification": "S.O. 955(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 347,
+   "name": "Ambroxol + Levocetirizine + Phenylephrine + Guaiphenesin + Menthol",
+   "notification": "S.O. 956(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ambroxol",
+    "levocetirizine",
+    "phenylephrine",
+    "guaifenesin",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 348,
+   "name": "Pseudoephedrine + Cetirizine",
+   "notification": "S.O. 957(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pseudoephedrine",
+    "cetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 349,
+   "name": "Dextromethorphan + Chlorpheniramine + Ammonium Chloride + Menthol",
+   "notification": "S.O. 958(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "chlorpheniramine",
+    "ammonium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 350,
+   "name": "Paracetamol + Caffeine + Phenylephrine + Chlorpheniramine",
+   "notification": "S.O. 959(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "caffeine",
+    "phenylephrine",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 351,
+   "name": "Salbutamol + Aminophylline + Guaifenesin",
+   "notification": "S.O. 960(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "aminophylline",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 352,
+   "name": "Salbutamol + Theophylline + Bromhexine",
+   "notification": "S.O. 961(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "theophylline",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 353,
+   "name": "Chlorpheniramine + Dextromethorphan + Guaifenesin + Phenylephrine",
+   "notification": "S.O. 962(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "dextromethorphan",
+    "guaifenesin",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 354,
+   "name": "Caffeine + Paracetamol + Chlorpheniramine",
+   "notification": "S.O. 963(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "caffeine",
+    "paracetamol",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 355,
+   "name": "Ammonium Chloride + Dextromethorphan + Cetirizine + Menthol",
+   "notification": "S.O. 964(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ammonium chloride",
+    "dextromethorphan",
+    "cetirizine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 356,
+   "name": "Dextromethorphan + Paracetamol + Cetirizine + Phenylephrine",
+   "notification": "S.O. 965(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "paracetamol",
+    "cetirizine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 357,
+   "name": "Chlorpheniramine + Terpin + Antimony Potassium Tartrate + Ammonium chloride + Sodium Citrate + Menthol",
+   "notification": "S.O. 966(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "terpin",
+    "antimony potassium tartrate",
+    "ammonium chloride",
+    "sodium citrate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 358,
+   "name": "Terbutaline Sulphate + Etofylline + Ambroxol",
+   "notification": "S.O. 967(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "terbutaline sulphate",
+    "etofylline",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 359,
+   "name": "Paracetamol + Codeine + Chlorpheniramine",
+   "notification": "S.O. 968(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "codeine",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 360,
+   "name": "Paracetamol + Pseudoephedrine + Cetirizine + Caffeine",
+   "notification": "S.O. 969(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "pseudoephedrine",
+    "cetirizine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 361,
+   "name": "Chlorpheniramine + Ammonium Chloride + Menthol",
+   "notification": "S.O. 970(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "ammonium chloride",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 362,
+   "name": "N-Acetyl Cysteine + Ambroxol + Phenylephrine + Levocetirizine",
+   "notification": "S.O. 971(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "n-acetyl cysteine",
+    "ambroxol",
+    "phenylephrine",
+    "levocetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 363,
+   "name": "Dextromethorphan + Phenylephrine + Triprolidine + Menthol",
+   "notification": "S.O. 972(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "triprolidine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 364,
+   "name": "Salbutamol + Cetirizine + Ambroxol",
+   "notification": "S.O. 973(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "cetirizine",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 365,
+   "name": "Dextromethorphan + Phenylephrine + Bromhexine + Guaifenesin + Chlorpheniramine",
+   "notification": "S.O. 974(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "bromhexine",
+    "guaifenesin",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 366,
+   "name": "Nimesulide + Cetirizine + Phenylephrine",
+   "notification": "S.O. 975(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "cetirizine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 367,
+   "name": "Naphazoline + Chlorpheniramine + Zinc Sulphate + Boric Acid IP + Sodium chloride + Chlorobutol",
+   "notification": "S.O. 976(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "naphazoline",
+    "chlorpheniramine",
+    "zinc sulphate",
+    "boric acid",
+    "sodium chloride",
+    "chlorobutol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 368,
+   "name": "Paracetamol + Bromhexine + Phenylephrine + Chlorpheniramine + Guaifenesin",
+   "notification": "S.O. 977(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "bromhexine",
+    "phenylephrine",
+    "chlorpheniramine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 369,
+   "name": "Salbutamol + Bromhexine",
+   "notification": "S.O. 978(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 370,
+   "name": "Dextromethorphan + Phenylephrine + Guaifenesin + Cetirizine + Acetaminophen",
+   "notification": "S.O. 979(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "guaifenesin",
+    "cetirizine",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 371,
+   "name": "Guaifenesin + Bromhexine + Chlorpheniramine + Paracetamol",
+   "notification": "S.O. 980(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "guaifenesin",
+    "bromhexine",
+    "chlorpheniramine",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 372,
+   "name": "Chlorpheniramine + Ammonium Chloride + Chloroform + Menthol",
+   "notification": "S.O. 981(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "ammonium chloride",
+    "chloroform",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 373,
+   "name": "Salbutamol + Choline Theophyllinate + Ambroxol",
+   "notification": "S.O. 982(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "choline theophyllinate",
+    "ambroxol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 374,
+   "name": "Chlorpheniramine + Codeine phosphate + Menthol syrup",
+   "notification": "S.O. 983(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "codeine phosphate",
+    "menthol"
+   ],
+   "scope": "syrup",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 375,
+   "name": "Pseudoephedrine + Bromhexine",
+   "notification": "S.O. 984(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "pseudoephedrine",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 376,
+   "name": "Cetirizine + Phenylephrine + Paracetamol + Caffeine + Nimesulide",
+   "notification": "S.O. 985(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "cetirizine",
+    "phenylephrine",
+    "paracetamol",
+    "caffeine",
+    "nimesulide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 377,
+   "name": "Dextromethorphan + Cetirizine + Guaifenesin + Ammonium Chloride",
+   "notification": "S.O. 986(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "cetirizine",
+    "guaifenesin",
+    "ammonium chloride"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 378,
+   "name": "Ambroxol + Salbutamol + Choline Theophyllinate + Menthol",
+   "notification": "S.O. 987(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ambroxol",
+    "salbutamol",
+    "choline theophyllinate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 379,
+   "name": "Paracetamol + Chlorpheniramine + Ambroxol + Guaifenesin + Phenylephrine",
+   "notification": "S.O. 988(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "chlorpheniramine",
+    "ambroxol",
+    "guaifenesin",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 380,
+   "name": "Chlorpheniramine + Vasaka + Tolu balsam + Ammonium Chloride + Sodium Citrate + Menthol",
+   "notification": "S.O. 989(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "vasaka",
+    "tolu balsam",
+    "ammonium chloride",
+    "sodium citrate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 381,
+   "name": "Bromhexine + Cetrizine + Phenylephrine + Guaifenesin + Menthol",
+   "notification": "S.O. 990(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "bromhexine",
+    "cetirizine",
+    "phenylephrine",
+    "guaifenesin",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 382,
+   "name": "Dextromethorphan + Ambroxol + Ammonium Chloride + Chlorpheniramine + Menthol",
+   "notification": "S.O. 991(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "ambroxol",
+    "ammonium chloride",
+    "chlorpheniramine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 383,
+   "name": "Dextromethorphan + Phenylephrine + Cetirizine + Zinc + Menthol",
+   "notification": "S.O. 992(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "phenylephrine",
+    "cetirizine",
+    "zinc",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 384,
+   "name": "Terbutaline + N-Acetyl L-Cysteine + Guaifenesin",
+   "notification": "S.O. 993(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "terbutaline",
+    "n-acetyl l-cysteine",
+    "guaifenesin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 385,
+   "name": "Calcium Gluconate + Levocetirizine",
+   "notification": "S.O. 994(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "calcium gluconate",
+    "levocetirizine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 386,
+   "name": "Paracetamol + Levocetirizine + Pseudoephedrine",
+   "notification": "S.O. 995(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "levocetirizine",
+    "pseudoephedrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 387,
+   "name": "Salbutamol + Choline Theophyllinate + Carbocisteine",
+   "notification": "S.O. 996(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "choline theophyllinate",
+    "carbocisteine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 388,
+   "name": "Chlorpheniramine + Vitamin C",
+   "notification": "S.O. 997(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "vitamin c"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 389,
+   "name": "Calcium Gluconate + Chlorpheniramine + Vitamin C",
+   "notification": "S.O. 998(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "calcium gluconate",
+    "chlorpheniramine",
+    "vitamin c"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 390,
+   "name": "Chlorpheniramine + Paracetamol + Pseudoephedrine + Caffeine",
+   "notification": "S.O. 999(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "chlorpheniramine",
+    "paracetamol",
+    "pseudoephedrine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 391,
+   "name": "Guaifenesin + Bromhexine + Chlorpheniramine + Phenylephrine + Paracetamol + Serratiopeptidase (as enteric coated granules) 10000 SP Units",
+   "notification": "S.O. 1000(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "guaifenesin",
+    "bromhexine",
+    "chlorpheniramine",
+    "phenylephrine",
+    "paracetamol",
+    "serratiopeptidase"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 392,
+   "name": "Paracetamol + Pheniramine",
+   "notification": "S.O. 1001(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "pheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 393,
+   "name": "Betamethasone + Fusidic Acid + Gentamycin + Tolnaftate + Iodochlorhydroxyquinoline (ICHQ)",
+   "notification": "S.O. 1002(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "betamethasone",
+    "fusidic acid",
+    "gentamicin",
+    "tolnaftate",
+    "iodochlorhydroxyquinoline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 394,
+   "name": "Clobetasol + Ofloxacin + Miconazole + Zinc Sulphate",
+   "notification": "S.O. 1003(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "ofloxacin",
+    "miconazole",
+    "zinc sulphate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 395,
+   "name": "Clobetasol + Gentamicin + Miconazole + Zinc Sulphate",
+   "notification": "S.O. 1004(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "gentamicin",
+    "miconazole",
+    "zinc sulphate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 396,
+   "name": "Levocetirizine + Ambroxol + Phenylephrine + Paracetamol",
+   "notification": "S.O. 1005(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levocetirizine",
+    "ambroxol",
+    "phenylephrine",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 397,
+   "name": "Permethrin + Cetrimide + Menthol",
+   "notification": "S.O. 1006(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "permethrin",
+    "cetrimide",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 398,
+   "name": "Beclomethasone + Clotrimazole + Neomycin + Iodochlorohydroxyquinoline",
+   "notification": "S.O. 1007(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "beclomethasone",
+    "clotrimazole",
+    "neomycin",
+    "iodochlorhydroxyquinoline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 399,
+   "name": "Neomycin + Doxycycline",
+   "notification": "S.O. 1008(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "neomycin",
+    "doxycycline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 400,
+   "name": "Ciprofloxacin + Fluocinolone + Clotrimazole + Neomycin + Chlorocresol",
+   "notification": "S.O. 1009(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ciprofloxacin",
+    "fluocinolone",
+    "clotrimazole",
+    "neomycin",
+    "chlorocresol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 401,
+   "name": "Clobetasol + Ofloxacin + Ketoconazole + Zinc Sulphate",
+   "notification": "S.O. 1010(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "ofloxacin",
+    "ketoconazole",
+    "zinc sulphate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 402,
+   "name": "Betamethasone + Gentamicin + Tolnaftate + Iodochlorhydroxyquinoline",
+   "notification": "S.O. 1011(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "betamethasone",
+    "gentamicin",
+    "tolnaftate",
+    "iodochlorhydroxyquinoline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 403,
+   "name": "Clobetasol + Gentamicin + Tolnaftate + Iodochlorhydroxyquinoline + Ketoconazole",
+   "notification": "S.O. 1012(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "gentamicin",
+    "tolnaftate",
+    "iodochlorhydroxyquinoline",
+    "ketoconazole"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 404,
+   "name": "Allantoin + Dimethicone + Urea + Propylene + Glycerin + Liquid paraffin",
+   "notification": "S.O. 1013(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "allantoin",
+    "dimethicone",
+    "urea",
+    "propylene",
+    "glycerin",
+    "liquid paraffin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 405,
+   "name": "Acriflavine + Thymol + Cetrimide",
+   "notification": "S.O. 1014(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "acriflavine",
+    "thymol",
+    "cetrimide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 406,
+   "name": "Betamethasone + Neomycin + Tolnaftate + Iodochlorohydroxyquinoline + Chlorocresol",
+   "notification": "S.O. 1015(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "betamethasone",
+    "neomycin",
+    "tolnaftate",
+    "iodochlorhydroxyquinoline",
+    "chlorocresol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 407,
+   "name": "Clobetasol + Neomycin + Miconazole + Clotrimazole",
+   "notification": "S.O. 1016(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "neomycin",
+    "miconazole",
+    "clotrimazole"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 408,
+   "name": "Ketoconazole + Tea Tree oil + Allantoin + Zinc Oxide + Aloe Vera + Jojoba oil + Lavender oil + Soap noodles",
+   "notification": "S.O. 1017(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ketoconazole",
+    "tea tree oil",
+    "allantoin",
+    "zinc oxide",
+    "aloe vera",
+    "jojoba oil",
+    "lavender oil",
+    "soap noodles"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 409,
+   "name": "Clobetasol + Ofloxacin + Ornidazole + Terbinafine",
+   "notification": "S.O. 1018(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "ofloxacin",
+    "ornidazole",
+    "terbinafine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 410,
+   "name": "Clobetasol + Neomycin + Miconazole + Zinc Sulphate",
+   "notification": "S.O. 1019(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clobetasol",
+    "neomycin",
+    "miconazole",
+    "zinc sulphate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 411,
+   "name": "Beclomethasone + Neomycin + Tolnaftate + Iodochlorhydroxyquinoline + Chlorocresol",
+   "notification": "S.O. 1020(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "beclomethasone",
+    "neomycin",
+    "tolnaftate",
+    "iodochlorhydroxyquinoline",
+    "chlorocresol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 412,
+   "name": "Betamethasone + Gentamycin + Zinc Sulphate + Clotrimazole + Chlorocresol",
+   "notification": "S.O. 1021(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "betamethasone",
+    "gentamicin",
+    "zinc sulphate",
+    "clotrimazole",
+    "chlorocresol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 413,
+   "name": "Borax + Boric acid + Naphazoline + Menthol + Camphor + Methyl hydroxy benzoate",
+   "notification": "S.O. 1022(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "borax",
+    "boric acid",
+    "naphazoline",
+    "menthol",
+    "camphor",
+    "methyl hydroxy benzoate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 414,
+   "name": "Bromhexine + Dextromethorphan",
+   "notification": "S.O. 1023(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "bromhexine",
+    "dextromethorphan"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 415,
+   "name": "Dextromethorphan + Chlorpheniramine + Bromhexine",
+   "notification": "S.O. 1024(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "chlorpheniramine",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 416,
+   "name": "Menthol + Anaesthetic Ether",
+   "notification": "S.O. 1025(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "menthol",
+    "anaesthetic ether"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 417,
+   "name": "Dextromethorphan + Chlorpheniramine + Ammonium Chloride + Sodium Citrate + Menthol",
+   "notification": "S.O. 1026(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dextromethorphan",
+    "chlorpheniramine",
+    "ammonium chloride",
+    "sodium citrate",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 418,
+   "name": "Ergotamine Tartrate + Belladonna dry extract + Caffeine + Paracetamol",
+   "notification": "S.O. 1027(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ergotamine tartrate",
+    "belladonna dry extract",
+    "caffeine",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 419,
+   "name": "Phenytoin + Phenobarbitone sodium",
+   "notification": "S.O. 1028(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "phenytoin",
+    "phenobarbitone sodium"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 420,
+   "name": "Gliclazide 40mg + Metformin 400mg",
+   "notification": "S.O. 1029(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "gliclazide",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 421,
+   "name": "Paracetamol + Ambroxol + Phenylephrine + Chlorpheniramine",
+   "notification": "S.O. 1030(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "ambroxol",
+    "phenylephrine",
+    "chlorpheniramine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 422,
+   "name": "Ofloxacin + Ornidazole suspension",
+   "notification": "S.O. 1031(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ofloxacin",
+    "ornidazole"
+   ],
+   "scope": "suspension",
+   "status": "sub-judice"
+  },
+  {
+   "sr": 423,
+   "name": "Albuterol + Etofylline + Bromhexine + Menthol",
+   "notification": "S.O. 1032(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "etofylline",
+    "bromhexine",
+    "menthol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 424,
+   "name": "Albuterol + Bromhexine + Theophylline",
+   "notification": "S.O. 1033(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "bromhexine",
+    "theophylline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 425,
+   "name": "Salbutamol + Hydroxyethyltheophylline (Etofylline) + Bromhexine",
+   "notification": "S.O. 1034(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "salbutamol",
+    "etofylline",
+    "bromhexine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 426,
+   "name": "Paracetamol + Phenylephrine + Levocetirizine + Sodium Citrate",
+   "notification": "S.O. 1035(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "phenylephrine",
+    "levocetirizine",
+    "sodium citrate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 427,
+   "name": "Paracetamol + Propyphenazone + Caffeine",
+   "notification": "S.O. 1036(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "paracetamol",
+    "propyphenazone",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 428,
+   "name": "Guaifenesin + Diphenhydramine + Bromhexine + Phenylephrine",
+   "notification": "S.O. 1037(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "guaifenesin",
+    "diphenhydramine",
+    "bromhexine",
+    "phenylephrine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 429,
+   "name": "Dried Aluminium Hydroxide Gel + Propantheline Bromide + Diazepam",
+   "notification": "S.O. 1038(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "dried aluminium hydroxide",
+    "propantheline bromide",
+    "diazepam"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 430,
+   "name": "Bromhexine + Phenylephrine + Chlorpheniramine + Paracetamol",
+   "notification": "S.O. 1039(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "bromhexine",
+    "phenylephrine",
+    "chlorpheniramine",
+    "paracetamol"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 431,
+   "name": "Beclomethasone + Clotrimazole + Gentamicin + Iodochlorhydroxyquinoline",
+   "notification": "S.O. 1040(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "beclomethasone",
+    "clotrimazole",
+    "gentamicin",
+    "iodochlorhydroxyquinoline"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 432,
+   "name": "Telmisartan + Metformin",
+   "notification": "S.O. 1041(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "telmisartan",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 433,
+   "name": "Ammonium Citrate + Vitamin B12 + Folic Acid + Zinc Sulphate",
+   "notification": "S.O. 1042(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "ammonium citrate",
+    "vitamin b12",
+    "folic acid",
+    "zinc sulphate"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 434,
+   "name": "Levothyroxine + Pyridoxine + Nicotinamide",
+   "notification": "S.O. 1043(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "levothyroxine",
+    "vitamin b6",
+    "nicotinamide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 435,
+   "name": "Benfotiamine + Metformin",
+   "notification": "S.O. 1044(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "benfotiamine",
+    "metformin"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 436,
+   "name": "Thyroid + Thiamine + Riboflavin + Pyridoxine + Calcium Pantothenate + Tocopheryl Acetate + Nicotinamide",
+   "notification": "S.O. 1045(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "thyroid",
+    "vitamin b1",
+    "riboflavin",
+    "vitamin b6",
+    "calcium pantothenate",
+    "tocopheryl acetate",
+    "nicotinamide"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 437,
+   "name": "Ascorbic Acid + Menadione Sodium Bisulphate + Rutin + Dibasic Calcium Phosphate + Adrenochrome Mono Semicarbazone",
+   "notification": "S.O. 1046(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "vitamin c",
+    "menadione sodium bisulphate",
+    "rutin",
+    "dibasic calcium phosphate",
+    "adrenochrome mono semicarbazone"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 438,
+   "name": "Phenylephrine + Chlorpheniramine + Paracetamol + Bromhexine + Caffeine",
+   "notification": "S.O. 1047(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "phenylephrine",
+    "chlorpheniramine",
+    "paracetamol",
+    "bromhexine",
+    "caffeine"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 439,
+   "name": "Clotrimazole + Beclomethasone + Lignocaine + Ofloxacin + Acetic Acid + Sodium Methyl Paraben + Propyl Paraben",
+   "notification": "S.O. 1048(E) dated 10.03.2016",
+   "type": "fdc",
+   "terms": [
+    "clotrimazole",
+    "beclomethasone",
+    "lignocaine",
+    "ofloxacin",
+    "acetic acid",
+    "sodium methyl paraben",
+    "propyl paraben"
+   ],
+   "status": "sub-judice"
+  },
+  {
+   "sr": 440,
+   "name": "Fixed Dose Combination of Nimesulide + Levocetirizine",
+   "notification": "S.O. 1851(E) dated 08.06.2017",
+   "type": "fdc",
+   "terms": [
+    "nimesulide",
+    "levocetirizine"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 441,
+   "name": "Fixed Dose Combination of Ofloxacin + Ornidazole Injection",
+   "notification": "S.O. 1852(E) dated 08.06.2017",
+   "type": "fdc",
+   "terms": [
+    "ofloxacin",
+    "ornidazole"
+   ],
+   "scope": "injection",
+   "status": "prohibited"
+  },
+  {
+   "sr": 442,
+   "name": "Fixed Dose Combination of Gemifloxacin + Ambroxol",
+   "notification": "S.O. 1853(E) dated 08.06.2017",
+   "type": "fdc",
+   "terms": [
+    "gemifloxacin",
+    "ambroxol"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 443,
+   "name": "Fixed Dose Combination of Glucosamine + Ibuprofen",
+   "notification": "S.O. 1854(E) dated 08.06.2017",
+   "type": "fdc",
+   "terms": [
+    "glucosamine",
+    "ibuprofen"
+   ],
+   "status": "prohibited"
+  },
+  {
+   "sr": 444,
+   "name": "Fixed Dose Combination of Etodolac + Paracetamol",
+   "notification": "S.O. 1855(E) dated 08.06.2017",
+   "type": "fdc",
+   "terms": [
+    "etodolac",
+    "paracetamol"
+   ],
+   "status": "prohibited"
+  }
+ ]
+}

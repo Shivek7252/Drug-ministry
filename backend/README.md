@@ -27,6 +27,22 @@ npm run dev
 
 Server runs at: http://localhost:5001
 
+## Reviewer query-history migration
+
+After deploying the reviewer query-history schema, run the idempotent backfill once:
+
+```bash
+npm run migrate:query-history
+```
+
+It creates the unique query indexes, preserves legacy reviewer/checklist/shipment
+queries, recalculates query counts, and backfills approval/rejection dates.
+
+Reviewer APIs include the paginated `GET /api/applications/reviewer`, filter
+options, unpaginated CSV export, and `GET /api/applications/:id/query-history`.
+They use the current frontend session convention: `X-User-Role: reviewer` and
+`X-Reviewer-Name` headers.
+
 ## Endpoints
 
 - `GET  /health` — Health check

@@ -9,7 +9,10 @@
 /* ===== MODAL ===== */
 .login-modal {
   position: fixed;
-  top: 130px;          /* sits just below the header, like CDSCO */
+  /* Was a hardcoded 130px matching the OLD chrome (announcement + tall
+     masthead). The chrome is now 32 + 72, and the announcement is dismissible,
+     so this is derived: --h-announce-current is 0px once dismissed. */
+  top: calc(var(--h-announce-current, var(--h-announce, 32px)) + var(--h-masthead, 72px));
   left: 0;
   right: 0;
   z-index: 301;

@@ -14,23 +14,20 @@ import ReviewDashboard from './pages/reviewer/ReviewDashboard';
 import ReviewApplicationPage from './pages/reviewer/ReviewApplicationPage';
 import './App.css';
 
-/* Reviewer sub-routes: dashboard queue at /review, full-page app detail at
-   /review/application/:appNumber (opens in a new browser tab).
-   The detail page is always accessible regardless of auth state — it reads
-   reviewer identity from sessionStorage (set at login time) and fetches data
-   directly from the API, so it works in a standalone new tab. */
-function ReviewerRoutes() {
+/* Reviewer queue and application detail routes share the existing role guard. */
+function ReviewerOnly({ children }) {
   const { isLoggedIn, userRole } = useApp();
+  if (!isLoggedIn) return <AuthGuard>{children}</AuthGuard>;
+  if (userRole !== 'reviewer') return <Navigate to="/" replace />;
+  return children;
+}
+
+function ReviewerRoutes() {
   return (
     <Routes>
-      {/* Detail page — accessible in new tab without auth context */}
-      <Route path="application/:appNumber" element={<ReviewApplicationPage />} />
-      {/* Queue page — requires reviewer login */}
-      <Route path="*" element={
-        isLoggedIn && userRole === 'reviewer'
-          ? <ReviewDashboard />
-          : <AuthGuard><DashboardPage /></AuthGuard>
-      }/>
+      {/* Detail and queue pages both require an authenticated reviewer. */}
+      <Route path="application/:appNumber" element={<ReviewerOnly><ReviewApplicationPage /></ReviewerOnly>} />
+      <Route path="*" element={<ReviewerOnly><ReviewDashboard /></ReviewerOnly>} />
     </Routes>
   );
 }

@@ -1,0 +1,206 @@
+/* ============================================================================
+   CDSCO SUGAM — design tokens
+   Single source for colour, spacing, radius, type scale and elevation.
+   No component may declare a raw hex; everything resolves through here.
+
+   Type sizes are rem-based so the masthead A- / A / A+ controls work by
+   changing the root font-size class (see useTextScale).
+   ============================================================================ */
+
+:root {
+  /* ---- Brand ------------------------------------------------------------ */
+  --c-navy-900: #002A63;
+  --c-navy-800: #003580;   /* CDSCO primary */
+  --c-navy-700: #0A4795;
+  --c-navy-100: #E4EBF5;
+  --c-navy-050: #F0F4FA;
+
+  /* ---- Neutral ramp (9 steps, biased slightly blue toward the navy) ------ */
+  --c-grey-50:  #F5F7FA;   /* page surface */
+  --c-grey-100: #EBEFF4;
+  --c-grey-200: #DCE3EB;   /* borders */
+  --c-grey-300: #C3CEDA;
+  --c-grey-400: #97A6B8;
+  --c-grey-500: #5F6E81;   /* muted text — measured 5.21:1 on white, 4.85:1 on page */
+  --c-grey-600: #4E5D70;
+  --c-grey-700: #3A4757;
+  --c-grey-800: #27313D;
+  --c-grey-900: #161C24;   /* body text */
+
+  /* ---- Semantic (all ≥ 4.5:1 on white, ≥ 3:1 for UI elements) ----------- */
+  --c-info:      #1D4ED8;
+  --c-info-bg:   #EFF4FE;
+  --c-info-br:   #C3D6FA;
+
+  --c-warning:    #B45309;
+  --c-warning-bg: #FEF6EC;
+  --c-warning-br: #F6D9B0;
+
+  --c-success:    #15803D;
+  --c-success-bg: #EEF9F1;
+  --c-success-br: #BFE3CB;
+
+  --c-danger:     #B91C1C;
+  --c-danger-bg:  #FDF0F0;
+  --c-danger-br:  #F3C6C6;
+
+  /* ---- Surfaces --------------------------------------------------------- */
+  --surface-page:   var(--c-grey-50);
+  --surface-card:   #FFFFFF;
+  --surface-sunken: var(--c-grey-100);
+  /* Decorative separators. WCAG 1.4.11 does not require 3:1 for boundaries
+     that are not needed to identify a control or understand content; card
+     edges and table rules qualify. Measured 1.29:1 — deliberate, not an
+     oversight. Controls use --border-input below, which does meet 3:1. */
+  --border-default: var(--c-grey-200);
+  --border-strong:  var(--c-grey-300);
+  /* Control borders identify an input, so WCAG 1.4.11 applies at 3:1.
+     Decorative separators (--border-default) are exempt and stay light. */
+  --border-input:   #8C949D;
+
+  --text-primary:   var(--c-grey-900);
+  --text-secondary: var(--c-grey-600);
+  --text-muted:     var(--c-grey-500);
+  --text-inverse:   #FFFFFF;
+
+  --focus-ring: var(--c-navy-700);
+
+  /* ---- Status tokens ----------------------------------------------------
+     A status pill and its KPI tile MUST read from the same triple, so the
+     two never drift apart (audit item 10). */
+  --st-total-fg:       var(--c-grey-700);
+  --st-total-bg:       var(--c-grey-100);
+  --st-total-br:       var(--c-grey-300);
+
+  --st-submitted-fg:   var(--c-info);
+  --st-submitted-bg:   var(--c-info-bg);
+  --st-submitted-br:   var(--c-info-br);
+
+  --st-review-fg:      var(--c-navy-800);
+  --st-review-bg:      var(--c-navy-050);
+  --st-review-br:      var(--c-navy-100);
+
+  --st-query-fg:       var(--c-warning);
+  --st-query-bg:       var(--c-warning-bg);
+  --st-query-br:       var(--c-warning-br);
+
+  --st-approved-fg:    var(--c-success);
+  --st-approved-bg:    var(--c-success-bg);
+  --st-approved-br:    var(--c-success-br);
+
+  --st-rejected-fg:    var(--c-danger);
+  --st-rejected-bg:    var(--c-danger-bg);
+  --st-rejected-br:    var(--c-danger-br);
+
+  --st-overdue-fg:     var(--c-danger);
+  --st-overdue-bg:     var(--c-danger-bg);
+  --st-overdue-br:     var(--c-danger);
+
+  --st-draft-fg:       var(--c-grey-500);
+  --st-draft-bg:       var(--c-grey-100);
+  --st-draft-br:       var(--c-grey-200);
+
+  /* ---- Chart palette ----------------------------------------------------
+     Okabe-Ito derived: distinguishable under deuteranopia, protanopia and
+     tritanopia. Meaning is never carried by hue alone — every series is also
+     labelled, and the TAT ramp is ordered by lightness as well as hue. */
+  --chart-1: #0072B2;
+  --chart-2: #C68900;
+  --chart-3: #009E73;
+  --chart-4: #CC79A7;
+  --chart-5: #4B9DCB;
+  --chart-6: #D55E00;
+  --chart-7: #6B7C91;
+  --chart-8: #8C6D31;
+
+  /* Sequential urgency ramp for turnaround buckets (light → dark, calm → red) */
+  --tat-1: #3B7FB8;
+  --tat-2: #7298B9;
+  --tat-3: #BB8D38;
+  --tat-4: #C9702F;
+  --tat-5: #A82F29;
+
+  /* Gridlines are decorative: every chart also carries axis labels, tooltips
+     with absolute values, and a full "View as table" alternative, so the data
+     is never conveyed by the grid alone. Measured 1.29:1 — exempt under 1.4.11. */
+  --chart-grid: var(--c-grey-200);
+  --chart-axis: #68788D;
+  --chart-ref:  var(--c-grey-700);
+
+  /* ---- Spacing: 4px base ------------------------------------------------ */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ---- Radius ----------------------------------------------------------- */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-pill: 999px;
+
+  /* ---- Type scale (rem — scales with the A- / A / A+ control) ----------- */
+  --fs-11: 0.6875rem;
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-16: 1rem;
+  --fs-18: 1.125rem;
+  --fs-20: 1.25rem;
+  --fs-24: 1.5rem;
+  --fs-30: 1.875rem;
+
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-bold:    700;
+
+  --lh-tight: 1.25;
+  --lh-body:  1.5;
+
+  /* ---- Elevation: overlays only. Cards use a 1px border. ---------------- */
+  --elev-overlay: 0 8px 24px rgba(22, 28, 36, 0.16);
+
+  /* ---- Fixed chrome heights (Part 3) ------------------------------------ */
+  --h-announcement: 32px;
+  --h-masthead:     72px;
+  --h-nav:          48px;
+  --h-pageheader:   64px;
+}
+
+/* ---- Root text scale, driven by the masthead A- / A / A+ controls ------- */
+html.text-scale-sm { font-size: 87.5%; }   /* A-  = 14px base */
+html.text-scale-md { font-size: 100%; }    /* A   = 16px base */
+html.text-scale-lg { font-size: 112.5%; }  /* A+  = 18px base */
+
+/* ---- Shared primitives -------------------------------------------------- */
+.tnum { font-variant-numeric: tabular-nums; }
+
+.focus-ring:focus-visible,
+.rq-focusable:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* Visible only to assistive tech until focused (skip link). */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-visible {
+  position: static;
+  width: auto; height: auto;
+  margin: 0; overflow: visible; clip: auto;
+  white-space: normal;
+}

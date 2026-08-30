@@ -1,0 +1,233 @@
+/* ============================================================
+   DrugComplianceAlert — full-width compliance banner for the wizard.
+   Severity colours come from the tokens in index.css (:root); nothing
+   here hardcodes a severity hex.
+   ============================================================ */
+
+/* ---- Alert region: full-width row inside the existing .grid-3 ---------- */
+.dca-region {
+  grid-column: 1 / -1;
+  /* Space is reserved as soon as a lookup can produce a result, so the banner
+     fades in without shifting the fields below it. */
+  min-height: 0;
+  transition: min-height 0.15s ease;
+}
+.dca-region.is-reserved { min-height: 92px; }
+
+/* ---- Banner ------------------------------------------------------------ */
+.dca {
+  --sev-bg: var(--sev-notFound-bg);
+  --sev-line: var(--sev-notFound-border);
+  --sev-ink: var(--sev-notFound-text);
+
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 13px 16px;
+  background: var(--sev-bg);
+  color: var(--sev-ink);
+  border: 1px solid var(--sev-line);
+  border: 1px solid color-mix(in srgb, var(--sev-line) 40%, transparent);
+  border-left: 4px solid var(--sev-line);
+  border-radius: 8px;
+  box-shadow: none;
+  animation: dca-enter 0.15s ease-out both;
+}
+
+.dca.sev-banned {
+  --sev-bg: var(--sev-banned-bg);
+  --sev-line: var(--sev-banned-border);
+  --sev-ink: var(--sev-banned-text);
+}
+.dca.sev-restricted {
+  --sev-bg: var(--sev-restricted-bg);
+  --sev-line: var(--sev-restricted-border);
+  --sev-ink: var(--sev-restricted-text);
+}
+.dca.sev-notFound {
+  --sev-bg: var(--sev-notFound-bg);
+  --sev-line: var(--sev-notFound-border);
+  --sev-ink: var(--sev-notFound-text);
+}
+.dca.sev-approved {
+  --sev-bg: var(--sev-approved-bg);
+  --sev-line: var(--sev-approved-border);
+  --sev-ink: var(--sev-approved-text);
+}
+
+@keyframes dca-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dca-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--sev-line);
+}
+
+.dca-body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- Headline block + metadata sit side by side on wide viewports ------ */
+.dca-top {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr);
+  gap: 10px 28px;
+  align-items: start;
+}
+.dca-headline {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0;
+  color: var(--sev-ink);
+}
+.dca-subline {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 2px 0 0;
+  opacity: 0.85;
+}
+.dca-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 72ch;
+}
+
+/* ---- Metadata definition list ----------------------------------------- */
+.dca-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, auto));
+  gap: 8px 24px;
+  margin: 0;
+}
+.dca-meta > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dca-meta dt {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.dca-meta dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* Disclosure wrapper: summary only shows on narrow viewports (see below). */
+.dca-details > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+  padding: 3px 0;
+  color: var(--sev-ink);
+}
+.dca-details > summary::-webkit-details-marker { display: none; }
+.dca-details > summary::before { content: '▸ '; display: inline-block; transition: transform 0.15s; }
+.dca-details[open] > summary::before { content: '▾ '; }
+.dca-details > summary:focus-visible { outline: 2px solid var(--sev-line); outline-offset: 2px; border-radius: 4px; }
+
+/* ---- Action row -------------------------------------------------------- */
+.dca-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--sev-line) 25%, transparent);
+}
+.dca-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.dca-ack input { margin: 2px 0 0; accent-color: var(--sev-line); flex: none; cursor: pointer; }
+.dca-ack input:focus-visible { outline: 2px solid var(--sev-line); outline-offset: 2px; }
+.dca-hint {
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.9;
+  font-style: italic;
+}
+.dca-note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.85;
+}
+
+@media (min-width: 900px) {
+  .dca-top { grid-template-columns: minmax(260px, 1fr) auto; }
+  .dca-details > summary { display: none; }
+  .dca-actions { flex-direction: row; align-items: center; justify-content: space-between; gap: 18px; }
+  .dca-hint { text-align: right; }
+}
+
+/* ---- Read-only variant (reviewer dashboard) ---------------------------- */
+.dca.is-readonly .dca-actions { border-top: none; padding-top: 0; }
+
+/* ============================================================
+   CDSCO lookup chip — mirrors the same severity tokens
+   ============================================================ */
+.cdsco-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  background: #E3F2FD;
+  color: var(--primary-light);
+  border: 1px solid transparent;
+}
+.cdsco-chip.is-checking { background: #ECEFF1; color: var(--text-muted); }
+.cdsco-chip.is-matched {
+  background: var(--sev-approved-bg);
+  color: var(--sev-approved-text);
+  border-color: color-mix(in srgb, var(--sev-approved-border) 40%, transparent);
+}
+.cdsco-chip.is-flagged.sev-banned {
+  background: var(--sev-banned-bg);
+  color: var(--sev-banned-text);
+  border-color: color-mix(in srgb, var(--sev-banned-border) 40%, transparent);
+}
+.cdsco-chip.is-flagged.sev-restricted {
+  background: var(--sev-restricted-bg);
+  color: var(--sev-restricted-text);
+  border-color: color-mix(in srgb, var(--sev-restricted-border) 40%, transparent);
+}
+.cdsco-chip.is-flagged.sev-notFound {
+  background: var(--sev-notFound-bg);
+  color: var(--sev-notFound-text);
+  border-color: color-mix(in srgb, var(--sev-notFound-border) 40%, transparent);
+}
+
+.cdsco-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: cdsco-spin 0.6s linear infinite;
+}
+@keyframes cdsco-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dca { animation: none; }
+  .dca-region { transition: none; }
+  .cdsco-spinner { animation-duration: 2s; }
+}

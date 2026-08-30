@@ -23,7 +23,7 @@ import './SummaryPanel.css';
  *   appNumber       — application number (required)
  *   application     — the loaded application (used for header metadata)
  *   onClose         — close callback
- *   onNavigateTo(tab) — jump to a tab (e.g. 'checklist', 'docs')
+ *   onNavigateTo(tab) — jump to a tab (e.g. 'docs', 'shipments')
  *   onOpenDoc(docId, docLabel, docType, docObj) — open doc viewer for an upload
  */
 export default function SummaryPanel({ appNumber, application, onClose, onNavigateTo, onOpenDoc }) {
@@ -143,7 +143,7 @@ function analyzeCompliance(data, application) {
       detail: it.matchedDoc?.validationResult?.documentTypeReason
         || 'AI classified the upload as a different document type.',
       itemNo: it.itemNo,
-      relatedTab: 'checklist',
+      relatedTab: 'docs',
     });
   }
   for (const it of buckets.missing) {
@@ -154,7 +154,7 @@ function analyzeCompliance(data, application) {
       title: `Missing: ${it.title}`,
       detail: `Item ${it.itemNo} — no matching document uploaded by the applicant.`,
       itemNo: it.itemNo,
-      relatedTab: 'checklist',
+      relatedTab: 'docs',
     });
   }
   for (const it of buckets.unchecked) {
@@ -179,9 +179,9 @@ function analyzeCompliance(data, application) {
     nextSteps.push({
       priority: 1,
       icon: '📝',
-      title: `Raise ${missingCount + wrongCount} quer${missingCount + wrongCount !== 1 ? 'ies' : 'y'} for missing / wrong documents`,
-      detail: `${missingCount} missing · ${wrongCount} wrongly uploaded. Use the Checklist Query tab to formally request corrections from the applicant.`,
-      cta: { label: 'Open Checklist Query', tab: 'checklist' },
+      title: `${missingCount + wrongCount} document${missingCount + wrongCount !== 1 ? 's' : ''} need correction`,
+      detail: `${missingCount} missing · ${wrongCount} wrongly uploaded. Review the uploads and request corrections from the applicant.`,
+      cta: { label: 'Open Documents', tab: 'docs' },
     });
   }
   if (uncheckedCount > 0 && missingCount + wrongCount === 0) {
@@ -326,7 +326,7 @@ function ChecklistSection({ analysis, onNav }) {
     <div className="sp-card">
       <div className="sp-card-title">
         📋 CDSCO Checklist Compliance
-        <button className="sp-card-cta" onClick={() => onNav('checklist')}>Open Checklist Query →</button>
+        <button className="sp-card-cta" onClick={() => onNav('docs')}>Open Documents →</button>
       </div>
       <div className="sp-list">
         {checklistItems.map(it => {
@@ -459,7 +459,7 @@ function IssuesSection({ analysis, onNav }) {
               </div>
               {clickable && (
                 <span className="sp-row-cta">
-                  {iss.relatedTab === 'checklist' ? 'Query →' : 'Review →'}
+                  Review →
                 </span>
               )}
             </div>

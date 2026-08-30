@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { saveDraft, submitApplication } from '../api/applicationService';
 
 const AppContext = createContext();
+const MAX_DOCUMENT_SIZE = 5 * 1024 * 1024;
 
 /* Small ref helper — client-side ids for cross-referencing arrays */
 const newRef = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e5).toString(36)}`;
@@ -235,7 +236,8 @@ export function AppProvider({ children }) {
   const replaceShipments = (rows) =>
     setFormData(prev => ({ ...prev, shipments: rows }));
 
-  const addDocument = (docId, file) =>
+  const addDocument = (docId, file) => {
+    if (!file || file.size > MAX_DOCUMENT_SIZE) return;
     setFormData(prev => ({
       ...prev,
       documents: {
@@ -250,6 +252,7 @@ export function AppProvider({ children }) {
         }
       }
     }));
+  };
 
   const removeDocument = (docId) =>
     setFormData(prev => { const docs = { ...prev.documents }; delete docs[docId]; return { ...prev, documents: docs }; });

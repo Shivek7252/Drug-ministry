@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import {
@@ -8,9 +8,13 @@ import {
   preVerifyDocs,
   reviewerAction,
   getChecklist,
+  getQueryHistory,
 } from '../../api/applicationService';
 import DocViewerModal from '../../components/shared/DocViewerModal';
-import NocChecklistPage from '../../components/checklist/NocChecklistPage';
+import DrugComplianceAlert from '../../components/wizard/DrugComplianceAlert';
+import { loadApprovedDrugs } from '../../data/approvedDrugs';
+import { loadBannedDrugs } from '../../data/bannedDrugs';
+import { resolveSeverity } from '../../hooks/useCdscoLookup';
 import ShipmentsTab from './ShipmentsTab';
 import SummaryPanel from './SummaryPanel';
 import './ReviewApplicationPage.css';
@@ -22,7 +26,7 @@ import './ReviewApplicationPage.css';
 
    Composed of a sticky topbar, a hero card, a KPI strip, and a two-column
    body (sidebar navigation + main content). Reuses ShipmentsTab,
-   NocChecklistPage, SummaryPanel and DocViewerModal.
+   SummaryPanel and DocViewerModal.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* Doc slots the applicant uploads to. Same list the queue-side modal used. */
@@ -40,7 +44,7 @@ const SECTIONS = [
   { id: 'details', label: 'Application', icon: '📋' },
   { id: 'docs', label: 'Documents', icon: '📁' },
   { id: 'shipments', label: 'Shipments', icon: '🚚' },
-  { id: 'checklist', label: 'Checklist Query', icon: '🔍' },
+  { id: 'queryHistory', label: 'Query History', icon: '?' },
 ];
 
 const STATUS_TONES = {
@@ -99,6 +103,7 @@ function SectionCard({ title, icon, right, children, className = '' }) {
 export default function ReviewApplicationPage() {
   const { appNumber } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser: ctxUser } = useApp();
 
   // When this page opens in a new browser tab via window.open(), the React
@@ -119,6 +124,8 @@ export default function ReviewApplicationPage() {
   const [full, setFull] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [queryHistory, setQueryHistory] = useState([]);
+  const [queryHistoryError, setQueryHistoryError] = useState('');
   const [activeSection, setActiveSection] = useState('overview');
 
   // Doc verdict / verify state — ported from the modal
@@ -154,9 +161,18 @@ export default function ReviewApplicationPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    const res = await getApplicationFull(appNumber);
+    const [res, historyRes] = await Promise.all([
+      getApplicationFull(appNumber),
+      getQueryHistory(appNumber),
+    ]);
     if (res.success) setFull(res.application);
     else setError(res.error || 'Application could not be loaded.');
+    if (historyRes.success) {
+      setQueryHistory(historyRes.queries || []);
+      setQueryHistoryError('');
+    } else {
+      setQueryHistoryError(historyRes.error || 'Query history could not be loaded.');
+    }
     setLoading(false);
   }, [appNumber]);
 
@@ -263,6 +279,18 @@ export default function ReviewApplicationPage() {
     }
   };
 
+  const handleDocumentReviewDecision = async (status, decisionRemarks, context = {}) => {
+    const documentContext = context.docLabel ? `Document: ${context.docLabel}\n` : '';
+    const res = await reviewerAction(data.applicationNumber, {
+      status,
+      remarks: `${documentContext}${decisionRemarks}`.trim(),
+      officer: currentUser || 'reviewer',
+    });
+    if (!res.success) throw new Error(res.error || 'Reviewer action failed.');
+    await load();
+    return res;
+  };
+
   const handleLineAction = (idx, nextStatus) => {
     if (nextStatus === 'Query' || nextStatus === 'Rejected') {
       setLineRemarksPrompt({ idx, nextStatus });
@@ -314,7 +342,7 @@ export default function ReviewApplicationPage() {
           <div className="rap-error-icon">⚠️</div>
           <h2>Could not load application</h2>
           <p>{error || `Application ${appNumber} was not found.`}</p>
-          <button className="rap-btn rap-btn-primary" onClick={() => navigate('/review')}>← Back to Review Queue</button>
+          <button className="rap-btn rap-btn-primary" onClick={() => navigate(`/review${location.search}`)}>← Back to Review Queue</button>
         </div>
       </div>
     );
@@ -334,7 +362,7 @@ export default function ReviewApplicationPage() {
         </div>
         <div className="rap-topbar-right">
           <StatusBadge status={data.status} />
-          <button className="rap-btn rap-btn-back" onClick={() => navigate('/review')}>← Back to Queue</button>
+          <button className="rap-btn rap-btn-back" onClick={() => navigate(`/review${location.search}`)}>← Back to Queue</button>
         </div>
       </div>
 
@@ -375,6 +403,12 @@ export default function ReviewApplicationPage() {
           )}
 
           {/* Under Review — no "Under Review" button (already there), just Reject + Approve */}
+          {data.status === 'Rejected' && (
+            <button className="rap-btn rap-btn-primary" onClick={() => { setActionStatus('Approved'); setShowForm(true); }}>
+              Approve after re-review
+            </button>
+          )}
+
           {data.status === 'Under Review' && (
             <>
               <button className="rap-btn rap-btn-danger" onClick={() => { setActionStatus('Rejected'); setShowForm(true); }}>✕ Reject</button>
@@ -395,7 +429,7 @@ export default function ReviewApplicationPage() {
           label="Compliance"
           value={compliance ? `${compliance.pct}%` : '—'}
           hint={compliance ? `${compliance.counts.ok}/${compliance.total} checklist items OK` : 'Loading…'}
-          onClick={() => setActiveSection('checklist')}
+          onClick={() => setActiveSection('docs')}
         />
         <KpiCard
           tone="neutral" icon="📎"
@@ -424,6 +458,14 @@ export default function ReviewApplicationPage() {
           value={String(data.shipments?.length || 0)}
           hint={`${(data.shipments || []).filter(s => s.lineStatus === 'Approved').length} approved · ${(data.shipments || []).filter(s => s.lineStatus === 'Pending').length} pending`}
           onClick={() => setActiveSection('shipments')}
+        />
+        <KpiCard
+          tone={queryHistory.length ? 'warn' : 'neutral'}
+          icon="?"
+          label="Queries"
+          value={String(queryHistory.length)}
+          hint="Complete query rounds for this application"
+          onClick={() => setActiveSection('queryHistory')}
         />
       </div>
 
@@ -463,7 +505,7 @@ export default function ReviewApplicationPage() {
           {activeSection === 'details' && <DetailsSection data={data} />}
           {activeSection === 'docs' && <DocumentsSection data={data} docVerdict={docVerdict} aiCheckLoading={aiCheckLoading} onDocClick={handleDocClick} />}
           {activeSection === 'shipments' && <ShipmentsTab data={data} actionBusy={lineBusy} onLineAction={handleLineAction} />}
-          {activeSection === 'checklist' && <NocChecklistPage applicationNumber={data.applicationNumber} role="reviewer" />}
+          {activeSection === 'queryHistory' && <QueryHistorySection queries={queryHistory} error={queryHistoryError} onRetry={load} />}
         </main>
       </div>
 
@@ -488,6 +530,9 @@ export default function ReviewApplicationPage() {
           fileSize={viewerDoc.fileSize}
           fileType={viewerDoc.fileType}
           appNumber={data.applicationNumber}
+          reviewerMode
+          onReviewerDecision={handleDocumentReviewDecision}
+          reviewActionsDisabled={data.status === 'Approved' || data.status === 'Rejected'}
           verificationResult={docVerdict[viewerDoc.docId]}
           onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}
           onDecline={(id) => setDocVerdict(p => ({ ...p, [id]: 'bad' }))}
@@ -568,6 +613,25 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
       .catch(() => { });
   }, []);
 
+  // Section 26A prohibition check — same resolver the applicant wizard uses, so
+  // the reviewer sees exactly the flag the applicant was shown.
+  const [complianceReady, setComplianceReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([loadApprovedDrugs(), loadBannedDrugs()])
+      .then(() => { if (alive) setComplianceReady(true); });
+    return () => { alive = false; };
+  }, []);
+
+  const drugCompliance = complianceReady
+    ? products.map(p => ({ product: p, ...resolveSeverity(p.genericName) }))
+    : [];
+  const prohibited = drugCompliance.filter(c => c.severity === 'banned');
+  const restricted = drugCompliance.filter(c => c.severity === 'restricted');
+  const flaggedByName = new Map(
+    [...prohibited, ...restricted].map(c => [c.product.genericName, c])
+  );
+
   const findApproval = (genericName) => {
     if (!genericName || !approvedDrugs.length) return null;
     const q = genericName.trim().toLowerCase();
@@ -580,6 +644,130 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
 
   return (
     <div className="rap-section">
+      {/* A Section 26A prohibition outranks every other overview signal. */}
+      {prohibited.length > 0 && (
+        <div className="rap-banned-card" role="alert">
+          <div className="rap-banned-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" /><line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
+            </svg>
+          </div>
+          <div className="rap-banned-main">
+            <div className="rap-banned-eyebrow">Prohibited drug detected</div>
+            <h3 className="rap-banned-title">
+              {prohibited.length === 1
+                ? `${prohibited[0].product.genericName} is banned for manufacture and sale in India`
+                : `${prohibited.length} drugs on this application are banned in India`}
+            </h3>
+            <p className="rap-banned-lede">
+              Prohibited under Section 26A of the Drugs &amp; Cosmetics Act, 1940. Do not approve
+              this application without verifying a valid exemption order.
+            </p>
+            <ul className="rap-banned-list">
+              {prohibited.map(({ product, gazette }, i) => (
+                <li key={i}>
+                  <span className="rap-banned-drug">{product.genericName}</span>
+                  <span className="rap-banned-sep">/</span>
+                  <span>{product.productName || 'Unnamed product'}</span>
+                  <span className="rap-banned-sep">/</span>
+                  <span>Sr. No. {gazette.sr}</span>
+                  <span className="rap-banned-sep">/</span>
+                  <span>{gazette.notification}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="rap-banned-ack">
+              {prohibited.every(c => c.product.exemptionAcknowledged)
+                ? 'Applicant confirmed they hold exemption documentation — verify it in Documents.'
+                : 'Applicant did not confirm exemption documentation.'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CDSCO approval is the first reviewer checkpoint in the overview. */}
+      {products.length > 0 && (
+        <SectionCard title="CDSCO Drug Approval Status" icon="💊">
+          <div className="rap-cdsco-list">
+            {products.map((p, i) => {
+              const flag = flaggedByName.get(p.genericName);
+              if (flag) {
+                return (
+                  <div key={i} className={`rap-cdsco-flagged sev-${flag.severity}`}>
+                    <div className="rap-cdsco-row-header">
+                      <div>
+                        <div className="rap-cdsco-product">
+                          <strong>{p.productName || p.genericName}</strong>
+                          {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
+                          {p.dosageForm && <span className="rap-chip-tag">{p.dosageForm}</span>}
+                        </div>
+                        <div className="rap-cdsco-generic">{p.genericName}</div>
+                      </div>
+                      <span className={`rap-cdsco-badge rap-cdsco-badge-${flag.severity}`}>
+                        {flag.severity === 'banned' ? 'BANNED — SECTION 26A' : 'RESTRICTED — SECTION 26A'}
+                      </span>
+                    </div>
+                    <DrugComplianceAlert
+                      readOnly
+                      severity={flag.severity}
+                      drug={flag.drug}
+                      gazette={flag.gazette}
+                    />
+                    <div className="rap-cdsco-details">
+                      <span>
+                        {p.exemptionAcknowledged
+                          ? '✓ Applicant confirmed exemption documentation'
+                          : '✗ Applicant did not confirm exemption documentation'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+              const drug = findApproval(p.genericName);
+              const stored = p.cdscoApproved === true || p.cdscoApproved === 'true';
+              const isApproved = drug || stored;
+              return (
+                <div key={i} className={`rap-cdsco-row ${isApproved ? 'rap-cdsco-ok' : 'rap-cdsco-warn'}`}>
+                  <div className="rap-cdsco-row-header">
+                    <span className="rap-cdsco-icon">{isApproved ? '✅' : '⚠️'}</span>
+                    <div>
+                      <div className="rap-cdsco-product">
+                        <strong>{p.productName || p.genericName}</strong>
+                        {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
+                        {p.dosageForm && <span className="rap-chip-tag">{p.dosageForm}</span>}
+                      </div>
+                      <div className="rap-cdsco-generic">{p.genericName}</div>
+                    </div>
+                    <span className={`rap-cdsco-badge ${isApproved ? 'rap-cdsco-badge-ok' : 'rap-cdsco-badge-warn'}`}>
+                      {isApproved ? 'CDSCO Approved' : 'Not in CDSCO list'}
+                    </span>
+                  </div>
+                  {isApproved && (drug || p.cdscoApprovalDate) && (
+                    <div className="rap-cdsco-details">
+                      {(drug?.genericName || p.genericName) && (
+                        <span>📋 {drug?.genericName || p.genericName}</span>
+                      )}
+                      {(drug?.approvalDate || p.cdscoApprovalDate) && (
+                        <span>📅 Approval Date: <strong>{drug?.approvalDate || p.cdscoApprovalDate}</strong></span>
+                      )}
+                      {drug?.indication && (
+                        <span>🩺 Indication: {drug.indication}</span>
+                      )}
+                    </div>
+                  )}
+                  {!isApproved && (
+                    <div className="rap-cdsco-details">
+                      <span>This drug may require additional approval documentation. Verify with applicant.</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+
       <SectionCard title="Snapshot" icon="👁️">
         <div className="rap-snapshot">
           <div className="rap-snap-item">
@@ -630,8 +818,8 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
               </div>
               <div className="rap-glance-list">
                 <GlanceRow label="Correct documents" count={compliance.counts.ok} tone="ok" />
-                <GlanceRow label="Missing documents" count={compliance.counts.missing} tone="missing" onClick={compliance.counts.missing > 0 ? () => onNavigate('checklist') : null} />
-                <GlanceRow label="Wrong documents" count={compliance.counts.wrong} tone="wrong" onClick={compliance.counts.wrong > 0 ? () => onNavigate('checklist') : null} />
+                <GlanceRow label="Missing documents" count={compliance.counts.missing} tone="missing" onClick={compliance.counts.missing > 0 ? () => onNavigate('docs') : null} />
+                <GlanceRow label="Wrong documents" count={compliance.counts.wrong} tone="wrong" onClick={compliance.counts.wrong > 0 ? () => onNavigate('docs') : null} />
                 <GlanceRow label="Not yet verified" count={compliance.counts.unchecked} tone="unchecked" onClick={compliance.counts.unchecked > 0 ? () => onNavigate('docs') : null} />
               </div>
             </div>
@@ -650,55 +838,6 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
           </div>
         </SectionCard>
       </div>
-
-      {/* CDSCO Drug Approval Status */}
-      {products.length > 0 && (
-        <SectionCard title="CDSCO Drug Approval Status" icon="💊">
-          <div className="rap-cdsco-list">
-            {products.map((p, i) => {
-              const drug = findApproval(p.genericName);
-              const stored = p.cdscoApproved === true || p.cdscoApproved === 'true';
-              const isApproved = drug || stored;
-              return (
-                <div key={i} className={`rap-cdsco-row ${isApproved ? 'rap-cdsco-ok' : 'rap-cdsco-warn'}`}>
-                  <div className="rap-cdsco-row-header">
-                    <span className="rap-cdsco-icon">{isApproved ? '✅' : '⚠️'}</span>
-                    <div>
-                      <div className="rap-cdsco-product">
-                        <strong>{p.productName || p.genericName}</strong>
-                        {p.strength && <span className="rap-chip-tag">{p.strength}</span>}
-                        {p.dosageForm && <span className="rap-chip-tag">{p.dosageForm}</span>}
-                      </div>
-                      <div className="rap-cdsco-generic">{p.genericName}</div>
-                    </div>
-                    <span className={`rap-cdsco-badge ${isApproved ? 'rap-cdsco-badge-ok' : 'rap-cdsco-badge-warn'}`}>
-                      {isApproved ? 'CDSCO Approved' : 'Not in CDSCO list'}
-                    </span>
-                  </div>
-                  {isApproved && (drug || p.cdscoApprovalDate) && (
-                    <div className="rap-cdsco-details">
-                      {(drug?.genericName || p.genericName) && (
-                        <span>📋 {drug?.genericName || p.genericName}</span>
-                      )}
-                      {(drug?.approvalDate || p.cdscoApprovalDate) && (
-                        <span>📅 Approval Date: <strong>{drug?.approvalDate || p.cdscoApprovalDate}</strong></span>
-                      )}
-                      {drug?.indication && (
-                        <span>🩺 Indication: {drug.indication}</span>
-                      )}
-                    </div>
-                  )}
-                  {!isApproved && (
-                    <div className="rap-cdsco-details">
-                      <span>This drug may require additional approval documentation. Verify with applicant.</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </SectionCard>
-      )}
 
       {consignees.length > 0 && (
         <SectionCard title="Consignees & Products" icon="🌍">          <div className="rap-two-col">
@@ -741,6 +880,56 @@ function GlanceRow({ label, count, tone, onClick }) {
       <span>{label}</span>
       <span className="rap-glance-count">{count}</span>
     </div>
+  );
+}
+
+function QueryHistorySection({ queries, error, onRetry }) {
+  const sourceLabel = {
+    application: 'Application decision',
+    shipment: 'Shipment line',
+    checklist: 'Checklist item',
+    legacy: 'Legacy query',
+  };
+
+  return (
+    <SectionCard title={`Query History (${queries.length})`} icon="?">
+      {error ? (
+        <div className="rap-query-empty" role="alert">
+          <p>{error}</p>
+          <button className="rap-btn rap-btn-neutral" onClick={onRetry}>Retry</button>
+        </div>
+      ) : queries.length === 0 ? (
+        <div className="rap-query-empty">No queries have been raised for this application.</div>
+      ) : (
+        <ol className="rap-query-history">
+          {queries.map(query => (
+            <li key={query.queryIdentifier} className="rap-query-entry">
+              <div className="rap-query-marker" aria-hidden="true" />
+              <div className="rap-query-content">
+                <div className="rap-query-head">
+                  <code>{query.queryIdentifier}</code>
+                  <span className={`rap-query-status rap-query-${String(query.status).toLowerCase()}`}>{query.status}</span>
+                </div>
+                <div className="rap-query-meta">
+                  {sourceLabel[query.source] || query.source}
+                  {query.sourceReference ? ` · ${query.sourceReference}` : ''}
+                  {' · '}{query.reviewer?.name || 'Reviewer'}
+                  {' · '}{query.createdAt ? new Date(query.createdAt).toLocaleString('en-IN') : 'Date unavailable'}
+                </div>
+                <p className="rap-query-remarks">{query.remarks}</p>
+                {query.applicantResponse && (
+                  <div className="rap-query-response">
+                    <strong>Applicant response</strong>
+                    <span>{query.applicantResponse}</span>
+                    {query.responseAt && <small>{new Date(query.responseAt).toLocaleString('en-IN')}</small>}
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </SectionCard>
   );
 }
 

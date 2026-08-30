@@ -1,117 +1,114 @@
-/**
- * verificationViewModel.js
- * Transforms raw /api/verify response payloads into a stable view-model
- * consumed by ReviewerPanelHeader and ReviewerVerificationResult.
- */
-
-/* ── Status key derivation ─────────────────────────────────────────────── */
-function deriveKey(runtimeStatus, payload) {
-    if (runtimeStatus === 'loading') return 'loading';
-    if (runtimeStatus === 'error') return 'error';
-    if (runtimeStatus === 'idle') return 'idle';
-    if (!payload) return 'idle';
-    if (payload.documentTypeMatch === false) return 'rejected';
-    if (runtimeStatus === 'done') {
-        const score = payload?.summary?.score ?? 0;
-        if (score >= 75) return 'approved';
-        if (score >= 40) return 'incomplete';
-        return 'incomplete';
-    }
-    return 'idle';
+function text(value) {
+    return typeof value === 'string' ? value.trim() : '';
 }
 
-const KEY_LABELS = {
-    loading: 'Verifying…',
-    error: 'Analysis Temporarily Unavailable',
-    idle: 'Not yet verified',
-    approved: 'Verified',
-    incomplete: 'Verification Incomplete',
-    rejected: 'Rejected by AI',
-};
-
-/* ── Map raw results array to normalised checks ────────────────────────── */
-function mapChecks(results) {
-    if (!Array.isArray(results)) return [];
-    return results.map((r, i) => ({
-        id: r.itemId || String(i),
-        item: r.item || r.label || `Check ${i + 1}`,
-        present: r.present,
-        reason: r.note || r.reason || '',
-        evidence: r.evidence || '',
-        page: typeof r.page === 'number' ? r.page : null,
-        expectedValue: r.expectedValue || '',
-        extractedValue: r.extractedValue || '',
-        correctiveAction: r.correctiveAction || '',
-        raw: r,
-    }));
+function pageNumber(value) {
+    const page = Number(value);
+    return Number.isInteger(page) && page > 0 ? page : null;
 }
 
-/**
- * getVerificationPresentation(runtimeStatus, payload)
- *
- * @param {string}      runtimeStatus  'idle' | 'loading' | 'done' | 'error'
- * @param {object|null} payload        Raw API response from /api/verify
- * @returns {object}   View-model consumed by ReviewerPanelHeader/Result
- */
-export function getVerificationPresentation(runtimeStatus, payload) {
-    const key = deriveKey(runtimeStatus, payload);
-    const label = KEY_LABELS[key] || key;
+export function normalizeVerificationResponse(payload) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const checks = Array.isArray(source.results)
+        ? source.results.filter(Boolean).map((result, index) => ({
+            id: result.index ?? index,
+            item: text(result.item) || `Verification check ${index + 1}`,
+            present: result.present === true ? true : result.present === false ? false : null,
+            reason: text(result.failureReason) || text(result.note),
+            expectedValue: text(result.expectedValue) || text(result.expected) || text(result.requirement) || text(result.item),
+            extractedValue: text(result.extractedValue) || text(result.extracted) || text(result.actualValue),
+            evidence: text(result.evidence) || text(result.supportingEvidence),
+            page: pageNumber(result.page ?? result.pageNumber),
+            correctiveAction: text(result.correctiveAction) || text(result.suggestedAction),
+            raw: result,
+        }))
+        : [];
 
-    const summary = payload?.summary
-        ? {
-            score: payload.summary.score ?? 0,
-            present: payload.summary.present ?? 0,
-            missing: payload.summary.missing ?? 0,
-            unknown: payload.summary.unknown ?? 0,
-            total: payload.summary.total ?? 0,
-        }
-        : { score: 0, present: 0, missing: 0, unknown: 0, total: 0 };
-
-    const checks = mapChecks(payload?.results);
-
-    // Type-mismatch fields (shown in rejection details)
-    const primaryReason = payload?.documentTypeReason || '';
-    const expectedDocumentType = payload?.docLabel || '';
-    const detectedDocumentType = payload?.detectedDocumentType || '';
-    const typeEvidence = payload?.typeEvidence || '';
-    const typePage = payload?.typePage || null;
-    const correctiveAction = payload?.correctiveAction || '';
-
-    // Text source / page count for analysis-meta row
-    const textSource = payload?.textSource || '';
-    const pageCount = payload?.pageCount || null;
-    const verifiedAt = payload?.verifiedAt || null;
+    const present = checks.filter(check => check.present === true).length;
+    const missing = checks.filter(check => check.present === false).length;
+    const unknown = checks.filter(check => check.present === null).length;
+    const suppliedSummary = source.summary && typeof source.summary === 'object' ? source.summary : null;
+    const total = Number.isFinite(Number(suppliedSummary?.total))
+        ? Number(suppliedSummary.total)
+        : checks.length;
+    const scoreValue = Number(suppliedSummary?.score);
+    const score = Number.isFinite(scoreValue)
+        ? Math.max(0, Math.min(100, scoreValue))
+        : total > 0 ? Math.round((present / total) * 100) : null;
 
     return {
-        key,
-        label,
-        summary,
+        typeMatches: source.documentTypeMatch !== false,
+        typeReason: text(source.documentTypeReason),
+        typeEvidence: text(source.documentTypeEvidence),
+        typePage: pageNumber(source.documentTypePage),
+        expectedDocumentType: text(source.expectedDocumentType) || text(source.docLabel),
+        detectedDocumentType: text(source.detectedDocumentType),
+        correctiveAction: text(source.suggestedCorrectiveAction) || text(source.correctiveAction),
+        verifiedAt: text(source.verifiedAt),
+        hasText: source.hasText !== false,
+        textSource: text(source.textSource),
+        pageCount: Number.isFinite(Number(source.pageCount)) ? Number(source.pageCount) : null,
         checks,
-        primaryReason,
-        expectedDocumentType,
-        detectedDocumentType,
-        typeEvidence,
-        typePage,
-        correctiveAction,
-        textSource,
-        pageCount,
-        verifiedAt,
+        summary: {
+            total,
+            present: Number.isFinite(Number(suppliedSummary?.present)) ? Number(suppliedSummary.present) : present,
+            missing: Number.isFinite(Number(suppliedSummary?.missing)) ? Number(suppliedSummary.missing) : missing,
+            unknown: Number.isFinite(Number(suppliedSummary?.unknown)) ? Number(suppliedSummary.unknown) : unknown,
+            score,
+        },
     };
 }
 
-/**
- * validateReviewerDecision(dialog, remarks)
- * Returns an error string if the decision is invalid, or null if OK.
- *
- * @param {{ status: string }} dialog
- * @param {string}             remarks
- * @returns {string|null}
- */
-export function validateReviewerDecision(dialog, remarks) {
-    if (!dialog?.status) return 'Please select a decision status.';
-    const requiresRemarks = ['Rejected', 'Query Raised'];
-    if (requiresRemarks.includes(dialog.status) && !remarks?.trim()) {
-        return `Remarks are required when status is "${dialog.status}".`;
+export function getVerificationPresentation(runtimeStatus, payload) {
+    const verification = normalizeVerificationResponse(payload);
+    let key = 'incomplete';
+    let label = 'Incomplete Result';
+
+    if (runtimeStatus === 'idle' || runtimeStatus === 'loading') {
+        key = 'pending';
+        label = 'Verification Pending';
+    } else if (runtimeStatus === 'error' || !payload) {
+        key = 'incomplete';
+        label = 'Verification Incomplete';
+    } else if (!verification.typeMatches || verification.summary.missing > 0) {
+        key = 'rejected';
+        label = 'Rejected by AI';
+    } else if (verification.summary.total === 0 || verification.summary.unknown > 0) {
+        key = 'incomplete';
+        label = 'Verification Incomplete';
+    } else {
+        key = 'approved';
+        label = 'AI Verified';
     }
-    return null;
+
+    const failedChecks = verification.typeMatches
+        ? verification.checks.filter(check => check.present === false)
+        : [];
+    const pendingChecks = verification.checks.filter(check => check.present === null);
+    const primaryReason = !verification.typeMatches
+        ? verification.typeReason
+        : failedChecks.find(check => check.reason)?.reason || pendingChecks.find(check => check.reason)?.reason || '';
+    const correctiveAction = verification.correctiveAction
+        || failedChecks.find(check => check.correctiveAction)?.correctiveAction
+        || '';
+
+    return {
+        ...verification,
+        key,
+        label,
+        failedChecks,
+        pendingChecks,
+        primaryReason,
+        correctiveAction,
+    };
+}
+
+export function validateReviewerDecision(status, remarks = '') {
+    if (!['Approved', 'Query Raised', 'Rejected'].includes(status)) {
+        return 'Select a valid reviewer decision.';
+    }
+    if ((status === 'Query Raised' || status === 'Rejected') && !String(remarks).trim()) {
+        return 'Reviewer remarks are required for this action.';
+    }
+    return '';
 }
