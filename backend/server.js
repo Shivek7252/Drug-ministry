@@ -12,6 +12,7 @@ const { fillAllTemplates } = require('./templateFiller');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const APPROVED_DRUGS_WORKBOOK = path.join(__dirname, '..', 'approved_drugs.xlsx');
+const BANNED_DRUGS_FILE = path.join(__dirname, 'data', 'bannedDrugs.json');
 
 function decodeXml(value) {
   return value
@@ -77,8 +78,19 @@ readApprovedDrugsWorkbook()
 
 app.get('/api/approved-drugs', (_, res) => res.json({ drugs: approvedDrugs }));
 
+/* ── Drugs prohibited under Section 26A of the Drugs & Cosmetics Act, 1940 ── */
+let bannedDrugs = { title: '', source: '', entryCount: 0, statusNotes: {}, entries: [] };
+try {
+  bannedDrugs = JSON.parse(fs.readFileSync(BANNED_DRUGS_FILE, 'utf8'));
+  console.log(`Loaded ${bannedDrugs.entries.length} prohibited drugs from bannedDrugs.json`);
+} catch (err) {
+  console.warn(`Could not load bannedDrugs.json: ${err.message}`);
+}
+
+app.get('/api/banned-drugs', (_, res) => res.json(bannedDrugs));
+
 /* ─── Health check ─────────────────────────────────────────────────────── */
-app.get('/health', (_, res) => res.json({ status: 'ok', model: 'mistral-large-latest' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', model: 'mistral-small-latest' }));
 
 /* ─── Document checklist items per document type ───────────────────────── */
 const CHECKLISTS = {
@@ -460,6 +472,11 @@ async function ocrPdfWithMistral(buffer) {
   });
   if (!response.ok) {
     const err = await response.text();
+    // 403 = model not in subscription tier — treat as unavailable, not fatal
+    if (response.status === 403) {
+      console.warn('[OCR] mistral-ocr-latest not available on this subscription tier — skipping OCR fallback.');
+      return [];
+    }
     throw new Error(`Mistral OCR error ${response.status}: ${err}`);
   }
   const data = await response.json();
@@ -470,6 +487,20 @@ async function ocrPdfWithMistral(buffer) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /* ─── Detect network-level errors (DNS, connection refused, timeout) ─────── */
+/* ─── Sanitize internal error messages before sending to client ──────────
+   Strips vendor/API names (Mistral, OpenAI, etc.) and raw JSON blobs so
+   users only see a clean "Anuvadini AI service unavailable" message.       */
+function sanitizeError(err) {
+  const msg = err?.message || String(err || 'Unknown error');
+  // Raw API error with JSON blob — replace entirely
+  if (msg.includes('Mistral API error') || msg.includes('tier_not_allowed') ||
+    msg.includes('mistral') || msg.includes('Mistral') ||
+    msg.includes('object":"error"') || msg.includes('"code":"')) {
+    return 'Anuvadini AI service is temporarily unavailable. Please try again shortly.';
+  }
+  return msg;
+}
+
 function isNetworkError(err) {
   const code = err?.code || '';
   return (
@@ -511,7 +542,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
 }
 
 /* ─── Call Mistral chat completions (plain text response) ──────────────── */
-async function callMistral(messages, { model = 'mistral-large-latest', maxTokens = 2000 } = {}) {
+async function callMistral(messages, { model = 'mistral-small-latest', maxTokens = 2000 } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
@@ -533,7 +564,7 @@ async function callMistral(messages, { model = 'mistral-large-latest', maxTokens
 }
 
 /* ─── Call Mistral chat completions in strict JSON mode ────────────────── */
-async function callMistralJson(messages, { model = 'mistral-large-latest', maxTokens = 3500 } = {}) {
+async function callMistralJson(messages, { model = 'mistral-small-latest', maxTokens = 3500 } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
@@ -1010,11 +1041,9 @@ ${sample}
 
 Return JSON only.`;
 
-  // Use the strong model — the truncation + parallelization already give us
-  // the speed win; using `small` here would trade real accuracy for maybe 2s.
   const raw = await callMistralJson(
     [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-    { model: 'mistral-large-latest', maxTokens: 200 }
+    { model: 'mistral-small-latest', maxTokens: 200 }
   );
 
   let parsed;
@@ -1047,7 +1076,7 @@ async function verifyDocumentBuffer({ buffer, mimetype, docType, docLabel }) {
       const ocrPages = await ocrPdfWithMistral(buffer);
       if (ocrPages.join('').trim().length > 50) {
         pages = ocrPages;
-        textSource = 'mistral-ocr';
+        textSource = 'anuvadini-ocr';
       }
     } catch (e) {
       if (e.message.includes('ENOTFOUND') || e.message.includes('unreachable')) {
@@ -1093,13 +1122,18 @@ CHECK 1 — Document type identification (do this first):
   Decide whether the uploaded document is actually the EXPECTED document type.
   - Use the identity description and the indicative keyword set you are given.
   - If the document is clearly a DIFFERENT type (e.g. an invoice, an undertaking, a CoA when a manufacturing licence is expected, a manufacturing licence when a product approval is expected), set "documentTypeMatch": false and explain why in "documentTypeReason".
+  - When the type is wrong, cite a short verbatim quote that supports the decision in "documentTypeEvidence" and its page in "documentTypePage", wherever the document provides usable evidence.
+  - Set "detectedDocumentType" to the document type actually observed, when it can be identified from the document.
+  - Give a specific upload correction in "suggestedCorrectiveAction". Base it on the expected document type and the observed problem.
   - If the document type matches, set "documentTypeMatch": true.
 
 CHECK 2 — Per-parameter verification:
   ONLY IF documentTypeMatch is true, evaluate each checklist parameter.
   - For each parameter decide present=true / present=false.
   - If present=true, you MUST cite a verbatim quote (<=25 words) copied directly from the document text into "evidence", and the integer "page" it appears on.
-  - If you cannot find a verbatim quote, set present=false. Do NOT guess. Do NOT paraphrase. Do NOT invent quotes.
+  - If a parameter is absent, set present=false and explain what is missing in "note".
+  - If a parameter is present but its value is wrong, expired, inconsistent, or otherwise invalid, set present=false, put the required value/condition in "expectedValue", the verbatim observed value in "extractedValue", and cite supporting text/page in "evidence" and "page".
+  - For every failed parameter, provide a specific "correctiveAction". Do NOT guess, paraphrase evidence, or invent quotes.
   - If documentTypeMatch is false, set every item's present=false, evidence="", page=null, and note="document type mismatch — parameter not applicable".
 
 Output STRICT JSON only — no preamble, no markdown fences, no commentary.
@@ -1108,13 +1142,20 @@ JSON schema:
 {
   "documentTypeMatch": true | false,
   "documentTypeReason": "<one short sentence explaining the type decision>",
+  "documentTypeEvidence": "<verbatim short quote supporting a type mismatch, or empty>",
+  "documentTypePage": <integer page number or null>,
+  "detectedDocumentType": "<observed document type, or empty when uncertain>",
+  "suggestedCorrectiveAction": "<specific corrective action when verification fails, or empty>",
   "items": [
     {
       "index": <1..N>,
       "present": true | false,
       "page": <integer page number or null>,
-      "evidence": "<verbatim short quote from document, or empty>",
-      "note": "<one-line reason in <= 20 words>"
+      "evidence": "<verbatim short quote from document, or empty when information is missing>",
+      "note": "<one-line result or failure reason in <= 20 words>",
+      "expectedValue": "<required value or condition, or empty>",
+      "extractedValue": "<verbatim observed value when relevant, or empty>",
+      "correctiveAction": "<specific correction for a failed check, or empty>"
     }
   ]
 }`;
@@ -1162,6 +1203,14 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
   const documentTypeMatch = parsed.documentTypeMatch === true;
   const documentTypeReason = typeof parsed.documentTypeReason === 'string'
     ? parsed.documentTypeReason.trim() : '';
+  const documentTypeEvidence = typeof parsed.documentTypeEvidence === 'string'
+    ? parsed.documentTypeEvidence.trim() : '';
+  const documentTypePage = typeof parsed.documentTypePage === 'number'
+    ? parsed.documentTypePage : null;
+  const detectedDocumentType = typeof parsed.detectedDocumentType === 'string'
+    ? parsed.detectedDocumentType.trim() : '';
+  const suggestedCorrectiveAction = typeof parsed.suggestedCorrectiveAction === 'string'
+    ? parsed.suggestedCorrectiveAction.trim() : '';
 
   const results = items.map((it, i) => {
     if (!documentTypeMatch) {
@@ -1171,6 +1220,9 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
         page: null,
         evidence: '',
         note: 'Document type mismatch — parameter not applicable.',
+        expectedValue: it,
+        extractedValue: '',
+        correctiveAction: '',
       };
     }
     const m = byIndex.get(i + 1) || {};
@@ -1181,8 +1233,12 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
       item: it,
       present: finalPresent,
       page: typeof m.page === 'number' ? m.page : null,
-      evidence: finalPresent === true ? evidence : '',
+      evidence,
       note: typeof m.note === 'string' ? m.note.trim() : '',
+      expectedValue: typeof m.expectedValue === 'string' && m.expectedValue.trim()
+        ? m.expectedValue.trim() : it,
+      extractedValue: typeof m.extractedValue === 'string' ? m.extractedValue.trim() : '',
+      correctiveAction: typeof m.correctiveAction === 'string' ? m.correctiveAction.trim() : '',
     };
   });
 
@@ -1236,11 +1292,16 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
     success: true,
     docType,
     docLabel,
+    expectedDocumentType: docLabel,
     hasText,
     textSource,
     pageCount: pages.length,
     documentTypeMatch,
     documentTypeReason,
+    documentTypeEvidence,
+    documentTypePage,
+    detectedDocumentType,
+    suggestedCorrectiveAction,
     visionUsed,
     results,
     summary: {
@@ -1397,7 +1458,7 @@ app.post('/api/applications/:appNum/pre-verify', async (req, res) => {
     res.json({ success: true, results });
   } catch (err) {
     console.error('Pre-verify error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1423,7 +1484,11 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
 
     // Cache hit
     if (!force && doc.validationResult?.fullResults) {
-      return res.json({ ...doc.validationResult.fullResults, cached: true });
+      return res.json({
+        ...doc.validationResult.fullResults,
+        cached: true,
+        verifiedAt: doc.validationResult.verifiedAt || doc.validationResult.fullResults.verifiedAt || null,
+      });
     }
 
     // Load bytes
@@ -1443,10 +1508,11 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
     }
 
     const docType = CHECKLISTS[docId] ? docId : 'default';
-    const docLabel = doc.name || docId;
+    const docLabel = TEMPLATE_REQUIREMENTS[docId]?.label || doc.name || docId;
     const mimetype = doc.type || 'application/pdf';
 
     const verifyResult = await verifyDocumentBuffer({ buffer, mimetype, docType, docLabel });
+    const verifiedAt = new Date();
 
     // Persist full result + refresh the top-level type match/reason too so
     // the reviewer's Documents-tab badge stays in sync.
@@ -1458,7 +1524,7 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
         documentTypeMatch: verifyResult.documentTypeMatch,
         documentTypeReason: verifyResult.documentTypeReason,
         score: verifyResult.summary?.score ?? null,
-        verifiedAt: new Date(),
+        verifiedAt,
         fullResults: verifyResult,
       },
     };
@@ -1467,10 +1533,10 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
     application.markModified('documents');
     await application.save();
 
-    res.json({ ...verifyResult, cached: false });
+    res.json({ ...verifyResult, cached: false, verifiedAt });
   } catch (err) {
     console.error('Doc verify error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 

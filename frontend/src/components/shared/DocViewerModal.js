@@ -17,13 +17,14 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import * as pdfjsLib from 'pdfjs-dist';
 import '../wizard/DocumentViewer.css';
+import './ReviewerDocumentVerification.css';
+import { getVerificationPresentation, validateReviewerDecision } from './verificationViewModel';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 /* ─── module-level caches (shared across all usages) ────────────────────── */
 const OCR_CACHE = new Map();
-
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 function fmtSize(b) {
   if (!b) return '';
@@ -304,11 +305,180 @@ function PdfPage({ pdf, pageNum, scale, query, activeGlobal, globalOffset, onRea
   );
 }
 
+function VerificationShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+      <path d="M12 3 5 6v5c0 4.7 2.8 8.2 7 10 4.2-1.8 7-5.3 7-10V6l-7-3Z" />
+      <path d="m9 12 2 2 4-5" />
+    </svg>
+  );
+}
+
+function StatusIcon({ state }) {
+  if (state === 'approved') return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>;
+  if (state === 'rejected') return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M12 8v5m0 3h.01" /><circle cx="12" cy="12" r="9" /></svg>;
+}
+
+function ReviewerPanelHeader({ runtimeStatus, payload, cached }) {
+  const view = getVerificationPresentation(runtimeStatus, payload);
+  let verifiedAt = '';
+  if (view.verifiedAt) {
+    const parsed = new Date(view.verifiedAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      verifiedAt = parsed.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+  }
+  return (
+    <header className="rvai-header">
+      <div className="rvai-header-main">
+        <span className="rvai-header-icon"><VerificationShieldIcon /></span>
+        <div className="rvai-header-copy">
+          <h2>AI Document Verification</h2>
+          <p>{verifiedAt ? `Last verified ${verifiedAt}` : 'CDSCO reviewer analysis'}</p>
+        </div>
+      </div>
+      <div className="rvai-header-badges">
+        <span className="rvai-result-origin">{cached ? 'Cached Result' : runtimeStatus === 'done' ? 'Live Result' : 'Analysis'}</span>
+        <span className={`rvai-status rvai-status-${view.key}`}><StatusIcon state={view.key} />{view.label}</span>
+      </div>
+    </header>
+  );
+}
+
+function ReviewerVerificationResult({ payload, onLocate, activeQuery, onRerun }) {
+  const view = getVerificationPresentation('done', payload);
+  const hasTypeComparison = Boolean(view.expectedDocumentType || view.detectedDocumentType);
+  const showRejectionDetails = view.key === 'rejected';
+
+  return (
+    <div className="rvai-content">
+      <section className="rvai-section" aria-labelledby="rvai-summary-heading">
+        <div className="rvai-section-title" id="rvai-summary-heading">Verification Summary</div>
+        <div className="rvai-summary-card">
+          <div className="rvai-progress-head">
+            <div><span>Completion</span><strong>{view.summary.score ?? 0}%</strong></div>
+            <span>{view.summary.present} of {view.summary.total} checks passed</span>
+          </div>
+          <div className="rvai-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={view.summary.score ?? 0}>
+            <span className={`rvai-progress-${view.key}`} style={{ width: `${view.summary.score ?? 0}%` }} />
+          </div>
+          <div className="rvai-metrics">
+            <div><span className="rvai-metric-dot rvai-dot-pass" /><strong>{view.summary.present}</strong><span>Passed</span></div>
+            <div><span className="rvai-metric-dot rvai-dot-fail" /><strong>{view.summary.missing}</strong><span>Failed</span></div>
+            <div><span className="rvai-metric-dot rvai-dot-total" /><strong>{view.summary.total}</strong><span>Total</span></div>
+          </div>
+          {(view.textSource || view.pageCount) && (
+            <div className="rvai-analysis-meta">
+              {view.textSource && (
+                <div>
+                  <span>Analysis source</span>
+                  <strong>
+                    {view.textSource === 'mistral-ocr' ? 'Anuvadini OCR'
+                      : view.textSource === 'anuvadini-ocr' ? 'Anuvadini OCR'
+                        : view.textSource === 'pdf-text' ? 'PDF Text Layer'
+                          : view.textSource === 'none' ? 'No text extracted'
+                            : view.textSource}
+                  </strong>
+                </div>
+              )}
+              {view.pageCount ? <div><span>Pages analysed</span><strong>{view.pageCount}</strong></div> : null}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {showRejectionDetails && (
+        <section className="rvai-section" aria-labelledby="rvai-rejection-heading">
+          <div className="rvai-section-title" id="rvai-rejection-heading">Rejection Details</div>
+          <div className="rvai-rejection-card">
+            {view.primaryReason && (
+              <div className="rvai-primary-reason">
+                <span className="rvai-reason-icon"><StatusIcon state="rejected" /></span>
+                <div><span>Primary rejection reason</span><p>{view.primaryReason}</p></div>
+              </div>
+            )}
+            {hasTypeComparison && (
+              <div className="rvai-type-grid">
+                {view.expectedDocumentType && <div><span>Expected document</span><strong>{view.expectedDocumentType}</strong></div>}
+                {view.detectedDocumentType && <div><span>Detected document</span><strong>{view.detectedDocumentType}</strong></div>}
+              </div>
+            )}
+            {view.typeEvidence && (
+              <div className="rvai-evidence">
+                <div><span>Supporting evidence</span>{view.typePage && <b>Page {view.typePage}</b>}</div>
+                <blockquote>“{view.typeEvidence}”</blockquote>
+                <button type="button" onClick={() => onLocate({ evidence: view.typeEvidence, page: view.typePage }, -1)}>Locate in document</button>
+              </div>
+            )}
+            {view.correctiveAction && (
+              <div className="rvai-correction"><span>Suggested corrective action</span><p>{view.correctiveAction}</p></div>
+            )}
+            {!view.primaryReason && !hasTypeComparison && !view.typeEvidence && !view.correctiveAction && (
+              <div className="rvai-empty-detail">No additional rejection fields were returned by this verification result.</div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <section className="rvai-section" aria-labelledby="rvai-checklist-heading">
+        <div className="rvai-section-title" id="rvai-checklist-heading">
+          <span>Verification Checklist</span><span className="rvai-count-badge">{view.checks.length}</span>
+        </div>
+        {view.checks.length > 0 ? (
+          <div className="rvai-checklist">
+            {view.checks.map((check, index) => {
+              const checkState = check.present === true ? 'passed' : check.present === false ? 'failed' : 'warning';
+              return (
+                <article className={`rvai-check rvai-check-${checkState}`} key={check.id}>
+                  <div className="rvai-check-head">
+                    <span className="rvai-check-icon"><StatusIcon state={check.present === true ? 'approved' : check.present === false ? 'rejected' : 'incomplete'} /></span>
+                    <strong>{check.item}</strong>
+                    <span className="rvai-check-state">{checkState === 'passed' ? 'Passed' : checkState === 'failed' ? 'Failed' : 'Needs review'}</span>
+                  </div>
+                  {check.reason && <p className="rvai-check-reason">{check.reason}</p>}
+                  {(check.expectedValue || check.extractedValue) && check.present !== true && (
+                    <div className="rvai-values">
+                      {check.expectedValue && <div><span>Expected</span><strong>{check.expectedValue}</strong></div>}
+                      {check.extractedValue && <div><span>Extracted</span><strong>{check.extractedValue}</strong></div>}
+                    </div>
+                  )}
+                  {check.evidence && (
+                    <div className="rvai-check-evidence">
+                      <div><span>Evidence</span>{check.page && <b>Page {check.page}</b>}</div>
+                      <p>“{check.evidence}”</p>
+                      <button type="button" onClick={() => onLocate(check.raw, index)}>{activeQuery ? 'Update highlight' : 'Locate in document'}</button>
+                    </div>
+                  )}
+                  {check.correctiveAction && check.present !== true && (
+                    <div className="rvai-check-correction"><span>Correction</span><p>{check.correctiveAction}</p></div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rvai-empty-detail">No check-level results are available for this analysis.</div>
+        )}
+      </section>
+
+      <div className="rvai-panel-actions">
+        {activeQuery && <button type="button" className="rvai-text-button" onClick={() => onLocate(null)}>Clear document highlight</button>}
+        <button type="button" className="rvai-rerun" onClick={onRerun}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></svg>
+          Re-run Verification
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── AI Checklist Panel ─────────────────────────────────────────────────── */
-function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber }) {
+function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber, reviewerMode = false }) {
   const [status, setStatus] = useState('idle');
   const [results, setResults] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [verificationPayload, setVerificationPayload] = useState(null);
   const [typeMatch, setTypeMatch] = useState(true);
   const [typeReason, setTypeReason] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -323,7 +493,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
   //   2. No appNumber → fall back to legacy multipart upload path.
   const run = async ({ force = false } = {}) => {
     if (!fileUrl && !appNumber) { setErrMsg('No file available for verification.'); setStatus('error'); return; }
-    setStatus('loading'); setResults(null); setSummary(null);
+    setStatus('loading'); setResults(null); setSummary(null); setVerificationPayload(null);
     setTypeMatch(true); setTypeReason(''); setErrMsg('');
     setActiveItem(null);
     if (onSearch) onSearch('');
@@ -346,7 +516,8 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
         data = await apiResp.json();
         if (!apiResp.ok) throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
       }
-      setResults(data.results); setSummary(data.summary);
+      setResults(Array.isArray(data.results) ? data.results : []); setSummary(data.summary || null);
+      setVerificationPayload(data);
       setTypeMatch(data.documentTypeMatch !== false);
       setTypeReason(data.documentTypeReason || '');
       setCached(data.cached === true);
@@ -406,7 +577,9 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
   };
 
   const handleItemClick = (r, i) => {
-    if (!onSearch || r.present !== true) return;
+    if (!onSearch) return;
+    if (!r) { setActiveItem(null); onSearch(''); return; }
+    if (!r.evidence) return;
     // Prefer a distinctive short token from the AI evidence (ID / date /
     // caps run) — much more OCR-robust than the full verbatim quote.
     let term = pickDistinctiveTerm(r.evidence);
@@ -422,14 +595,18 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
 
   return (
     <div className="cl-panel">
-      <div className="cl-header">
-        <span className="cl-header-icon">🤖</span>
-        <div>
-          <div className="cl-header-title">AI Document Verification</div>
-          <div className="cl-header-sub">Powered by ANUVADINI AI</div>
+      {reviewerMode ? (
+        <ReviewerPanelHeader runtimeStatus={status} payload={verificationPayload} cached={cached} />
+      ) : (
+        <div className="cl-header">
+          <span className="cl-header-icon">🤖</span>
+          <div>
+            <div className="cl-header-title">AI Document Verification</div>
+            <div className="cl-header-sub">Powered by ANUVADINI AI</div>
+          </div>
         </div>
-      </div>
-      <div className="cl-body">
+      )}
+      <div className={`cl-body${reviewerMode ? ' rvai-body' : ''}`}>
         {status === 'idle' && (
           <div className="cl-idle">
             <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
@@ -463,13 +640,20 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
             <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
             <p style={{ fontWeight: 700, color: '#d97706', marginBottom: 6 }}>Analysis Temporarily Unavailable</p>
             <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
-              The AI analysis service encountered a network issue.
-              Please ensure the backend is running and try again.
+              {errMsg || 'The AI analysis service could not complete verification. Please try again.'}
             </p>
             <button className="cl-btn-primary" onClick={run}>Retry</button>
           </div>
         )}
-        {status === 'done' && summary && !typeMatch && (
+        {status === 'done' && reviewerMode && verificationPayload && (
+          <ReviewerVerificationResult
+            payload={verificationPayload}
+            activeQuery={activeQuery}
+            onLocate={handleItemClick}
+            onRerun={() => run({ force: true })}
+          />
+        )}
+        {status === 'done' && !reviewerMode && summary && !typeMatch && (
           <div>
             <div className="cl-absent-banner">
               <span className="cl-absent-icon">❌</span>
@@ -486,7 +670,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
             <button className="cl-btn-secondary" onClick={() => run({ force: true })}>🔄 Re-run Verification</button>
           </div>
         )}
-        {status === 'done' && summary && typeMatch && (
+        {status === 'done' && !reviewerMode && summary && typeMatch && (
           <div>
             {cached && (
               <div style={{
@@ -639,7 +823,7 @@ function ImageViewer({ fileUrl, fileName, fileSize, onClose }) {
 }
 
 /* ─── Main exported component ────────────────────────────────────────────── */
-export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, onRaiseQuery, verificationResult, appNumber }) {
+export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, onRaiseQuery, verificationResult, appNumber, reviewerMode = false, onReviewerDecision, reviewActionsDisabled = false }) {
   const isPDF = fileType?.includes('pdf') || fileName?.toLowerCase().endsWith('.pdf');
   const isImg = fileType?.startsWith('image/');
 
@@ -658,6 +842,11 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   const [activeIdx, setActive] = useState(0);
   const [ocrStatus, setOcrStatus] = useState({});
   const [ocrWords, setOcrWords] = useState({});
+  const [decisionDialog, setDecisionDialog] = useState(null);
+  const [decisionRemarks, setDecisionRemarks] = useState('');
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionFeedback, setDecisionFeedback] = useState(null);
+  const [decisionComplete, setDecisionComplete] = useState(false);
 
   const scrollRef = useRef();
   const pageRefs = useRef({});
@@ -690,7 +879,11 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   // keyboard shortcuts
   useEffect(() => {
     const fn = (e) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') {
+        if (decisionDialog && !decisionBusy) setDecisionDialog(null);
+        else if (!decisionDialog) onClose();
+        return;
+      }
       if (e.key === 'Enter' && document.activeElement === inputRef.current) {
         e.preventDefault();
         const t = totalRef.current;
@@ -699,7 +892,38 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
-  }, [onClose]);
+  }, [onClose, decisionDialog, decisionBusy]);
+
+  const openDecision = (status) => {
+    if (decisionBusy || decisionComplete || reviewActionsDisabled) return;
+    setDecisionFeedback(null);
+    setDecisionRemarks('');
+    setDecisionDialog(status);
+  };
+
+  const submitDecision = async () => {
+    if (!decisionDialog || decisionBusy || decisionComplete || !onReviewerDecision) return;
+    const validationError = validateReviewerDecision(decisionDialog, decisionRemarks);
+    if (validationError) {
+      setDecisionFeedback({ type: 'error', message: validationError });
+      return;
+    }
+    setDecisionBusy(true);
+    setDecisionFeedback(null);
+    try {
+      const result = await onReviewerDecision(decisionDialog, decisionRemarks.trim(), { docId, docLabel });
+      if (result?.success === false) throw new Error(result.error || 'The reviewer action could not be submitted.');
+      const actionLabel = decisionDialog === 'Query Raised' ? 'Query submitted' : decisionDialog === 'Approved' ? 'Application approved' : 'Application rejected';
+      setDecisionFeedback({ type: 'success', message: `${actionLabel} successfully.` });
+      setDecisionComplete(true);
+      setDecisionDialog(null);
+      setDecisionRemarks('');
+    } catch (error) {
+      setDecisionFeedback({ type: 'error', message: error.message || 'The reviewer action could not be submitted.' });
+    } finally {
+      setDecisionBusy(false);
+    }
+  };
 
   const onReady = useCallback((pn, rects) => setPageHl(prev => ({ ...prev, [pn]: rects })), []);
   const onNeedsOcr = useCallback((pn, canvas) => {
@@ -772,8 +996,8 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
 
   // PDF viewer with checklist
   return createPortal(
-    <div className="dv-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="dv-modal dv-modal-split" onClick={e => e.stopPropagation()}>
+    <div className={`dv-overlay${reviewerMode ? ' dv-overlay-reviewer' : ''}`} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className={`dv-modal dv-modal-split${reviewerMode ? ' dv-modal-reviewer' : ''}`} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="dv-header">
@@ -873,7 +1097,7 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
             ))}
           </div>
 
-          <div className="dv-split-right">
+          <div className={`dv-split-right${reviewerMode ? ' dv-split-right-reviewer' : ''}`}>
             <ChecklistPanel
               docId={docId}
               docType={docType || docId}
@@ -896,12 +1120,36 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                 }
               }}
               activeQuery={effectiveQuery}
+              reviewerMode={reviewerMode}
             />
           </div>
         </div>
 
-        <div className="dv-footer">
-          {(onVerify || onDecline || onRaiseQuery) && (
+        <div className={`dv-footer${reviewerMode ? ' rvai-decision-footer' : ''}`}>
+          {reviewerMode && onReviewerDecision ? (
+            <>
+              <div className="rvai-decision-feedback" aria-live="polite">
+                {decisionFeedback && <span className={`rvai-feedback-${decisionFeedback.type}`}>{decisionFeedback.message}</span>}
+                {!decisionFeedback && reviewActionsDisabled && <span>This application already has a final decision.</span>}
+                {!decisionFeedback && !reviewActionsDisabled && <span>Select a reviewer decision for this application.</span>}
+              </div>
+              <div className="rvai-decision-actions">
+                <button type="button" className="rvai-action rvai-action-approve" title="Approve application"
+                  disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Approved')}>
+                  <StatusIcon state="approved" />Approve
+                </button>
+                <button type="button" className="rvai-action rvai-action-query" title="Raise a query requiring applicant clarification"
+                  disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Query Raised')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" /><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.7.8-.7 1.1M12 15.5h.01" /></svg>
+                  Query
+                </button>
+                <button type="button" className="rvai-action rvai-action-reject" title="Reject application"
+                  disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Rejected')}>
+                  <StatusIcon state="rejected" />Reject
+                </button>
+              </div>
+            </>
+          ) : (onVerify || onDecline || onRaiseQuery) && (
             <div className="dv-verdict">
               {verificationResult === 'ok' && <span className="dv-verdict-chip dv-verdict-ok">✓ Verified</span>}
               {verificationResult === 'bad' && <span className="dv-verdict-chip dv-verdict-bad">✗ Declined</span>}
@@ -926,6 +1174,48 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
             </div>
           )}
         </div>
+
+        {reviewerMode && decisionDialog && (
+          <div className="rvai-dialog-backdrop" onClick={e => e.target === e.currentTarget && !decisionBusy && setDecisionDialog(null)}>
+            <div className="rvai-dialog" role="dialog" aria-modal="true" aria-labelledby="rvai-dialog-title">
+              <div className={`rvai-dialog-icon rvai-dialog-icon-${decisionDialog === 'Approved' ? 'approve' : decisionDialog === 'Rejected' ? 'reject' : 'query'}`}>
+                {decisionDialog === 'Query Raised'
+                  ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" /></svg>
+                  : <StatusIcon state={decisionDialog === 'Approved' ? 'approved' : 'rejected'} />}
+              </div>
+              <div className="rvai-dialog-copy">
+                <h3 id="rvai-dialog-title">
+                  {decisionDialog === 'Approved' ? 'Approve this application?' : decisionDialog === 'Query Raised' ? 'Raise a query' : 'Reject this application?'}
+                </h3>
+                <p>
+                  {decisionDialog === 'Approved'
+                    ? 'Confirm that the application and supporting documents meet the review requirements.'
+                    : decisionDialog === 'Query Raised'
+                      ? 'Explain what clarification or corrected document the applicant must provide.'
+                      : 'Provide the specific reason for rejection. This will be recorded in the review history.'}
+                </p>
+              </div>
+              {decisionDialog !== 'Approved' && (
+                <label className="rvai-dialog-field">
+                  <span>Reviewer remarks <b>*</b></span>
+                  <textarea rows="5" value={decisionRemarks} onChange={e => setDecisionRemarks(e.target.value)}
+                    placeholder={decisionDialog === 'Query Raised' ? 'Enter the required clarification…' : 'Enter the rejection reason…'}
+                    disabled={decisionBusy} autoFocus />
+                </label>
+              )}
+              {decisionFeedback?.type === 'error' && <div className="rvai-dialog-error" role="alert">{decisionFeedback.message}</div>}
+              <div className="rvai-dialog-actions">
+                <button type="button" className="rvai-dialog-cancel" disabled={decisionBusy} onClick={() => setDecisionDialog(null)}>Cancel</button>
+                <button type="button"
+                  className={`rvai-dialog-submit rvai-dialog-submit-${decisionDialog === 'Approved' ? 'approve' : decisionDialog === 'Rejected' ? 'reject' : 'query'}`}
+                  disabled={decisionBusy || (decisionDialog !== 'Approved' && !decisionRemarks.trim())}
+                  onClick={submitDecision} autoFocus={decisionDialog === 'Approved'}>
+                  {decisionBusy ? 'Submitting…' : decisionDialog === 'Approved' ? 'Confirm Approval' : decisionDialog === 'Query Raised' ? 'Submit Query' : 'Confirm Rejection'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.body
