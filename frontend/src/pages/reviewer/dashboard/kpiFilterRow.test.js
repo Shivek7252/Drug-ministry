@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import KpiFilterRow from './KpiFilterRow';
-import { kpiCounts, kpiDeltas, OVERDUE_DAYS, KPI_TILES } from './aggregations';
+import { kpiCounts, kpiDeltas, KPI_TILES } from './aggregations';
+import { SLA_DESCRIPTION } from './statusModel';
 
 const day = 86400000;
 const ago = n => new Date(Date.now() - n * day).toISOString();
@@ -76,8 +77,8 @@ describe('KpiFilterRow — radiogroup semantics', () => {
   test('arrow keys move the selection', () => {
     render(<Harness />);
     fireEvent.keyDown(tile('Total'), { key: 'ArrowRight' });
-    expect(tile('New')).toHaveAttribute('aria-checked', 'true');
-    fireEvent.keyDown(tile('New'), { key: 'ArrowLeft' });
+    expect(tile('Submitted')).toHaveAttribute('aria-checked', 'true');
+    fireEvent.keyDown(tile('Submitted'), { key: 'ArrowLeft' });
     expect(tile('Total')).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -101,14 +102,99 @@ describe('KpiFilterRow — radiogroup semantics', () => {
 describe('KpiFilterRow — Overdue tile', () => {
   test('states the threshold in its title so nobody must read the code', () => {
     render(<Harness />);
-    expect(tile('Overdue')).toHaveAttribute(
-      'title',
-      `Submitted or in review (including document verification and compliance check) for more than ${OVERDUE_DAYS} days`
-    );
+    expect(tile('Overdue')).toHaveAttribute('title', SLA_DESCRIPTION);
   });
 
   test('counts only Submitted / Under Review beyond the threshold', () => {
     render(<Harness />);
     expect(countOf('Overdue')).toBe('3');
+  });
+});
+
+/* ============================================================================
+   Server-computed comparisons: what the arrow, percentage and label mean.
+   ============================================================================ */
+describe('KPI delta rendering from server analytics', () => {
+  const tiles = KPI_TILES;
+  const counts = { total: 13, submitted: 10, underReview: 1, queryRaised: 1, approved: 1, rejected: 0, overdue: 10 };
+  const partial = { windows: { currentWeekComplete: false } };
+
+  const renderRow = (deltas, analytics = partial) => render(
+    <KpiFilterRow
+      tiles={tiles} counts={counts} deltas={deltas}
+      value="all" onChange={() => {}} loading={false}
+      unreadCount={12} readStateReady analytics={analytics}
+    />,
+  );
+
+  test('an increase renders an up arrow, a signed value and the percentage', () => {
+    renderRow({ total: { available: true, current: 3, prior: 2, delta: 1, percent: 50, direction: 'up' } });
+    expect(screen.getByText(/\+1 WTD/)).toBeInTheDocument();
+    expect(screen.getByText(/\+50%/)).toBeInTheDocument();
+  });
+
+  test('a decrease renders a down arrow and a negative value', () => {
+    renderRow({ total: { available: true, current: 0, prior: 2, delta: -2, percent: -100, direction: 'down' } });
+    expect(screen.getByText(/-2 WTD/)).toBeInTheDocument();
+  });
+
+  test('no percentage is shown when the previous week was zero', () => {
+    renderRow({ total: { available: true, current: 2, prior: 0, delta: 2, percent: null, direction: 'up' } });
+    expect(screen.getByText(/\+2 WTD/)).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).toBeNull();
+  });
+
+  test('an equal week renders no comparison text or empty delta element', () => {
+    renderRow({ rejected: { available: true, current: 0, prior: 0, delta: 0, percent: null, direction: 'flat' } });
+    const tile = screen.getByRole('radio', { name: /Rejected/ });
+    expect(tile).toHaveTextContent('0');
+    expect(tile.querySelector('.kpi-delta')).toBeNull();
+    expect(screen.queryByText(/No WTD change/)).not.toBeInTheDocument();
+  });
+
+  test('an unavailable comparison says so and never shows a number', () => {
+    renderRow({
+      overdue: {
+        available: false,
+        reason: 'Historical data unavailable',
+        detail: '3 application(s) have no reconcilable status history.',
+      },
+    });
+    const el = screen.getAllByText('Historical data unavailable')[0];
+    expect(el).toBeInTheDocument();
+    expect(el).toHaveAttribute('title', expect.stringContaining('reconcilable status history'));
+  });
+
+  test('the tooltip states both weeks and the event being counted', () => {
+    renderRow({
+      approved: {
+        available: true, current: 1, prior: 4, delta: -3, percent: -75, direction: 'down',
+        basis: 'Applications approved in the window, even if later rejected.',
+      },
+    });
+    const el = screen.getByText(/-3 WTD/).closest('.kpi-delta');
+    expect(el).toHaveAttribute('title', expect.stringContaining('1 week to date vs 4 in the same period last week'));
+    expect(el).toHaveAttribute('title', expect.stringContaining('even if later rejected'));
+    expect(el).toHaveAttribute('title', expect.stringContaining('same period last week'));
+  });
+
+  test('a complete week omits the in-progress note', () => {
+    renderRow(
+      { total: { available: true, current: 5, prior: 4, delta: 1, percent: 25, direction: 'up' } },
+      { windows: { currentWeekComplete: true } },
+    );
+    const el = screen.getByText(/\+1 WTD/).closest('.kpi-delta');
+    expect(el.getAttribute('title')).not.toContain('still in progress');
+  });
+
+  test('a missing comparison degrades to Not comparable rather than crashing', () => {
+    renderRow({});
+    expect(screen.getAllByText('Not comparable').length).toBe(tiles.length);
+  });
+
+  test('counts still come from the count prop, never from the delta', () => {
+    renderRow({ total: { available: true, current: 99, prior: 1, delta: 98, percent: 9800, direction: 'up' } });
+    const tile = screen.getByRole('radio', { name: /Total/ });
+    expect(tile.querySelector('.kpi-value')).toHaveTextContent('13');
   });
 });

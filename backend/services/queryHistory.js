@@ -138,10 +138,25 @@ async function queryCountsForApplications(applications) {
   return result;
 }
 
+/* Latest query-raised timestamp per application.
+   The Query KPI's week-over-week delta must be measured on when a query was
+   RAISED, not on when the application was submitted. Returned as a Map keyed
+   by application id so the reviewer list can attach it without a second pass. */
+async function latestQueryRaisedAt(applications) {
+  const ids = applications.map(app => app._id);
+  if (!ids.length) return new Map();
+  const rows = await ApplicationQuery.aggregate([
+    { $match: { application: { $in: ids } } },
+    { $group: { _id: '$application', lastRaisedAt: { $max: '$createdAt' } } },
+  ]);
+  return new Map(rows.map(r => [String(r._id), r.lastRaisedAt]));
+}
+
 module.exports = {
   collectLegacyQueries,
   createApplicationQuery,
   generateQueryIdentifier,
   getCompleteQueryHistory,
   queryCountsForApplications,
+  latestQueryRaisedAt,
 };

@@ -159,6 +159,14 @@ const AuditSchema = new mongoose.Schema({
   detail:    String,
   timestamp: { type: Date, default: Date.now },
   user:      String,
+  /* Structured workflow transition fields. New writes populate these; detail
+     remains human-readable and the analytics parser keeps a legacy fallback. */
+  applicationId: mongoose.Schema.Types.ObjectId,
+  fromStatus: String,
+  toStatus: String,
+  occurredAt: Date,
+  actorId: String,
+  remarks: String,
 }, { _id: false });
 
 /* ── Checklist query round (one entry per version, max 5) ──────────────── */
@@ -321,5 +329,9 @@ ApplicationSchema.index({
   destinationCountry:  'text',
   mfgLicenseNo:        'text',
 });
+ApplicationSchema.index({ isDraft: 1, status: 1, submittedAt: -1 });
+ApplicationSchema.index({ isDraft: 1, exportCategory: 1, submittedAt: -1 });
+ApplicationSchema.index({ isDraft: 1, destinationCountry: 1, submittedAt: -1 });
+ApplicationSchema.index({ 'auditLog.occurredAt': 1 });
 
 module.exports = mongoose.model('Application', ApplicationSchema);

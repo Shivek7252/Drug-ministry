@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import Icon from '../../../components/ui/Icon';
-import { OVERDUE_DAYS } from './aggregations';
+import { SLA_DESCRIPTION } from './statusModel';
 
 /* ============================================================================
    KpiFilterRow — the KPI strip is the primary filter affordance.
@@ -29,28 +29,62 @@ const TILE_ICON = {
 
 const TILE_HINT = {
   total: 'All applications matching the current filters',
-  submitted: 'Awaiting first review',
+  submitted: 'Workflow status is Submitted — awaiting first review',
   underReview: 'Under review, including document verification and compliance check',
   queryRaised: 'Held pending applicant response',
   approved: 'Approved or partially approved',
   rejected: 'Rejected',
-  overdue: `Submitted or in review (including document verification and compliance check) for more than ${OVERDUE_DAYS} days`,
+  overdue: SLA_DESCRIPTION,
 };
 
+/* What the reader is looking at, stated once:
+
+     "this week"   the calendar week to date in the business timezone, Monday
+                   00:00 IST up to now. The window is half-open, so an event on
+                   the boundary belongs to the later week.
+     the number    EVENTS in that window (approvals, rejections, queries
+                   raised, submissions, entries into review) minus the same
+                   count for the whole previous week — not a change in the
+                   tile's current count.
+     arrow/colour  up + green = more of that event than last week; down + red =
+                   fewer. Direction only. More rejections is "up", which is not
+                   necessarily good; the arrow reports volume, not sentiment.
+     percentage    change against last week. Omitted when last week was zero,
+                   because a percentage of nothing is not a number.
+     unavailable   the history needed to reconstruct last week is missing. Says
+                   so rather than showing a zero that reads as "no change". */
 function Delta({ delta }) {
-  if (!delta || delta.delta === 0) {
-    return <span className="kpi-delta is-flat tnum">No change this week</span>;
+  if (!delta || delta.available === false) {
+    return (
+      <span
+        className="kpi-delta is-na"
+        title={delta?.detail || delta?.reason
+          || 'The previous period cannot be reconstructed from the recorded history.'}
+      >
+        {delta?.reason === 'Historical data unavailable' ? 'Historical data unavailable' : 'Not comparable'}
+      </span>
+    );
   }
+
+  const pct = typeof delta.percent === 'number' ? ` (${delta.percent > 0 ? '+' : ''}${delta.percent}%)` : '';
+  const title = `${delta.current} week to date vs ${delta.prior} in the same period last week${pct}.`
+    + ` ${delta.basis || delta.label || ''}`;
+
+  if (delta.delta === 0) return null;
   const up = delta.delta > 0;
   return (
-    <span className={`kpi-delta ${up ? 'is-up' : 'is-down'} tnum`}>
+    <span className={`kpi-delta ${up ? 'is-up' : 'is-down'} tnum`} title={title}>
       <Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} />
-      {up ? '+' : ''}{delta.delta} this week
+      {up ? '+' : ''}{delta.delta} WTD{pct}
     </span>
   );
 }
 
-export default function KpiFilterRow({ tiles, counts, deltas, value, onChange, loading }) {
+export default function KpiFilterRow({
+  tiles, counts, deltas, value, onChange, loading,
+  unreadCount = 0, readStateReady = false, unknownCount = 0,
+  unavailable = false,
+}) {
   const refs = useRef([]);
 
   const move = (from, to) => {
@@ -80,11 +114,12 @@ export default function KpiFilterRow({ tiles, counts, deltas, value, onChange, l
   const select = key => onChange(key === value && key !== 'total' ? 'total' : key);
 
   return (
-    <div
-      className="kpi-row"
-      role="radiogroup"
-      aria-label="Filter applications by status"
-    >
+    <>
+      <div
+        className="kpi-row"
+        role="radiogroup"
+        aria-label="Filter applications by status"
+      >
       {tiles.map((tile, i) => {
         const active = tile.key === value;
         return (
@@ -106,13 +141,32 @@ export default function KpiFilterRow({ tiles, counts, deltas, value, onChange, l
             </span>
             <span className="kpi-figures">
               <span className="kpi-value tnum">
-                {loading ? '—' : (counts?.[tile.key] ?? 0)}
+                {loading || unavailable ? '—' : (counts?.[tile.key] ?? 0)}
               </span>
-              {!loading && <Delta delta={deltas?.[tile.key]} />}
+              {!loading && !unavailable && <Delta delta={deltas?.[tile.key]} />}
+              {!loading && unavailable && <span className="kpi-delta is-na">Unavailable</span>}
             </span>
           </button>
         );
       })}
-    </div>
+      </div>
+
+      {/* Reviewer read state and data-quality notices sit outside the
+          radiogroup: neither is a workflow status and neither filters. */}
+      <div className="kpi-notes">
+        <span className="kpi-unread" title="Applications you have not opened yet">
+          <Icon name="sparkle" size={14} />
+          {readStateReady
+            ? <><strong className="tnum">{unreadCount}</strong> unread by you</>
+            : 'Loading read state…'}
+        </span>
+        {unknownCount > 0 && (
+          <span className="kpi-unknown" title="Status value not recognised by the workflow model">
+            <Icon name="alertTriangle" size={14} />
+            <strong className="tnum">{unknownCount}</strong> with an unrecognised status
+          </span>
+        )}
+      </div>
+    </>
   );
 }

@@ -3,8 +3,9 @@ import RankedBarChart from './RankedBarChart';
 import { categoryMix } from '../aggregations';
 
 /* Export category mix — full labels, no truncation (audit item 9). */
-export default function CategoryMix({ apps, loading }) {
-  const rows = useMemo(() => categoryMix(apps), [apps]);
+export default function CategoryMix({ apps = [], rows: serverRows = null, loading, error }) {
+  const derivedRows = useMemo(() => categoryMix(apps), [apps]);
+  const rows = serverRows || derivedRows;
   return (
     <RankedBarChart
       title="Category Mix"
@@ -12,6 +13,8 @@ export default function CategoryMix({ apps, loading }) {
       span={6}
       rows={rows}
       loading={loading}
+      error={error}
+      height={320}
       yWidth={170}
     />
   );

@@ -28,8 +28,9 @@ function TatTooltip({ active, payload }) {
   );
 }
 
-export default function ProcessingTime({ apps, loading }) {
-  const { rows, median, counted } = useMemo(() => processingTime(apps), [apps]);
+export default function ProcessingTime({ apps = [], data = null, loading, error }) {
+  const derived = useMemo(() => processingTime(apps), [apps]);
+  const { rows, median, counted } = data || derived;
   const ramp = tatRamp();
 
   /* The reference line sits on the bucket the median falls inside. */
@@ -40,11 +41,12 @@ export default function ProcessingTime({ apps, loading }) {
   return (
     <ChartCard
       title="Processing Time"
-      subtitle="Turnaround per application: submission to decision, or to today while still open."
+      subtitle="Submission to decision, or to today while still open."
       span={6}
       loading={loading}
+      error={error}
       empty={!loading && counted === 0}
-      height={280}
+      height={300}
       footnote={
         median === null
           ? undefined
@@ -63,11 +65,11 @@ export default function ProcessingTime({ apps, loading }) {
       }}
     >
       <div className="cc-plot" role="img" aria-label={`Processing time by age bucket. Median ${median ?? 'not available'} days.`}>
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart
             data={rows}
             layout="vertical"
-            margin={{ top: 4, right: 52, bottom: 4, left: 4 }}
+            margin={{ top: 4, right: 96, bottom: 4, left: 4 }}   /* room for the median label */
             barCategoryGap={8}
           >
             <XAxis type="number" hide />

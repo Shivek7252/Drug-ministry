@@ -6,9 +6,18 @@ const multer = require('multer');
 const mongoose = require('mongoose');
 const Application = require('../models/Application');
 const ApplicationQuery = require('../models/ApplicationQuery');
+const ApplicationRead = require('../models/ApplicationRead');
+const { validateCountry, isValidCountry } = require('../services/countryValidation');
 const { v4: uuidv4 } = require('uuid');
 const { validateProductsApproval } = require('../approvedDrugs');
 const { requireReviewer } = require('../middleware/reviewerAuth');
+const { buildAnalytics } = require('../services/reviewerAnalytics');
+const { buildEventChartActivity } = require('../services/reviewerAnalytics');
+const {
+  aggregateCharts, aggregateSummary, loadAnalyticsEventRows,
+} = require('../services/reviewerAnalyticsDb');
+const { validateCategory, isValidCategory } = require('../services/categoryValidation');
+const { recordStatusTransition } = require('../services/transitionEvents');
 const {
   applicationsToCsv,
   buildReviewerFilter,
@@ -18,6 +27,7 @@ const {
   createApplicationQuery,
   getCompleteQueryHistory,
   queryCountsForApplications,
+  latestQueryRaisedAt,
 } = require('../services/queryHistory');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -780,6 +790,32 @@ router.post('/submit', async (req, res) => {
       return res.status(400).json({ error: 'At least one product is required.' });
     }
 
+    /* Country must be a real ISO 3166-1 country, name/code/alias. Presence
+       alone was the only check before, which is how the legacy "X" records
+       were accepted. Existing rows are untouched — this guards new writes. */
+    const destCheck = validateCountry(formData.destinationCountry, 'Destination country');
+    if (!destCheck.valid) {
+      return res.status(400).json({ error: destCheck.message, field: 'destinationCountry' });
+    }
+    formData.destinationCountry = destCheck.canonical;
+    for (const [i, consignee] of (formData.consignees || []).entries()) {
+      if (!consignee || !String(consignee.country ?? '').trim()) continue;
+      const check = validateCountry(consignee.country, `Consignee ${i + 1} country`);
+      if (!check.valid) {
+        return res.status(400).json({ error: check.message, field: `consignees[${i}].country` });
+      }
+      consignee.country = check.canonical;
+    }
+
+    /* Category must be one of the allowed export categories. Presence alone was
+       the only check before, which is how the legacy "Y" records were accepted.
+       Existing rows are untouched — this guards new writes. */
+    const catCheck = validateCategory(formData.exportCategory, 'Export category');
+    if (!catCheck.valid) {
+      return res.status(400).json({ error: catCheck.message, field: 'exportCategory' });
+    }
+    formData.exportCategory = catCheck.canonical;
+
     // ── CDSCO drug approval validation ──────────────────────────────────────
     // We run this on every submit. Policy: warn-not-block — applications with
     // unapproved drugs are still saved and submitted, but:
@@ -974,23 +1010,75 @@ router.get('/stats/summary', async (req, res) => {
 router.get('/reviewer/options', requireReviewer, async (req, res) => {
   try {
     const applications = await Application.find({ isDraft: false })
-      .select('destinationCountry consigneeCountry consignees.country exportCategory')
+      .select('destinationCountry consigneeCountry consignees.country exportCategory state city')
       .lean();
     const countries = new Set();
     const categories = new Set();
+    const states = new Set();
     for (const app of applications) {
       [app.destinationCountry, app.consigneeCountry, ...(app.consignees || []).map(c => c.country)]
         .filter(Boolean)
         .forEach(country => countries.add(String(country).trim()));
       if (app.exportCategory) categories.add(String(app.exportCategory).trim());
+      [app.state, app.city].filter(Boolean).forEach(state => states.add(String(state).trim()));
     }
+    /* Stored country values are split into those that resolve to a real ISO
+       country and those that do not, so the console can label legacy junk
+       ("X") as invalid rather than presenting it as a country. */
+    const storedCountries = [...countries].sort((a, b) => a.localeCompare(b));
+    const storedCategories = [...categories].sort((a, b) => a.localeCompare(b));
+    const invalidCountries = storedCountries.filter(c => !isValidCountry(c));
     res.json({
       success: true,
-      countries: [...countries].sort((a, b) => a.localeCompare(b)),
-      categories: [...categories].sort((a, b) => a.localeCompare(b)),
+      countries: storedCountries,
+      invalidCountries,
+      categories: storedCategories.filter(isValidCategory),
+      invalidCategories: storedCategories.filter(value => !isValidCategory(value)),
+      states: [...states].sort((a, b) => a.localeCompare(b)),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Reviewer read receipts ───────────────────────────────────────────────
+   Read/unread is per-reviewer state and must survive refresh, re-login and a
+   different machine, so it is persisted rather than kept in localStorage. */
+router.get('/reviewer/read-state', requireReviewer, async (req, res) => {
+  try {
+    const rows = await ApplicationRead.find({
+      $or: [
+        { reviewerId: req.reviewer.id },
+        { reviewerId: { $exists: false }, reviewer: req.reviewer.name },
+      ],
+    })
+      .select('applicationNumber readAt')
+      .lean();
+    res.json({
+      success: true,
+      reviewer: { id: req.reviewer.id, name: req.reviewer.name },
+      read: rows.map(r => ({ applicationNumber: r.applicationNumber, readAt: r.readAt })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/read', requireReviewer, async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return undefined;
+    const readAt = new Date();
+    await ApplicationRead.updateOne(
+      { reviewerId: req.reviewer.id, applicationNumber: app.applicationNumber },
+      { $set: {
+        application: app._id, readAt, reviewerName: req.reviewer.name,
+      }, $setOnInsert: { reviewerId: req.reviewer.id } },
+      { upsert: true },
+    );
+    return res.json({ success: true, applicationNumber: app.applicationNumber, readAt });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -999,13 +1087,22 @@ router.get('/reviewer', requireReviewer, async (req, res) => {
   try {
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 20));
-    const { filter, dateRange } = buildReviewerFilter(req.query);
-    const { filter: statusBaseFilter } = buildReviewerFilter({ ...req.query, status: 'All' });
+    const { filter, dateRange, appliedFilters } = buildReviewerFilter(req.query);
+    const { filter: statusBaseFilter } = buildReviewerFilter({
+      ...req.query, status: 'All', workflowStatus: 'total',
+    });
+    const sortFields = {
+      application: 'applicationNumber', applicant: 'applicantOrganization',
+      submitted: 'submittedAt', queries: 'queryCount', status: 'status',
+    };
+    const sortKey = sortFields[req.query.sort] || 'submittedAt';
+    const sortDirection = req.query.direction === 'asc' ? 1 : -1;
+    const sort = { [sortKey]: sortDirection, _id: sortDirection };
 
     const [apps, total, statusRows] = await Promise.all([
       Application.find(filter)
         .select('-documents -auditLog')
-        .sort({ submittedAt: -1, createdAt: -1 })
+        .sort(sort)
         .skip((page - 1) * pageSize)
         .limit(pageSize),
       Application.countDocuments(filter),
@@ -1014,10 +1111,21 @@ router.get('/reviewer', requireReviewer, async (req, res) => {
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
     ]);
-    const queryCounts = await queryCountsForApplications(apps);
+    const [queryCounts, queryRaisedAt, readDocs] = await Promise.all([
+      queryCountsForApplications(apps),
+      latestQueryRaisedAt(apps),
+      ApplicationRead.find({
+        reviewerId: req.reviewer.id,
+        applicationNumber: { $in: apps.map(app => app.applicationNumber) },
+      }).select('applicationNumber').lean(),
+    ]);
+    const readSet = new Set(readDocs.map(row => row.applicationNumber));
     const applications = apps.map(app => ({
       ...app.toObject({ flattenMaps: true }),
       queryCount: queryCounts.get(String(app._id)) || 0,
+      // Own timestamp for the Query KPI delta — never submittedAt.
+      lastQueryRaisedAt: queryRaisedAt.get(String(app._id)) || null,
+      isRead: readSet.has(app.applicationNumber),
     }));
     const statusCounts = Object.fromEntries(statusRows.map(row => [row._id, row.count]));
 
@@ -1029,12 +1137,81 @@ router.get('/reviewer', requireReviewer, async (req, res) => {
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
       dateRange,
+      filters: appliedFilters,
       statusCounts,
       applications,
     });
   } catch (err) {
     const validationError = /datePreset|date range|startDate|endDate/.test(err.message);
     res.status(validationError ? 400 : 500).json({ error: err.message });
+  }
+});
+
+/* ----------------------------------------------------------------------------
+   Reviewer analytics: current KPI counts, weekly event activity and the
+   week-over-week comparison, aggregated over the COMPLETE filtered dataset
+   rather than the current page.
+
+   Security: reviewer-authenticated, and the projection is deliberately narrow.
+   auditLog is read here to reconstruct transition events but is NEVER returned
+   — the response carries counts and definitions, no raw audit trail, no
+   documents, no applicant contact details.
+   -------------------------------------------------------------------------- */
+router.get('/reviewer/analytics', requireReviewer, async (req, res) => {
+  try {
+    const now = new Date();
+    const { filter: baseFilter, dateRange, appliedFilters } = buildReviewerFilter({
+      ...req.query, workflowStatus: 'total',
+    }, now);
+    const { filter: chartFilter, appliedFilters: chartFilters } = buildReviewerFilter(req.query, now);
+    const since = new Date(now.getTime() - 365 * 86400000);
+    const [summary, charts, baseEvents, chartEvents] = await Promise.all([
+      aggregateSummary(baseFilter, req.reviewer, now),
+      aggregateCharts(chartFilter, now),
+      loadAnalyticsEventRows(baseFilter, since),
+      chartFilters.workflowStatus === 'total'
+        ? Promise.resolve(null)
+        : loadAnalyticsEventRows(chartFilter, since),
+    ]);
+    const comparisons = buildAnalytics(
+      baseEvents.apps, baseEvents.queriesByApp, new Set(), now,
+    );
+    const eventSource = chartEvents || baseEvents;
+    const eventCharts = buildEventChartActivity(
+      eventSource.apps, eventSource.queriesByApp, now,
+    );
+    charts.decisionThroughput = eventCharts.decisionThroughput;
+    for (const granularity of ['day', 'week', 'month']) {
+      const values = new Map(eventCharts.disposed[granularity].map(row => [row.key, row.value]));
+      charts.submissionTrend[granularity] = charts.submissionTrend[granularity].map(row => ({
+        ...row, disposed: values.get(row.key) || 0,
+      }));
+    }
+
+    const analytics = {
+      ...comparisons,
+      generatedAt: now.toISOString(),
+      current: summary.current,
+      unread: {
+        count: summary.unreadCount,
+        definition: 'Applications in the globally filtered set this reviewer has not opened.',
+      },
+      scope: { applications: summary.current.total, countedBy: 'unique application id' },
+      unknownCount: summary.unknownCount,
+      charts,
+    };
+
+    return res.json({
+      success: true,
+      reviewer: { id: req.reviewer.id, name: req.reviewer.name },
+      dateRange,
+      filters: appliedFilters,
+      chartFilters,
+      ...analytics,
+    });
+  } catch (err) {
+    const validationError = /datePreset|date range|startDate|endDate/.test(err.message);
+    return res.status(validationError ? 400 : 500).json({ error: err.message });
   }
 });
 
@@ -1219,14 +1396,14 @@ router.post('/:id/review', requireReviewer, async (req, res) => {
       });
       app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
     }
+    const occurredAt = new Date();
     app.status = status;
-    if (status === 'Approved') app.approvedAt = new Date();
-    if (status === 'Rejected') app.rejectedAt = new Date();
-    app.auditLog.push({
-      action: 'reviewer_action',
-      detail: `Status: ${prev} → ${status || prev}. Remarks: ${remarks || '—'}`,
-      user: officer,
-      timestamp: new Date(),
+    if (status === 'Approved' || status === 'Partially Approved') app.approvedAt = occurredAt;
+    if (status === 'Rejected') app.rejectedAt = occurredAt;
+    recordStatusTransition(app, {
+      fromStatus: prev, toStatus: status, occurredAt,
+      actorId: req.reviewer.id, actorName: officer,
+      action: 'reviewer_action', remarks,
     });
     if (remarks) {
       if (!app.reviewerRemarks) app.reviewerRemarks = [];
@@ -1386,6 +1563,7 @@ router.post('/:id/shipments/:idx/action', requireReviewer, async (req, res) => {
     app.markModified('shipments');
 
     // Roll-up application-level status
+    const previousApplicationStatus = app.status;
     const rolled = rollupApplicationStatus(app.shipments.map(s => s.lineStatus || 'Pending'));
     if (rolled) app.status = rolled;
 
@@ -1395,6 +1573,13 @@ router.post('/:id/shipments/:idx/action', requireReviewer, async (req, res) => {
       user: officer,
       timestamp: new Date(),
     });
+    if (rolled) {
+      recordStatusTransition(app, {
+        fromStatus: previousApplicationStatus, toStatus: rolled,
+        actorId: req.reviewer.id, actorName: officer,
+        action: 'shipment_rollup', remarks,
+      });
+    }
 
     try {
       await app.save();
@@ -1425,8 +1610,12 @@ router.patch('/:id/status', async (req, res) => {
     });
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
+    const previousStatus = app.status;
     app.status = status;
-    app.auditLog.push({ action: 'status_changed', detail: `Status changed to ${status}. ${note || ''}`, user });
+    recordStatusTransition(app, {
+      fromStatus: previousStatus, toStatus: status,
+      actorId: user, actorName: user, action: 'status_changed', remarks: note,
+    });
     await app.save();
     res.json({ success: true, status: app.status });
   } catch (err) {
@@ -1535,6 +1724,7 @@ router.post('/:id/checklist/:itemId/query', requireReviewer, async (req, res) =>
     if (version === 1) item.baseQuery = String(queryText).trim();
     item.status = 'Query';
 
+    const previousStatus = app.status;
     app.status = 'Query Raised';
     app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
     app.checklistItems.set(req.params.itemId, item);
@@ -1543,6 +1733,11 @@ router.post('/:id/checklist/:itemId/query', requireReviewer, async (req, res) =>
       action: 'checklist_query',
       detail: `Item ${item.itemNo} (${item.title}) — v${version} query raised: "${item.queries[version - 1].queryText}"`,
       user: officer,
+    });
+    recordStatusTransition(app, {
+      fromStatus: previousStatus, toStatus: 'Query Raised',
+      actorId: req.reviewer.id, actorName: officer,
+      action: 'checklist_query_status', remarks: String(queryText).trim(),
     });
     try {
       await app.save();
@@ -1625,6 +1820,7 @@ router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), 
 
     // Roll application status back to Under Review if no other items still open
     const anyOpen = [...app.checklistItems.values()].some(it => (it.queries || []).some(q => !q.reply));
+    const previousStatus = app.status;
     if (!anyOpen && app.status === 'Query Raised') app.status = 'Under Review';
 
     app.auditLog.push({
@@ -1632,6 +1828,13 @@ router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), 
       detail: `Item ${item.itemNo} (${item.title}) — v${round.version} reply: "${reply}"${req.file ? ' [file attached]' : ''}`,
       user: applicant,
     });
+    if (previousStatus !== app.status) {
+      recordStatusTransition(app, {
+        fromStatus: previousStatus, toStatus: app.status,
+        actorId: `applicant:${String(applicant).toLowerCase()}`,
+        actorName: applicant, action: 'query_resolved', remarks: reply,
+      });
+    }
     await app.save();
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;

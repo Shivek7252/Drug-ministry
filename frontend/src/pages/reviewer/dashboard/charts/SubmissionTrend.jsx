@@ -37,14 +37,15 @@ function TrendTooltip({ active, payload, label, granularity }) {
   );
 }
 
-export default function SubmissionTrend({ apps, loading }) {
+export default function SubmissionTrend({ apps = [], series = null, loading, error }) {
   const [granularity, setGranularity] = useState('day');
   const active = GRANULARITIES.find(g => g.key === granularity) || GRANULARITIES[0];
 
-  const rows = useMemo(
+  const derivedRows = useMemo(
     () => submissionTrend(apps, { granularity, days: active.days }),
     [apps, granularity, active.days]
   );
+  const rows = series?.[granularity] || derivedRows;
 
   const hasData = rows.some(r => r.received > 0 || r.disposed > 0);
   const cReceived = token('--chart-1');
@@ -69,11 +70,12 @@ export default function SubmissionTrend({ apps, loading }) {
   return (
     <ChartCard
       title="Submission Trend"
-      subtitle={`Applications received against applications disposed (approved, partially approved or rejected), ${active.label.toLowerCase()} over the last ${active.days} days. The gap is backlog growth.`}
+      subtitle={`Received vs disposed, ${active.label.toLowerCase()} over ${active.days} days — the gap is backlog growth.`}
       span={8}
       loading={loading}
+      error={error}
       empty={!loading && !hasData}
-      height={260}
+      height={300}
       actions={segmented}
       table={{
         columns: [
@@ -92,7 +94,7 @@ export default function SubmissionTrend({ apps, loading }) {
       }}
     >
       <div className="cc-plot" role="img" aria-label={`Submission trend, ${active.label.toLowerCase()}. Received and disposed applications over the last ${active.days} days.`}>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: -12 }}>
             <CartesianGrid {...gridProps()} />
             <XAxis

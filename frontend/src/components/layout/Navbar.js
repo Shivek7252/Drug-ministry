@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { NOTIFICATIONS } from '../../data/mockData';
+import useReviewerNotifications from '../../hooks/useReviewerNotifications';
 import LoginModal from '../auth/LoginModal';
 import Icon from '../ui/Icon';
 import useTextScale from '../../hooks/useTextScale';
@@ -20,10 +20,15 @@ const TEXT_SCALE_BUTTONS = [
 export default function Navbar() {
   const location  = useLocation();
   const navigate  = useNavigate();
-  const { notifOpen, setNotifOpen, isLoggedIn, setLoginOpen, logout, currentUser } = useApp();
+  const { notifOpen, setNotifOpen, isLoggedIn, setLoginOpen, logout, currentUser, userRole } = useApp();
   const [mobileMenu,   setMobileMenu]   = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const unread = NOTIFICATIONS.filter(n => !n.read).length;
+
+  /* Real applications from the reviewer endpoint, not the old mock array. The
+     endpoint is called unfiltered, so eligibility is exactly the queue's
+     ({ isDraft: false }) and the badge cannot claim an entry the queue hides. */
+  const { notifications, unreadCount: unread } =
+    useReviewerNotifications({ enabled: isLoggedIn && userRole === 'reviewer' });
 
   /* Drives the root rem class from tokens.css, on BOTH portals, and persists.
      Replaces an inline html.style.fontSize that was not persisted and would
@@ -239,7 +244,10 @@ export default function Navbar() {
             <button onClick={() => setNotifOpen(false)} aria-label="Close notifications"><Icon name="x" size={16} /></button>
           </div>
           <div className="notif-list">
-            {NOTIFICATIONS.map(n => (
+            {notifications.length === 0 && (
+              <p className="notif-empty">No notifications.</p>
+            )}
+            {notifications.map(n => (
               <div key={n.id} className={`notif-item ${!n.read ? 'unread' : ''}`}>
                 <div className={`notif-dot dot-${n.type}`} />
                 <div className="notif-content">

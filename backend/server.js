@@ -90,7 +90,12 @@ try {
 app.get('/api/banned-drugs', (_, res) => res.json(bannedDrugs));
 
 /* ─── Health check ─────────────────────────────────────────────────────── */
-app.get('/health', (_, res) => res.json({ status: 'ok', model: 'mistral-small-latest' }));
+app.get('/health', (_, res) => res.json({
+  status: 'ok',
+  model: 'mistral-small-latest',
+  database: mongoose.connection.name || null,
+  testMode: process.env.NODE_ENV === 'test',
+}));
 
 /* ─── Document checklist items per document type ───────────────────────── */
 const CHECKLISTS = {

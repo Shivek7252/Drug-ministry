@@ -1,3 +1,8 @@
+import {
+  STATUS, normalizeStatus, isNonTerminal, SLA_DAYS,
+} from './statusModel';
+import { canonicalName, countryDisplayLabel, isInvalidCountryValue } from '../../../data/countries';
+
 /* ============================================================================
    Pure aggregation functions for the reviewer analytics panel.
 
@@ -20,7 +25,7 @@ export const PIPELINE = [
 const DECIDED = ['Approved', 'Partially Approved', 'Rejected'];
 const OPEN_STATES = ['Submitted', 'Under Review', 'Document Verification', 'Compliance Check', 'Query Raised'];
 
-export const OVERDUE_DAYS = 15;
+export const OVERDUE_DAYS = SLA_DAYS;   // re-exported; defined in statusModel
 
 export const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -68,10 +73,18 @@ export function pipelineRank(status) {
 export const isDecided = app => DECIDED.includes(app.status);
 export const isOpen = app => OPEN_STATES.includes(app.status);
 
-/** Decision timestamp for a disposed application, or null while open. */
+/** Decision timestamp for a disposed application, or null while open.
+ *
+ *  Keyed off the CURRENT status, not date presence. The reviewer flow sets
+ *  approvedAt on approve and rejectedAt on reject and never clears the other,
+ *  so an application approved and later rejected carries both. Preferring
+ *  approvedAt unconditionally would report the superseded date and bucket the
+ *  decision into the wrong day/week. Live data already contains one such row. */
 export function decidedAt(app) {
-  return asDate(app.approvedAt) || asDate(app.rejectedAt)
-    || (isDecided(app) ? asDate(app.updatedAt) : null);
+  if (!isDecided(app)) return null;
+  return app.status === 'Rejected'
+    ? asDate(app.rejectedAt) || asDate(app.updatedAt)
+    : asDate(app.approvedAt) || asDate(app.updatedAt);
 }
 
 /** Turnaround in days: submission → decision, or → today while still open. */
@@ -82,13 +95,14 @@ export function turnaroundDays(app) {
   return Math.max(0, Math.floor(((to ? to.getTime() : Date.now()) - from.getTime()) / 86400000));
 }
 
-export function isOverdue(app) {
-  // Follows the In Review fold: an application parked 40 days in Compliance
-  // Check is exactly the case this tile exists to surface, so the mid-review
-  // states count as overdue too.
-  if (!['Submitted', ...IN_REVIEW_STATES].includes(app.status)) return false;
-  const age = daysBetween(app.submittedAt || app.createdAt);
-  return age !== null && age > OVERDUE_DAYS;
+export function isOverdue(app, now = Date.now()) {
+  // Non-terminal only: approved, partially approved and rejected applications
+  // are finished and can never be overdue. Query Raised IS included — it is a
+  // hold, not a completion, and unanswered queries are exactly the ageing this
+  // metric exists to surface (see SLA_DESCRIPTION in statusModel).
+  if (!isNonTerminal(app)) return false;
+  const age = daysBetween(app.submittedAt || app.createdAt, now);
+  return age !== null && age > SLA_DAYS;
 }
 
 /* ---- 1. Submission trend: received vs disposed -------------------------- */
@@ -201,11 +215,14 @@ function countBy(apps, pick, { limit = 0, othersLabel = 'Others' } = {}) {
 
 export const categoryMix = apps => countBy(apps, a => a.exportCategory);
 
+/* Invalid legacy values are labelled rather than shown as a country, so the
+   affected records stay visible and auditable without implying validity. */
 export const destinationCountries = apps =>
-  countBy(apps, a => a.destinationCountry || a.consigneeCountry, { limit: 8 });
+  countBy(apps, a => {
+    const raw = a.destinationCountry || a.consigneeCountry;
+    return isInvalidCountryValue(raw) ? countryDisplayLabel(raw) : canonicalName(raw);
+  }, { limit: 8 });
 
-export const stateDistribution = apps =>
-  countBy(apps, a => a.state, { limit: 10 });
 
 /* ---- 7. Cumulative pipeline funnel -------------------------------------
    "Reached stage N or beyond" — so a decided application still counts at
@@ -292,16 +309,28 @@ export function decisionThroughput(apps, { weeks = 12 } = {}) {
    -------------------------------------------------------------------------- */
 export const KPI_TILES = [
   { key: 'total', label: 'Total', token: 'total', match: () => true },
-  { key: 'submitted', label: 'New', token: 'submitted', match: a => a.status === 'Submitted' },
-  // Absorbs Document Verification and Compliance Check: they are mid-review
-  // states with no tile of their own, and leaving them unfilterable would be a
-  // capability regression. The tile's title says so.
-  { key: 'underReview', label: 'In Review', token: 'review', match: a => IN_REVIEW_STATES.includes(a.status) },
-  { key: 'queryRaised', label: 'Query', token: 'query', match: a => a.status === 'Query Raised' },
-  { key: 'approved', label: 'Approved', token: 'approved', match: a => a.status === 'Approved' || a.status === 'Partially Approved' },
-  { key: 'rejected', label: 'Rejected', token: 'rejected', match: a => a.status === 'Rejected' },
-  { key: 'overdue', label: 'Overdue', token: 'overdue', match: isOverdue },
+  // Renamed from "New": this is a workflow status, not reviewer read state.
+  // Unread is reported separately and comes from the read-receipt API.
+  { key: 'submitted', label: 'Submitted', token: 'submitted', match: a => normalizeStatus(a.status) === STATUS.SUBMITTED },
+  { key: 'underReview', label: 'In Review', token: 'review', match: a => normalizeStatus(a.status) === STATUS.IN_REVIEW },
+  { key: 'queryRaised', label: 'Query', token: 'query', match: a => normalizeStatus(a.status) === STATUS.QUERY_RAISED },
+  {
+    key: 'approved',
+    label: 'Approved',
+    token: 'approved',
+    match: a => [STATUS.APPROVED, STATUS.PARTIALLY_APPROVED].includes(normalizeStatus(a.status)),
+  },
+  { key: 'rejected', label: 'Rejected', token: 'rejected', match: a => normalizeStatus(a.status) === STATUS.REJECTED },
+  // Wrapped deliberately: Array.filter passes (element, index), and isOverdue
+  // takes an optional clock as its second argument. Passing it bare made the
+  // index the clock and zeroed the tile.
+  { key: 'overdue', label: 'Overdue', token: 'overdue', match: a => isOverdue(a) },
 ];
+
+/* Applications whose status matches nothing we recognise. Surfaced so a data
+   problem is visible rather than silently missing from every tile. */
+export const unknownStatusApps = apps =>
+  apps.filter(a => normalizeStatus(a.status) === STATUS.UNKNOWN);
 
 /* ---- KPI counts and period-over-period deltas --------------------------- */
 
@@ -319,25 +348,89 @@ export function tileForStatus(status) {
   return hit ? hit.key : 'total';
 }
 
-/**
- * Change in intake for the last `days` versus the equivalent preceding window.
- * Deltas are computed on submissions, which is the only event every row has.
- */
-export function kpiDeltas(apps, { days = 7 } = {}) {
-  const now = Date.now();
+/* ---- Week-over-week deltas -------------------------------------------------
+   Each metric is measured on ITS OWN event timestamp. The previous
+   implementation windowed every tile by submittedAt and then counted statuses
+   inside that window, which answered "how many applications submitted this week
+   are currently approved" — not "how many approvals happened this week". With
+   live data that reported Approved as -1 in a week containing +1 approval.
+
+   Where the event timestamp does not exist in the payload the delta is returned
+   as { available: false } and the UI states that plainly, rather than
+   substituting updatedAt and producing a confident wrong number.
+
+   Weeks are [now-7d, now) against [now-14d, now-7d), evaluated in the browser's
+   local zone, which is the reviewer's working timezone.
+   -------------------------------------------------------------------------- */
+
+export const DELTA_BASIS = {
+  total:       { field: 'submittedAt', label: 'submissions' },
+  submitted:   { field: 'submittedAt', label: 'submissions' },
+  approved:    { field: 'approvedAt',  label: 'approvals' },
+  rejected:    { field: 'rejectedAt',  label: 'rejections' },
+  queryRaised: { field: 'lastQueryRaisedAt', label: 'queries raised' },
+  // No status-history timestamp is exposed on the reviewer list payload, so a
+  // truthful "entered review this week" cannot be computed. Reported as
+  // unavailable rather than approximated from updatedAt.
+  underReview: { field: null, reason: 'No status-history timestamp available' },
+  // Overdue is a point-in-time property of the current queue, not an event;
+  // there is no "became overdue" record to compare periods against.
+  overdue:     { field: null, reason: 'Point-in-time measure, not an event' },
+};
+
+const inWindow = (app, field, from, to) => {
+  const raw = app[field];
+  if (!raw) return false;
+  const t = new Date(raw).getTime();
+  return !Number.isNaN(t) && t >= from && t < to;
+};
+
+export function kpiDeltas(apps, { days = 7, now = Date.now() } = {}) {
   const currentFrom = now - days * 86400000;
   const priorFrom = now - 2 * days * 86400000;
 
-  const inWindow = (app, from, to) => {
-    const d = asDate(app.submittedAt) || asDate(app.createdAt);
-    return d && d.getTime() >= from && d.getTime() < to;
-  };
+  return Object.fromEntries(KPI_TILES.map(tile => {
+    const basis = DELTA_BASIS[tile.key];
+    if (!basis || !basis.field) {
+      return [tile.key, { available: false, reason: basis?.reason || 'Not comparable' }];
+    }
+    // Count the EVENTS in each window, restricted to rows the tile represents,
+    // so "approvals this week" cannot be inflated by a later status change.
+    const eligible = tile.key === 'total' || tile.key === 'submitted'
+      ? apps
+      : apps.filter(tile.match);
+    const current = eligible.filter(a => inWindow(a, basis.field, currentFrom, now)).length;
+    const prior = eligible.filter(a => inWindow(a, basis.field, priorFrom, currentFrom)).length;
+    return [tile.key, {
+      available: true, current, prior, delta: current - prior, basis: basis.field, label: basis.label,
+    }];
+  }));
+}
 
-  const tally = (from, to) => kpiCounts(apps.filter(a => inWindow(a, from, to)));
-  const current = tally(currentFrom, now);
-  const prior = tally(priorFrom, currentFrom);
+/* ----------------------------------------------------------------------------
+   Review-queue row sorting. Lives here rather than in useReviewQueue so it can
+   be unit-tested: that hook imports react-router-dom, which the CRA jest
+   resolver cannot resolve for v7. Same reason KPI_TILES moved here.
+   -------------------------------------------------------------------------- */
+export const SORT_ACCESSORS = {
+  application: a => a.applicationNumber || '',
+  applicant: a => (a.applicantOrganization || a.applicantName || '').toLowerCase(),
+  // Full millisecond timestamp, not the formatted date, so two rows on the
+  // same day still order by the time they were received.
+  submitted: a => new Date(a.submittedAt || a.createdAt || 0).getTime(),
+  queries: a => a.queryCount || 0,
+  status: a => a.status || '',
+};
 
-  return Object.fromEntries(
-    Object.keys(current).map(k => [k, { current: current[k], prior: prior[k], delta: current[k] - prior[k] }])
-  );
+export function sortRows(rows, key, dir) {
+  const accessor = SORT_ACCESSORS[key];
+  if (!accessor) return rows;
+  const factor = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = accessor(a);
+    const bv = accessor(b);
+    if (av < bv) return -1 * factor;
+    if (av > bv) return 1 * factor;
+    return 0;
+  });
 }

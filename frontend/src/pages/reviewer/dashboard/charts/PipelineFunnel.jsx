@@ -33,33 +33,29 @@ function FunnelTooltip({ active, payload }) {
   );
 }
 
-export default function PipelineFunnel({ apps, loading }) {
-  const stages = useMemo(() => pipelineFunnel(apps), [apps]);
-  const hold = useMemo(() => queryHold(apps), [apps]);
+export default function PipelineFunnel({ apps = [], data = null, loading, error }) {
+  const derivedStages = useMemo(() => pipelineFunnel(apps), [apps]);
+  const derivedHold = useMemo(() => queryHold(apps), [apps]);
+  const stages = data?.stages || derivedStages;
+  const hold = data?.hold || derivedHold;
   const palette = seriesColors();
   const entry = stages[0]?.value || 0;
 
   const footnote = hold.held > 0
-    ? `Includes ${fmtInt(hold.held)} application${hold.held === 1 ? '' : 's'} currently held at query, counted at the stages they have cleared.`
+    ? `Includes ${fmtInt(hold.held)} application${hold.held === 1 ? '' : 's'} (${fmtPct(hold.share)}) currently held at query, counted at the stages they have cleared.`
     : undefined;
 
   return (
     <ChartCard
       title="Pipeline Funnel"
-      subtitle="Cumulative — each stage counts applications that have reached it or moved past it."
+      subtitle="Cumulative — each stage counts applications that reached it or moved past it."
       span={6}
+      className="cc-wide-tablet"
       loading={loading}
+      error={error}
       empty={!loading && entry === 0}
-      height={260}
+      height={300}
       footnote={footnote}
-      actions={
-        hold.held > 0 ? (
-          <span className="cc-annot" title="Query Raised is an off-pipeline hold, not a pipeline stage">
-            <span className="cc-annot-value tnum">{fmtInt(hold.held)}</span>
-            <span className="cc-annot-label">held at query · {fmtPct(hold.share)}</span>
-          </span>
-        ) : null
-      }
       table={{
         columns: [
           { key: 'label', label: 'Stage' },
@@ -83,7 +79,7 @@ export default function PipelineFunnel({ apps, loading }) {
       }}
     >
       <div className="cc-plot" role="img" aria-label={`Cumulative pipeline funnel across ${stages.length} stages, from ${fmtInt(entry)} applications at intake.`}>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart
             data={stages}
             layout="vertical"

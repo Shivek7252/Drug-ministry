@@ -185,13 +185,10 @@ export const CHART_DATA = {
   ]
 };
 
-export const NOTIFICATIONS = [
-  { id: 1, type: "success", title: "NOC Approved", msg: "Application EXP-2026-000141 has been approved.", time: "2 hours ago", read: false },
-  { id: 2, type: "warning", title: "Document Verification Pending", msg: "EXP-2026-000143 requires additional documents.", time: "5 hours ago", read: false },
-  { id: 3, type: "info", title: "New Application Submitted", msg: "EXP-2026-000145 submitted successfully.", time: "1 day ago", read: true },
-  { id: 4, type: "info", title: "Application Under Review", msg: "EXP-2026-000142 is under review.", time: "2 days ago", read: true },
-  { id: 5, type: "danger", title: "Application Rejected", msg: "EXP-2026-000144 has been rejected. Please review.", time: "3 days ago", read: true }
-];
+/* NOTIFICATIONS removed: it was a hardcoded array naming applications that do
+   not exist (EXP-2026-000141 ...) with a constant unread count of 2. The navbar
+   now derives notifications from the reviewer endpoint via
+   hooks/useReviewerNotifications.js, which shares the queue's eligibility rule. */
 
 export const REQUIRED_DOCUMENTS = [
   { id: "mfg_license", label: "Manufacturing License", required: true, hint: "Valid manufacturing license issued by State Drug Authority" },

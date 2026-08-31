@@ -43,15 +43,19 @@ const withCtx = (ui, truncated = false) => render(
 describe('PipelineFunnel', () => {
   test('renders the query-hold footnote reconciling the cumulative counts', () => {
     withCtx(<PipelineFunnel apps={APPS} loading={false} />);
+    // Requirement, not literal copy: the count and the reconciliation rule must
+    // both appear. The share in between is allowed to change.
     expect(
-      screen.getByText(/Includes 1 application currently held at query, counted at the stages they have cleared\./i)
+      screen.getByText(/Includes 1 application.*currently held at query, counted at the stages they have cleared/i)
     ).toBeInTheDocument();
   });
 
   test('states the cumulative definition in the subtitle', () => {
     withCtx(<PipelineFunnel apps={APPS} loading={false} />);
+    // Guards the requirement (the cumulative rule is stated), not the exact
+    // wording, so copy edits do not break it while omission still does.
     expect(
-      screen.getByText(/Cumulative — each stage counts applications that have reached it or moved past it\./i)
+      screen.getByText(/cumulative.*each stage counts applications that reached it or moved past it/i)
     ).toBeInTheDocument();
   });
 

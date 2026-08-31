@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { reviewerAction } from '../../api/applicationService';
 
-import useReviewQueue, { isNewUnseen } from '../../hooks/useReviewQueue';
+import useReviewQueue, { isUnread } from '../../hooks/useReviewQueue';
+import useReviewerAnalytics from '../../hooks/useReviewerAnalytics';
 import { tileForStatus } from './dashboard/aggregations';
 
 import DashboardHeader from './dashboard/DashboardHeader';
@@ -17,7 +18,6 @@ import StatusDonut from './dashboard/charts/StatusDonut';
 import ProcessingTime from './dashboard/charts/ProcessingTime';
 import CategoryMix from './dashboard/charts/CategoryMix';
 import DestinationCountries from './dashboard/charts/DestinationCountries';
-import StateDistribution from './dashboard/charts/StateDistribution';
 import PipelineFunnel from './dashboard/charts/PipelineFunnel';
 import DecisionThroughput from './dashboard/charts/DecisionThroughput';
 
@@ -42,6 +42,13 @@ export default function ReviewDashboard() {
   const [searchParams] = useSearchParams();
   const { currentUser } = useApp();
   const q = useReviewQueue();
+  /* KPI comparisons come from the server: it can see the full filtered set and
+     the transition history, neither of which this client has. Same filters as
+     the table, so both describe the same population. */
+  const analytics = useReviewerAnalytics({
+    ...q.serverFilters,
+    workflowStatus: q.kpiFilter,
+  });
 
   const [density, setDensityState] = useState(() => {
     try { return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable'; }
@@ -56,9 +63,10 @@ export default function ReviewDashboard() {
 
   const openApplication = useCallback(app => {
     q.markOpened(app.applicationNumber);
+    analytics.reload();
     const search = searchParams.toString();
     navigate(`/review/application/${app.applicationNumber}${search ? `?${search}` : ''}`);
-  }, [navigate, q, searchParams]);
+  }, [navigate, q, analytics, searchParams]);
 
   /* The only bulk action with a backing endpoint. Loops the existing
      per-application route; no API change. */
@@ -71,22 +79,27 @@ export default function ReviewDashboard() {
     q.clearSelection();
     setBulkBusy(false);
     q.reload();
-  }, [q]);
+    analytics.reload();
+  }, [q, analytics]);
+
+  const chartData = analytics.analytics?.charts || null;
+  const analyticsLoading = analytics.loading && !chartData;
+  const analyticsError = !chartData ? analytics.error : '';
 
   const charts = (
     <>
-      <SubmissionTrend apps={q.viewFiltered} loading={q.loading} />
+      <SubmissionTrend series={chartData?.submissionTrend} loading={analyticsLoading} error={analyticsError} />
       <StatusDonut
-        apps={q.viewFiltered}
-        loading={q.loading}
+        rows={chartData?.statusDistribution}
+        loading={analyticsLoading}
+        error={analyticsError}
         onSelectStatus={status => q.setKpiFilter(tileForStatus(status))}
       />
-      <ProcessingTime apps={q.viewFiltered} loading={q.loading} />
-      <CategoryMix apps={q.viewFiltered} loading={q.loading} />
-      <DestinationCountries apps={q.viewFiltered} loading={q.loading} />
-      <StateDistribution apps={q.viewFiltered} loading={q.loading} />
-      <PipelineFunnel apps={q.viewFiltered} loading={q.loading} />
-      <DecisionThroughput apps={q.viewFiltered} loading={q.loading} />
+      <ProcessingTime data={chartData?.processingTime} loading={analyticsLoading} error={analyticsError} />
+      <CategoryMix rows={chartData?.categoryMix} loading={analyticsLoading} error={analyticsError} />
+      <DestinationCountries rows={chartData?.destinationCountries} loading={analyticsLoading} error={analyticsError} />
+      <PipelineFunnel data={chartData?.pipeline} loading={analyticsLoading} error={analyticsError} />
+      <DecisionThroughput rows={chartData?.decisionThroughput} loading={analyticsLoading} error={analyticsError} />
     </>
   );
 
@@ -98,18 +111,26 @@ export default function ReviewDashboard() {
         <div className="rvd-wrap">
           <KpiFilterRow
             tiles={q.tiles}
-            counts={q.counts}
-            deltas={q.deltas}
+            counts={analytics.serverCounts}
+            deltas={analytics.comparison}
+            analytics={analytics}
             value={q.kpiFilter}
             onChange={q.setKpiFilter}
-            loading={q.loading}
+            loading={analytics.loading && !analytics.analytics}
+            unavailable={!analytics.analytics}
+            unreadCount={analytics.unread?.count}
+            readStateReady={Boolean(analytics.analytics)}
+            unknownCount={analytics.analytics?.unknownCount || 0}
           />
 
           <AnalyticsPanel
-            truncated={q.truncated}
-            loading={q.loading}
-            resultCount={q.viewFiltered.length}
+            truncated={false}
+            loading={analyticsLoading}
+            resultCount={chartData?.scope?.applications || 0}
             filtered={q.hasFilters}
+            stale={analytics.stale}
+            error={analytics.error}
+            generatedAt={analytics.generatedAt}
           >
             {charts}
           </AnalyticsPanel>
@@ -118,31 +139,35 @@ export default function ReviewDashboard() {
         <FilterBar
           searchQ={q.searchQ} onSearch={q.setSearchQ}
           filterCat={q.filterCat} onCategory={q.setFilterCat} categories={q.categories}
-          country={q.country} onCountry={q.setCountry} countries={q.countries}
+          country={q.country} onCountry={q.setCountry}
+          state={q.state} onState={q.setState} states={q.states}
           datePreset={q.datePreset} onDatePreset={q.setDatePreset}
           startDate={q.startDate} onStartDate={q.setStartDate}
           endDate={q.endDate} onEndDate={q.setEndDate}
           hasFilters={q.hasFilters} onClearAll={q.resetFilters}
-          resultCount={q.viewFiltered.length} loading={q.loading}
+          resultCount={q.totalRows} loading={q.loading}
         />
 
         <div className="rvd-wrap">
           <ReviewQueueTable
             rows={q.pageRows}
             loading={q.loading}
+            refreshing={q.refreshing}
+            stale={q.stale}
             error={q.error}
+            hasFilters={q.hasFilters}
+            onRetry={() => q.reload()}
             sort={q.sort} onSort={q.toggleSort}
             page={q.page} pageCount={q.pageCount} onPage={q.setPage}
             rowsPerPage={q.rowsPerPage} onRowsPerPage={q.setRowsPerPage}
-            totalRows={q.sortedRows.length}
+            totalRows={q.totalRows}
             selected={q.selected}
             onToggleSelect={q.toggleSelect}
             onToggleSelectAll={q.toggleSelectAllOnPage}
             onClearSelection={q.clearSelection}
             density={density} onDensity={setDensity}
             onOpen={openApplication}
-            openedApps={q.openedApps}
-            isUnseen={app => isNewUnseen(app, q.openedApps)}
+            isUnread={app => isUnread(app, q.readSet)}
             onBulkMarkInReview={bulkMarkInReview}
             bulkBusy={bulkBusy}
           />

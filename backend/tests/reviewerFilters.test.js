@@ -14,10 +14,10 @@ test('resolves three-month and one-year presets', () => {
   assert.equal(resolveDateRange({ datePreset: '1year' }, NOW).start.toISOString(), '2025-08-28T12:00:00.000Z');
 });
 
-test('validates custom dates and creates an inclusive end date', () => {
+test('validates custom dates and creates a half-open business-timezone range', () => {
   const range = resolveDateRange({ datePreset: 'custom', startDate: '2026-01-01', endDate: '2026-01-31' }, NOW);
-  assert.equal(range.start.toISOString(), '2026-01-01T00:00:00.000Z');
-  assert.equal(range.end.toISOString(), '2026-01-31T23:59:59.999Z');
+  assert.equal(range.start.toISOString(), '2025-12-31T18:30:00.000Z');
+  assert.equal(range.endExclusive.toISOString(), '2026-01-31T18:30:00.000Z');
   assert.throws(() => resolveDateRange({ datePreset: 'custom', startDate: '2026-02-31', endDate: '2026-03-02' }), /valid/);
   assert.throws(() => resolveDateRange({ datePreset: 'custom', startDate: '2026-03-02', endDate: '2026-03-01' }), /after/);
 });
@@ -29,6 +29,30 @@ test('combines date and country before pagination', () => {
   const countryClause = filter.$and.find(clause => clause.$or);
   assert.equal(countryClause.$or.length, 3);
   assert.ok(countryClause.$or[0].destinationCountry.test('KENYA'));
+});
+
+test('search has one canonical name while legacy q remains compatible', () => {
+  const canonical = buildReviewerFilter({ search: 'EXP-123' }, NOW);
+  const legacy = buildReviewerFilter({ q: 'EXP-123' }, NOW);
+  assert.deepEqual(canonical.filter, legacy.filter);
+  assert.equal(canonical.appliedFilters.search, 'EXP-123');
+});
+
+test('state, search, category, country and date combine before aggregation', () => {
+  const { filter, appliedFilters } = buildReviewerFilter({
+    search: 'Acme', state: 'Kerala', category: 'Vaccines', country: 'Japan',
+    datePreset: '7d', workflowStatus: 'underReview',
+  }, NOW);
+  assert.ok(filter.$and.length >= 6);
+  assert.equal(appliedFilters.search, 'Acme');
+  assert.equal(appliedFilters.state, 'Kerala');
+  assert.equal(appliedFilters.workflowStatus, 'underReview');
+});
+
+test('every date preset rendered by the frontend is accepted', () => {
+  for (const datePreset of ['all', 'today', '7d', '30d', '90d']) {
+    assert.doesNotThrow(() => resolveDateRange({ datePreset }, NOW));
+  }
 });
 
 test('CSV includes required values, legacy decision dates, and formula protection', () => {

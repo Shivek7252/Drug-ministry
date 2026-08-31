@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import ChartCard from './ChartCard';
 import {
@@ -52,7 +52,7 @@ function WrappedTick({ x, y, payload, width }) {
 }
 
 export default function RankedBarChart({
-  title, subtitle, span, rows, loading, height = 240,
+  title, subtitle, span, rows, loading, error, height = 240,
   colorMode = 'single', yWidth = 150, emptyMessage,
 }) {
   const palette = seriesColors();
@@ -64,6 +64,7 @@ export default function RankedBarChart({
       subtitle={subtitle}
       span={span}
       loading={loading}
+      error={error}
       empty={!loading && rows.length === 0}
       emptyMessage={emptyMessage}
       height={height}
@@ -94,10 +95,19 @@ export default function RankedBarChart({
               tick={<WrappedTick width={yWidth} />}
             />
             <Tooltip content={<RankedTooltip />} cursor={{ fill: token('--chart-grid'), fillOpacity: 0.35 }} />
-            <Bar dataKey="value" radius={[0, 3, 3, 0]} isAnimationActive={false}>
+            <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} isAnimationActive={false}>
               {rows.map((row, i) => (
                 <Cell key={row.label} fill={colorMode === 'series' ? palette[i % palette.length] : barFill} />
               ))}
+              {/* Values on the bar, matching Processing Time and the funnel —
+                  the x axis is hidden, so without these the chart is unreadable
+                  without hovering. */}
+              <LabelList
+                dataKey="value"
+                position="right"
+                className="tnum"
+                style={{ fill: token('--chart-axis'), fontSize: 11 }}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

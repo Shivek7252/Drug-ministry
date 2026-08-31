@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Icon from '../../../components/ui/Icon';
+import CountrySelect from './CountrySelect';
+import { DATE_PRESETS } from '../../../config/reviewerFilters';
 
 /* ============================================================================
    FilterBar — sticky under the page header. The KPI row scrolls away above it.
@@ -11,21 +13,13 @@ import Icon from '../../../components/ui/Icon';
    search box does not fire an announcement per keystroke.
    ============================================================================ */
 
-const DATE_PRESETS = [
-  { value: 'all', label: 'All dates' },
-  { value: 'today', label: 'Today' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: 'custom', label: 'Custom range' },
-];
-
 const ANNOUNCE_DELAY = 700;
 
 export default function FilterBar({
   searchQ, onSearch,
   filterCat, onCategory, categories,
-  country, onCountry, countries,
+  country, onCountry,
+  state, onState, states,
   datePreset, onDatePreset,
   startDate, onStartDate,
   endDate, onEndDate,
@@ -88,11 +82,16 @@ export default function FilterBar({
           </select>
         </label>
 
+        <div className="fb-field">
+          <label htmlFor="country-filter">Country</label>
+          <CountrySelect value={country} onChange={onCountry} />
+        </div>
+
         <label className="fb-field">
-          <span>Country</span>
-          <select value={country} onChange={e => onCountry(e.target.value)}>
-            <option value="All">All</option>
-            {countries.map(c => <option key={c} value={c}>{c}</option>)}
+          <span>State</span>
+          <select value={state} onChange={e => onState(e.target.value)}>
+            <option value="All States">All states</option>
+            {states.map(value => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
 
@@ -122,6 +121,7 @@ export default function FilterBar({
             Clear all
           </button>
         )}
+
       </div>
 
       {/* Debounced so a search keystroke does not announce on every character. */}

@@ -4,6 +4,9 @@
  * Falls back gracefully when the backend is offline.
  */
 
+import { serializeReviewerFilters } from '../config/reviewerFilters';
+import { signalQueueChanged } from '../config/queueRefreshSignal';
+
 const BASE = 'http://localhost:5001/api/applications';
 
 function reviewerHeaders() {
@@ -18,16 +21,28 @@ function reviewerHeaders() {
 
 /* ── helper ─────────────────────────────────────────────────────────────── */
 async function apiFetch(url, options = {}) {
+  const { signal: caller, ...rest } = options;
+  /* The 15s timeout still applies, but a caller-supplied signal must also be
+     able to cancel — previously it was silently overwritten, so a component
+     that unmounted mid-request could not actually abort it. */
+  const timeout = AbortSignal.timeout(15000);
+  const signal = caller && typeof AbortSignal.any === 'function'
+    ? AbortSignal.any([caller, timeout])
+    : (caller || timeout);
   try {
     const res = await fetch(url, {
-      ...options,
+      ...rest,
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      signal: AbortSignal.timeout(15000),
+      signal,
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return { success: true, ...data };
   } catch (err) {
+    /* A deliberate abort is not a failure the UI should report. */
+    if (caller?.aborted || err.name === 'AbortError' || err.name === 'TimeoutError') {
+      return { success: false, aborted: true, error: err.message };
+    }
     return { success: false, error: err.message };
   }
 }
@@ -110,11 +125,13 @@ export async function updateStatus(appNumber, status, note = '') {
 
 /* ── Reviewer: add remark + status update ─────────────────────────────── */
 export async function reviewerAction(appNumber, { status, remarks, officer = 'reviewer' }) {
-  return apiFetch(`${BASE}/${appNumber}/review`, {
+  const result = await apiFetch(`${BASE}/${appNumber}/review`, {
     method: 'POST',
     headers: reviewerHeaders(),
     body: JSON.stringify({ status, remarks, officer }),
   });
+  if (result.success) signalQueueChanged();
+  return result;
 }
 
 /* ── Reviewer: get full application with audit log ──────────────────────── */
@@ -143,11 +160,13 @@ export async function preVerifyDocs(appNumber, { force = false } = {}) {
 
 /* ── Reviewer: act on a single shipment line item ──────────────────────── */
 export async function shipmentAction(appNumber, shipmentIdx, { status, remarks = '', officer = 'reviewer' }) {
-  return apiFetch(`${BASE}/${appNumber}/shipments/${shipmentIdx}/action`, {
+  const result = await apiFetch(`${BASE}/${appNumber}/shipments/${shipmentIdx}/action`, {
     method: 'POST',
     headers: reviewerHeaders(),
     body: JSON.stringify({ status, remarks, officer }),
   });
+  if (result.success) signalQueueChanged();
+  return result;
 }
 
 /* ── Export NOC Check-List Query flow ────────────────────────────────── */
@@ -156,20 +175,26 @@ export async function getChecklist(appNumber) {
 }
 
 export async function raiseChecklistQuery(appNumber, itemId, { queryText, officer = 'reviewer' }) {
-  return apiFetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/query`, {
+  const result = await apiFetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/query`, {
     method: 'POST',
     headers: reviewerHeaders(),
     body: JSON.stringify({ queryText, officer }),
   });
+  if (result.success) signalQueueChanged();
+  return result;
 }
 
 /* Reviewer queue: all filtering happens on the server before pagination. */
-export async function listReviewerApplications(filters = {}) {
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') params.set(key, value);
-  });
+export async function listReviewerApplications(filters = {}, extras = {}) {
+  const params = serializeReviewerFilters(filters, extras);
   return apiFetch(`${BASE}/reviewer?${params}`, { headers: reviewerHeaders() });
+}
+
+/* Reviewer analytics: current counts, weekly activity and the week-over-week
+   comparison, aggregated server-side over the complete filtered dataset. */
+export async function getReviewerAnalytics(filters = {}, { signal } = {}) {
+  const params = serializeReviewerFilters(filters);
+  return apiFetch(`${BASE}/reviewer/analytics?${params}`, { headers: reviewerHeaders(), signal });
 }
 
 export async function getReviewerFilterOptions() {
@@ -178,33 +203,6 @@ export async function getReviewerFilterOptions() {
 
 export async function getQueryHistory(appNumber) {
   return apiFetch(`${BASE}/${encodeURIComponent(appNumber)}/query-history`, { headers: reviewerHeaders() });
-}
-
-export async function exportReviewerApplications(filters = {}) {
-  try {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') params.set(key, value);
-    });
-    const res = await fetch(`${BASE}/reviewer/export?${params}`, {
-      headers: reviewerHeaders(),
-      signal: AbortSignal.timeout(60000),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    const disposition = res.headers.get('content-disposition') || '';
-    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'reviewer-applications.csv';
-    return {
-      success: true,
-      blob: await res.blob(),
-      filename,
-      count: Number(res.headers.get('x-export-record-count') || 0),
-    };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
 }
 
 /* Applicant reply — multipart because it can include a document. */
@@ -221,7 +219,9 @@ export async function replyChecklistQuery(appNumber, itemId, { reply, applicant 
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return { success: true, ...data };
+    const result = { success: true, ...data };
+    signalQueueChanged();
+    return result;
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -338,4 +338,15 @@ export async function verifyChecklistFile({ fileUrl, itemId, docLabel = 'documen
   } catch (err) {
     return { success: false, error: err.message };
   }
+}
+
+export async function getReviewerReadState() {
+  return apiFetch(`${BASE}/reviewer/read-state`, { headers: reviewerHeaders() });
+}
+
+export async function markApplicationRead(appNumber) {
+  return apiFetch(`${BASE}/${encodeURIComponent(appNumber)}/read`, {
+    method: 'POST',
+    headers: reviewerHeaders(),
+  });
 }

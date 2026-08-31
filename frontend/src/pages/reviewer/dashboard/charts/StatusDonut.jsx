@@ -21,18 +21,20 @@ function DonutTooltip({ active, payload }) {
   );
 }
 
-export default function StatusDonut({ apps, loading, onSelectStatus }) {
-  const rows = useMemo(() => statusDistribution(apps), [apps]);
+export default function StatusDonut({ apps = [], rows: serverRows = null, loading, error, onSelectStatus }) {
+  const derivedRows = useMemo(() => statusDistribution(apps), [apps]);
+  const rows = serverRows || derivedRows;
   const total = rows.reduce((s, r) => s + r.value, 0);
 
   return (
     <ChartCard
       title="Status Distribution"
-      subtitle="Current status of every application in view. Select a status to filter the queue."
+      subtitle="Current status of every application in view — select to filter."
       span={4}
       loading={loading}
+      error={error}
       empty={!loading && total === 0}
-      height={260}
+      height={300}
       table={{
         columns: [
           { key: 'status', label: 'Status' },

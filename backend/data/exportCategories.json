@@ -1,0 +1,27 @@
+{
+  "generatedFrom": "frontend/src/data/mockData.js EXPORT_CATEGORIES",
+  "categories": [
+    "Allopathic Drugs",
+    "Ayurvedic / Herbal Products",
+    "Homeopathic Products",
+    "Biological Products",
+    "Vaccines",
+    "Medical Devices",
+    "Cosmetics",
+    "Nutraceuticals",
+    "Veterinary Drugs"
+  ],
+  "aliases": {
+    "allopathic": "Allopathic Drugs",
+    "ayurvedic": "Ayurvedic / Herbal Products",
+    "herbal": "Ayurvedic / Herbal Products",
+    "ayurvedic/herbal products": "Ayurvedic / Herbal Products",
+    "homeopathic": "Homeopathic Products",
+    "biological": "Biological Products",
+    "vaccine": "Vaccines",
+    "medical device": "Medical Devices",
+    "cosmetic": "Cosmetics",
+    "nutraceutical": "Nutraceuticals",
+    "veterinary": "Veterinary Drugs"
+  }
+}

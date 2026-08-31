@@ -38,18 +38,20 @@ function ThroughputTooltip({ active, payload, label }) {
   );
 }
 
-export default function DecisionThroughput({ apps, loading }) {
-  const rows = useMemo(() => decisionThroughput(apps, { weeks: 12 }), [apps]);
+export default function DecisionThroughput({ apps = [], rows: serverRows = null, loading, error }) {
+  const derivedRows = useMemo(() => decisionThroughput(apps, { weeks: 12 }), [apps]);
+  const rows = serverRows || derivedRows;
   const hasData = rows.some(r => r.approved || r.partiallyApproved || r.rejected || r.pending);
 
   return (
     <ChartCard
       title="Decision Throughput"
-      subtitle="Decisions recorded per week, with applications still open shown against the week they were received."
-      span={6}
+      subtitle="Last 12 weeks; decisions by event week, with open arrivals in their received week."
+      span={12}
       loading={loading}
+      error={error}
       empty={!loading && !hasData}
-      height={260}
+      height={300}
       table={{
         columns: [
           { key: 'key', label: 'Week beginning', render: r => fmtDateKey(r.key, 'day') },
@@ -59,11 +61,11 @@ export default function DecisionThroughput({ apps, loading }) {
           { key: 'pending', label: 'Still open', numeric: true, render: r => fmtInt(r.pending) },
         ],
         rows,
-        note: 'Decided applications are counted in the week the decision was recorded. Open applications are counted in the week they were received, so the bar shows arriving work that has not yet been disposed.',
+        note: 'Rolling 12-week view. Decided applications are counted in the week the decision was recorded. Open applications are counted in the week they were received, so records outside the displayed period are intentionally outside this time-series chart.',
       }}
     >
       <div className="cc-plot" role="img" aria-label="Decision throughput by week: approved, partially approved, rejected and still open.">
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: -12 }}>
             <CartesianGrid {...gridProps()} />
             <XAxis

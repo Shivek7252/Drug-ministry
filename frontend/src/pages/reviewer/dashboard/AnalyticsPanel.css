@@ -59,6 +59,20 @@
   font-size: var(--fs-13);
   line-height: var(--lh-body);
 }
+.ap-stale,
+.ap-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: var(--sp-3) var(--sp-4) 0;
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+}
+.ap-stale { background: var(--c-warning-bg); color: var(--c-warning); border: 1px solid var(--c-warning-br); }
+.ap-error { background: var(--c-danger-bg); color: var(--c-danger); border: 1px solid var(--c-danger-br); }
+.ap-stale svg, .ap-error svg { flex: none; margin-top: 1px; }
 .ap-truncated svg { flex: none; margin-top: 1px; }
 
 .ap-grid {
@@ -77,6 +91,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100%;          /* fill the stretched grid row so bottoms align */
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--r-lg);
@@ -97,6 +112,8 @@
   justify-content: space-between;
   gap: var(--sp-3);
   margin-bottom: var(--sp-3);
+  min-height: 3.75rem;   /* title + 2 subtitle lines at the narrowest card (col-4),
+                            so plots start on the same line in every pairing */
 }
 .cc-head-text { min-width: 0; }
 
@@ -113,6 +130,10 @@
   font-size: var(--fs-12);
   line-height: var(--lh-body);
   color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .cc-head-actions {
@@ -152,7 +173,17 @@
   cursor: not-allowed;
 }
 
-.cc-body { position: relative; }
+.cc-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--cc-plot-h, 240px);
+}
+.cc-body > .cc-plot,
+.cc-body > .cc-donut { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.cc-table-wrap { align-self: stretch; }
 
 /* ---- Skeleton ----------------------------------------------------------- */
 .cc-skeleton { display: block; height: 100%; }
@@ -192,6 +223,24 @@
   font-size: var(--fs-13);
   text-align: center;
 }
+
+/* ---- Error -------------------------------------------------------------- */
+.cc-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-3);
+  background: var(--c-danger-bg);
+  border: 1px solid var(--c-danger-br);
+  border-left: 4px solid var(--c-danger);
+  border-radius: var(--r-md);
+  color: var(--c-danger);
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+  text-align: left;
+}
+.cc-error svg { flex: none; margin-top: 1px; }
 
 /* ---- Footnote ----------------------------------------------------------- */
 .cc-footnote {
@@ -244,13 +293,38 @@
   line-height: var(--lh-body);
 }
 
-/* ---- Responsive: single column below 1024px ----------------------------- */
-@media (max-width: 1023px) {
-  .ap-grid { grid-template-columns: minmax(0, 1fr); }
+/* ============================================================================
+   Responsive tiers
+
+     >= 1280px   12-column grid, authored spans honoured
+     768-1279    2 equal columns; wide charts (trend, throughput) span both
+     < 768px     single column, every chart full width
+
+   Grid rows stretch, and .cc is height:100%, so paired cards always share a
+   bottom edge regardless of how much content each one holds.
+   ============================================================================ */
+
+/* Tablet: collapse the 12-column system to two equal columns. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .ap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-span-4, .cc-span-5, .cc-span-6, .cc-span-7 { grid-column: span 1; }
+  .cc-span-8, .cc-span-12 { grid-column: span 2; }
+  /* Seven charts with two full-width ones leaves one card unpaired here; let it
+     stretch rather than sit beside an empty half-row. */
+  .cc-wide-tablet { grid-column: span 2; }
+}
+
+/* Mobile: one column. */
+@media (max-width: 767px) {
+  .ap-grid { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3); }
   .cc-span-4, .cc-span-5, .cc-span-6,
   .cc-span-7, .cc-span-8, .cc-span-12 { grid-column: span 1; }
-  .cc-head { flex-direction: column; }
+  .cc { padding: var(--sp-3); }
+  .cc-head { flex-direction: column; min-height: 0; }
   .cc-head-actions { align-self: flex-start; }
+  .cc-subtitle { -webkit-line-clamp: 3; }
+  /* Shorter plots on a phone; the table alternative carries the detail. */
+  .cc-body { min-height: min(var(--cc-plot-h, 240px), 240px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

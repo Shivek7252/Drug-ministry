@@ -36,6 +36,9 @@ export default function AnalyticsPanel({
   loading = false,
   resultCount = 0,
   filtered = false,
+  stale = false,
+  error = '',
+  generatedAt = null,
   children,
 }) {
   const [open, setOpen] = useState(readInitialOpen);
@@ -72,6 +75,24 @@ export default function AnalyticsPanel({
                 : 'Derived from all applications in the review queue'}
           </p>
         </header>
+
+        {open && stale && generatedAt && (
+          <div className="ap-stale" role="status">
+            <Icon name="alertTriangle" size={18} />
+            <div>
+              <strong>Showing the last successful analytics snapshot.</strong>{' '}
+              Refresh failed{error ? `: ${error}` : '.'} Generated{' '}
+              <time dateTime={generatedAt}>{new Date(generatedAt).toLocaleString('en-IN')}</time>.
+            </div>
+          </div>
+        )}
+
+        {open && !stale && error && (
+          <div className="ap-error" role="alert">
+            <Icon name="alertTriangle" size={18} />
+            <div><strong>Analytics unavailable.</strong> {error}</div>
+          </div>
+        )}
 
         {open && truncated && (
           <div className="ap-truncated" role="alert">

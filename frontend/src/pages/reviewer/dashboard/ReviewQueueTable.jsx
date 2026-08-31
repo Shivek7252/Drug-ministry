@@ -1,18 +1,14 @@
 import React from 'react';
 import Icon from '../../../components/ui/Icon';
-import { statusColor } from './charts/chartTheme';
-import { OVERDUE_DAYS, daysBetween, isOverdue, ROWS_PER_PAGE_OPTIONS } from './aggregations';
+import { countryDisplayLabel, isInvalidCountryValue } from '../../../data/countries';
+import { EXPORT_CATEGORIES } from '../../../data/mockData';
+import { ROWS_PER_PAGE_OPTIONS } from './aggregations';
+import { formatBusinessDateTime } from '../../../config/businessTime';
+import { normalizeStatus, STATUS, STATUS_LABEL } from './statusModel';
 
-/* ============================================================================
-   ReviewQueueTable
-
-   Sorting is applied by the hook to viewFiltered BEFORE pagination, so the
-   order is across the whole result set, not just the visible page.
-
-   The urgency dot and the Overdue tile read the same OVERDUE_DAYS constant,
-   and status pills read statusColor() — the same function the charts use — so
-   pill, tile and chart segment can never drift apart.
-   ============================================================================ */
+/* The desktop table and mobile review cards are the same semantic table. At
+   small widths CSS turns each <tr> into a stacked card, so values are never
+   duplicated in the DOM and assistive technology keeps proper row context. */
 
 const COLUMNS = [
   { key: 'application', label: 'Application', sortable: true },
@@ -22,174 +18,282 @@ const COLUMNS = [
   { key: 'category', label: 'Category', sortable: false },
   { key: 'destination', label: 'Destination', sortable: false },
   { key: 'submitted', label: 'Submitted', sortable: true, numeric: true },
-  { key: 'age', label: 'Age', sortable: true, numeric: true },
   { key: 'queries', label: 'Queries', sortable: true, numeric: true },
   { key: 'status', label: 'Status', sortable: true },
   { key: 'action', label: 'Action', sortable: false },
 ];
 
-const ariaSort = (col, sort) => {
-  if (!col.sortable) return undefined;
-  if (sort.key !== col.key) return 'none';
+const STATUS_CLASS = {
+  [STATUS.DRAFT]: 'draft',
+  [STATUS.SUBMITTED]: 'submitted',
+  [STATUS.IN_REVIEW]: 'review',
+  [STATUS.QUERY_RAISED]: 'query',
+  [STATUS.APPROVED]: 'approved',
+  [STATUS.PARTIALLY_APPROVED]: 'approved',
+  [STATUS.REJECTED]: 'rejected',
+  [STATUS.UNKNOWN]: 'unknown',
+};
+
+const categoryDisplay = value => {
+  const raw = String(value || '').trim();
+  if (!raw) return { label: '—', raw: '', invalid: false };
+  const canonical = EXPORT_CATEGORIES.find(category => category.toLowerCase() === raw.toLowerCase());
+  return canonical
+    ? { label: canonical, raw, invalid: false }
+    : { label: 'Invalid data', raw, invalid: true };
+};
+
+const countryDisplay = value => {
+  const raw = String(value || '').trim();
+  if (!raw) return { label: '—', raw: '', invalid: false };
+  return isInvalidCountryValue(raw)
+    ? { label: 'Invalid data', raw, invalid: true }
+    : { label: countryDisplayLabel(raw), raw, invalid: false };
+};
+
+const ariaSort = (column, sort) => {
+  if (!column.sortable) return undefined;
+  if (sort.key !== column.key) return 'none';
   return sort.dir === 'asc' ? 'ascending' : 'descending';
 };
 
-const fmtDate = value => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', yyyy: undefined, year: 'numeric' });
-};
-
-function StatusPill({ status }) {
-  const colour = statusColor(status);
+function TextValue({ value, className = '' }) {
+  const text = String(value || '').trim();
   return (
-    <span className="rq-pill" style={{ color: colour, borderColor: colour }}>
-      <span className="rq-pill-dot" style={{ background: colour }} aria-hidden="true" />
-      {status}
+    <span className={className} title={text || undefined}>
+      {text || '—'}
     </span>
   );
 }
 
-function AgeCell({ app }) {
-  const age = daysBetween(app.submittedAt || app.createdAt);
-  if (age === null) return <span className="rq-muted">—</span>;
-  // Same predicate the Overdue tile uses — never re-state the status list here.
-  const overdue = isOverdue(app);
+function SubmittedCell({ app }) {
+  const { date, time } = formatBusinessDateTime(app.submittedAt);
+  if (!date) return <span className="rq-muted">—</span>;
+  const full = `${date}, ${time || 'time unavailable'}`;
   return (
-    <span className={`rq-age tnum${overdue ? ' is-overdue' : ''}`}>
-      {overdue && (
-        <span
-          className="rq-age-dot"
-          aria-hidden="true"
-          title={`Open for more than ${OVERDUE_DAYS} days`}
-        />
-      )}
-      {age}d
-      {overdue && <span className="sr-only"> — overdue, open more than {OVERDUE_DAYS} days</span>}
+    <span className="rq-submitted" title={full}>
+      <span className="rq-submitted-date tnum">{date}</span>
+      <span className="rq-submitted-time tnum">{time || 'Time unavailable'}</span>
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const canonical = normalizeStatus(status);
+  const label = STATUS_LABEL[canonical];
+  return (
+    <span className={`rq-status is-${STATUS_CLASS[canonical]}`} aria-label={`Status: ${label}`}>
+      <span className="rq-status-dot" aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+function InvalidValue({ kind, value }) {
+  return (
+    <span
+      className="rq-invalid"
+      title={`Invalid stored ${kind} value: ${value}`}
+      aria-label={`Invalid ${kind} data. Stored value: ${value}`}
+    >
+      <Icon name="alertTriangle" size={13} />
+      Invalid data
     </span>
   );
 }
 
 export default function ReviewQueueTable({
-  rows, loading, error,
+  rows, loading, refreshing = false, stale = false, error,
+  hasFilters = false, onRetry,
   sort, onSort,
   page, pageCount, onPage,
   rowsPerPage, onRowsPerPage,
   totalRows,
   selected, onToggleSelect, onToggleSelectAll, onClearSelection,
   density, onDensity,
-  onOpen, openedApps, isUnseen,
+  onOpen, isUnread,
   onBulkMarkInReview, bulkBusy,
 }) {
-  const pageIds = rows.map(r => r.applicationNumber);
+  const pageIds = rows.map(row => row.applicationNumber);
   const allOnPageSelected = pageIds.length > 0 && pageIds.every(id => selected.has(id));
   const someOnPageSelected = pageIds.some(id => selected.has(id));
   const from = totalRows === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const to = Math.min(page * rowsPerPage, totalRows);
+  const hasRows = rows.length > 0;
+  const initialError = !loading && Boolean(error) && !hasRows;
+  const empty = !loading && !error && !hasRows;
 
   return (
     <section className="rq" aria-labelledby="rq-heading">
-      {/* Toolbar: selection state and the single bulk action live here, inline,
-          rather than in a slide-in bar built for actions that do not exist. */}
-      <div className="rq-toolbar">
-        <h2 className="rq-heading" id="rq-heading">Review Queue</h2>
+      <header className={`rq-toolbar${selected.size > 0 ? ' is-selection' : ''}`}>
+        <div className="rq-title-group">
+          <h2 className="rq-heading" id="rq-heading">Review Queue</h2>
+          <span className="rq-result-count tnum" aria-live="polite">
+            {loading && !hasRows
+              ? 'Loading applications'
+              : `${totalRows.toLocaleString('en-IN')} application${totalRows === 1 ? '' : 's'}`}
+          </span>
+        </div>
 
         {selected.size > 0 ? (
-          <div className="rq-bulk">
+          <div className="rq-bulk" aria-label="Selection actions">
             <span className="rq-bulk-count tnum">{selected.size} selected</span>
-            <span className="rq-bulk-sep" aria-hidden="true">·</span>
             <button
               type="button"
               className="rq-bulk-action"
               onClick={onBulkMarkInReview}
               disabled={bulkBusy}
             >
+              <Icon name="search" size={14} />
               {bulkBusy ? 'Marking…' : 'Mark In Review'}
             </button>
-            <span className="rq-bulk-sep" aria-hidden="true">·</span>
-            <button type="button" className="rq-bulk-clear" onClick={onClearSelection}>Clear</button>
+            <button type="button" className="rq-bulk-clear" onClick={onClearSelection}>Clear selection</button>
           </div>
         ) : (
-          <div className="rq-density" role="group" aria-label="Row density">
-            <Icon name="rows" size={16} />
-            {['comfortable', 'compact'].map(d => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => onDensity(d)}
-                aria-pressed={density === d}
-                className={density === d ? 'is-active' : ''}
-              >
-                {d === 'comfortable' ? 'Comfortable' : 'Compact'}
-              </button>
-            ))}
+          <div className="rq-density-wrap">
+            <span className="rq-density-label">Density</span>
+            <div className="rq-density" role="group" aria-label="Row density">
+              {['comfortable', 'compact'].map(option => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => onDensity(option)}
+                  aria-pressed={density === option}
+                  className={density === option ? 'is-active' : ''}
+                >
+                  {option === 'comfortable' ? 'Comfortable' : 'Compact'}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-      </div>
+      </header>
+
+      {(refreshing || (stale && hasRows)) && (
+        <div className={`rq-sync${stale ? ' is-stale' : ''}`} role="status">
+          <Icon name={stale ? 'alertTriangle' : 'refresh'} size={14} />
+          <span>{stale ? 'Showing the last loaded results because refresh failed.' : 'Refreshing queue…'}</span>
+          {stale && onRetry && (
+            <button type="button" onClick={onRetry}>Retry</button>
+          )}
+        </div>
+      )}
 
       <div className="rq-scroll">
         <table className={`rq-table is-${density}`}>
+          <caption className="sr-only">
+            Reviewer applications. Use sortable column headers to change the server-side order.
+          </caption>
+          <colgroup>
+            <col className="rq-col-check" />
+            <col className="rq-col-application" />
+            <col className="rq-col-reference" />
+            <col className="rq-col-applicant" />
+            <col className="rq-col-state" />
+            <col className="rq-col-category" />
+            <col className="rq-col-destination" />
+            <col className="rq-col-submitted" />
+            <col className="rq-col-queries" />
+            <col className="rq-col-status" />
+            <col className="rq-col-action" />
+          </colgroup>
           <thead>
             <tr>
               <th scope="col" className="rq-check">
                 <input
                   type="checkbox"
                   checked={allOnPageSelected}
-                  ref={el => { if (el) el.indeterminate = !allOnPageSelected && someOnPageSelected; }}
+                  ref={element => { if (element) element.indeterminate = !allOnPageSelected && someOnPageSelected; }}
                   onChange={onToggleSelectAll}
-                  aria-label="Select all rows on this page"
-                  disabled={rows.length === 0}
+                  aria-label="Select all applications on this page"
+                  disabled={!hasRows}
                 />
               </th>
-              {COLUMNS.map(col => (
+              {COLUMNS.map(column => (
                 <th
-                  key={col.key}
+                  key={column.key}
                   scope="col"
-                  aria-sort={ariaSort(col, sort)}
-                  className={col.numeric ? 'rq-num' : undefined}
+                  aria-sort={ariaSort(column, sort)}
+                  className={column.numeric ? 'rq-num' : undefined}
                 >
-                  {col.sortable ? (
-                    <button type="button" className="rq-sort" onClick={() => onSort(col.key)}>
-                      {col.label}
+                  {column.sortable ? (
+                    <button type="button" className="rq-sort" onClick={() => onSort(column.key)}>
+                      {column.label}
                       <Icon
-                        name={sort.key !== col.key ? 'arrowUpDown' : (sort.dir === 'asc' ? 'arrowUp' : 'arrowDown')}
+                        name={sort.key !== column.key
+                          ? 'arrowUpDown'
+                          : (sort.dir === 'asc' ? 'arrowUp' : 'arrowDown')}
                         size={13}
                       />
                     </button>
-                  ) : col.label}
+                  ) : column.label}
                 </th>
               ))}
             </tr>
           </thead>
 
           <tbody>
-            {loading && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={`sk-${i}`} className="rq-skeleton" aria-hidden="true">
-                {Array.from({ length: COLUMNS.length + 1 }).map((__, j) => (
-                  <td key={j}><span className="rq-skel" /></td>
+            {loading && Array.from({ length: 5 }).map((_, rowIndex) => (
+              <tr key={`skeleton-${rowIndex}`} className="rq-skeleton" aria-hidden="true">
+                {Array.from({ length: COLUMNS.length + 1 }).map((__, cellIndex) => (
+                  <td key={cellIndex}><span className="rq-skel" /></td>
                 ))}
               </tr>
             ))}
 
-            {!loading && error && (
-              <tr><td colSpan={COLUMNS.length + 1} className="rq-state rq-state-error">{error}</td></tr>
+            {initialError && (
+              <tr className="rq-state-row">
+                <td colSpan={COLUMNS.length + 1}>
+                  <div className="rq-state rq-state-error" role="alert">
+                    <Icon name="alertTriangle" size={22} />
+                    <strong>Review queue could not be loaded</strong>
+                    <span>{error}</span>
+                    {onRetry && (
+                      <button type="button" onClick={onRetry}>
+                        <Icon name="refresh" size={14} /> Retry
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
             )}
 
-            {!loading && !error && rows.length === 0 && (
-              <tr><td colSpan={COLUMNS.length + 1} className="rq-state">No applications match the current filters.</td></tr>
+            {empty && (
+              <tr className="rq-state-row">
+                <td colSpan={COLUMNS.length + 1}>
+                  <div className="rq-state">
+                    <Icon name={hasFilters ? 'search' : 'rows'} size={22} />
+                    <strong>{hasFilters ? 'No applications match these filters' : 'The review queue is empty'}</strong>
+                    <span>{hasFilters
+                      ? 'Adjust or clear the filters to see more applications.'
+                      : 'Submitted applications will appear here for review.'}</span>
+                  </div>
+                </td>
+              </tr>
             )}
 
-            {!loading && !error && rows.map(app => {
+            {!loading && hasRows && rows.map(app => {
               const id = app.applicationNumber;
               const checked = selected.has(id);
+              const unread = Boolean(isUnread(app));
+              const applicant = app.applicantOrganization || app.applicantName || '—';
+              const category = categoryDisplay(app.exportCategory);
+              const destination = countryDisplay(app.destinationCountry || app.consigneeCountry);
+              const queryCount = Number(app.queryCount) || 0;
+              const statusLabel = STATUS_LABEL[normalizeStatus(app.status)];
+
               return (
                 <tr
                   key={id}
-                  className={`rq-row${checked ? ' is-selected' : ''}${isUnseen(app) ? ' is-unseen' : ''}`}
+                  className={`rq-row${checked ? ' is-selected' : ''}${unread ? ' is-unseen' : ''}`}
                   onClick={() => onOpen(app)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(app);
+                  }}
+                  tabIndex={0}
+                  aria-label={`${id}, ${applicant}, ${statusLabel}${unread ? ', unread' : ''}`}
                 >
-                  <td className="rq-check" onClick={e => e.stopPropagation()}>
+                  <td className="rq-check rq-cell-check" onClick={event => event.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -197,26 +301,51 @@ export default function ReviewQueueTable({
                       aria-label={`Select ${id}`}
                     />
                   </td>
-                  <td className="rq-appno">{id}</td>
-                  <td><span className="rq-ref tnum">{app.referenceNumber || '—'}</span></td>
-                  <td>
-                    <span className="rq-applicant">{app.applicantOrganization || app.applicantName || '—'}</span>
-                    {app.email && <span className="rq-email">{app.email}</span>}
+                  <td className="rq-cell-application" data-label="Application">
+                    <span className="rq-application-line">
+                      <TextValue value={id} className="rq-appno tnum" />
+                      {unread && <span className="rq-unread-badge">Unread</span>}
+                    </span>
                   </td>
-                  <td>{app.state || '—'}</td>
-                  <td>
-                    {app.exportCategory
-                      ? <span className="rq-chip" title={app.exportCategory}>{app.exportCategory}</span>
-                      : <span className="rq-muted">—</span>}
+                  <td className="rq-cell-reference" data-label="Reference">
+                    <TextValue value={app.referenceNumber} className="rq-ref tnum" />
                   </td>
-                  <td>{app.destinationCountry || app.consigneeCountry || '—'}</td>
-                  <td className="rq-num tnum">{fmtDate(app.submittedAt || app.createdAt)}</td>
-                  <td className="rq-num"><AgeCell app={app} /></td>
-                  <td className="rq-num tnum">{app.queryCount || 0}</td>
-                  <td><StatusPill status={app.status} /></td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <button type="button" className="rq-open" onClick={() => onOpen(app)}>
-                      Open <Icon name="externalLink" size={13} />
+                  <td className="rq-cell-applicant" data-label="Applicant">
+                    <TextValue value={applicant} className="rq-applicant" />
+                    {app.email && <TextValue value={app.email} className="rq-email" />}
+                  </td>
+                  <td className="rq-cell-state" data-label="State">
+                    <TextValue value={app.state} className="rq-truncate" />
+                  </td>
+                  <td className="rq-cell-category" data-label="Category">
+                    {category.invalid
+                      ? <InvalidValue kind="category" value={category.raw} />
+                      : <span className="rq-chip" title={category.label}>{category.label}</span>}
+                  </td>
+                  <td className="rq-cell-destination" data-label="Destination">
+                    {destination.invalid
+                      ? <InvalidValue kind="country" value={destination.raw} />
+                      : <TextValue value={destination.label} className="rq-truncate" />}
+                  </td>
+                  <td className="rq-num rq-cell-submitted" data-label="Submitted">
+                    <SubmittedCell app={app} />
+                  </td>
+                  <td
+                    className={`rq-num rq-cell-queries tnum${queryCount === 0 ? ' is-zero' : ''}`}
+                    data-label="Queries"
+                    aria-label={`${queryCount} ${queryCount === 1 ? 'query' : 'queries'}`}
+                  >
+                    {queryCount}
+                  </td>
+                  <td className="rq-cell-status" data-label="Status"><StatusBadge status={app.status} /></td>
+                  <td className="rq-cell-action" data-label="Action" onClick={event => event.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="rq-open"
+                      onClick={() => onOpen(app)}
+                      aria-label={`Open application ${id}`}
+                    >
+                      Review <Icon name="chevronRight" size={14} />
                     </button>
                   </td>
                 </tr>
@@ -226,35 +355,40 @@ export default function ReviewQueueTable({
         </table>
       </div>
 
-      {/* Single source of "how many" — the duplicate line above the table is gone. */}
-      <div className="rq-pagination">
+      <footer className="rq-pagination">
         <label className="rq-perpage">
-          <span>Rows</span>
-          <select value={rowsPerPage} onChange={e => onRowsPerPage(Number(e.target.value))}>
-            {ROWS_PER_PAGE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+          <span>Rows per page</span>
+          <select
+            value={rowsPerPage}
+            onChange={event => onRowsPerPage(Number(event.target.value))}
+            aria-label="Rows per page"
+          >
+            {ROWS_PER_PAGE_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
 
         <p className="rq-range tnum">
-          {totalRows === 0 ? 'No results' : `${from}–${to} of ${totalRows.toLocaleString('en-IN')}`}
+          {totalRows === 0
+            ? 'No results'
+            : <><strong>{from.toLocaleString('en-IN')}–{to.toLocaleString('en-IN')}</strong> of {totalRows.toLocaleString('en-IN')} results</>}
         </p>
 
-        <nav className="rq-pager" aria-label="Pagination">
-          <button type="button" onClick={() => onPage(1)} disabled={page <= 1} aria-label="First page">
+        <nav className="rq-pager" aria-label="Queue pagination">
+          <button type="button" className="rq-page-edge" onClick={() => onPage(1)} disabled={page <= 1} aria-label="First page">
             <Icon name="chevronsLeft" size={16} />
           </button>
-          <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page">
-            <Icon name="chevronLeft" size={16} />
+          <button type="button" className="rq-page-step" onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page">
+            <Icon name="chevronLeft" size={16} /> Previous
           </button>
-          <span className="rq-pageno tnum">Page {page} of {pageCount}</span>
-          <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pageCount} aria-label="Next page">
-            <Icon name="chevronRight" size={16} />
+          <span className="rq-pageno tnum" aria-current="page">Page {page} of {pageCount}</span>
+          <button type="button" className="rq-page-step" onClick={() => onPage(page + 1)} disabled={page >= pageCount} aria-label="Next page">
+            Next <Icon name="chevronRight" size={16} />
           </button>
-          <button type="button" onClick={() => onPage(pageCount)} disabled={page >= pageCount} aria-label="Last page">
+          <button type="button" className="rq-page-edge" onClick={() => onPage(pageCount)} disabled={page >= pageCount} aria-label="Last page">
             <Icon name="chevronsRight" size={16} />
           </button>
         </nav>
-      </div>
+      </footer>
     </section>
   );
 }

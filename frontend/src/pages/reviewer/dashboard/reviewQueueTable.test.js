@@ -3,7 +3,8 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ReviewQueueTable from './ReviewQueueTable';
 import { statusColor } from './charts/chartTheme';
-import { KPI_TILES, OVERDUE_DAYS, ROWS_PER_PAGE_OPTIONS } from './aggregations';
+import { KPI_TILES, ROWS_PER_PAGE_OPTIONS } from './aggregations';
+import { BUSINESS_TIMEZONE, formatBusinessTime } from '../../../config/businessTime';
 import KpiFilterRow from './KpiFilterRow';
 
 const day = 86400000;
@@ -21,12 +22,12 @@ const ROWS = Array.from({ length: 7 }, (_, i) => ({
   status: ['Submitted', 'Under Review', 'Approved', 'Query Raised', 'Rejected', 'Submitted', 'Under Review'][i],
 }));
 
-function Harness({ rows = ROWS }) {
+function Harness({ rows = ROWS, density: initialDensity = 'comfortable' }) {
   const [sort, setSort] = useState({ key: 'submitted', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [rpp, setRpp] = useState(10);
   const [selected, setSelected] = useState(new Set());
-  const [density, setDensity] = useState('comfortable');
+  const [density, setDensity] = useState(initialDensity);
 
   return (
     <ReviewQueueTable
@@ -44,13 +45,18 @@ function Harness({ rows = ROWS }) {
       onClearSelection={() => setSelected(new Set())}
       density={density} onDensity={setDensity}
       onOpen={() => {}}
-      openedApps={new Set()}
-      isUnseen={() => false}
+      isUnread={() => false}
       onBulkMarkInReview={() => {}}
       bulkBusy={false}
     />
   );
 }
+
+const FIXED_ROW = {
+  ...ROWS[0],
+  applicationNumber: 'EXP-FIXED',
+  submittedAt: '2026-08-26T05:12:00.000Z',   // 10:42 IST
+};
 
 const header = name => screen.getByRole('columnheader', { name: new RegExp(`^${name}$`, 'i') });
 
@@ -80,7 +86,7 @@ describe('ReviewQueueTable — sorting', () => {
 
   test('sort controls are real buttons, so they are keyboard reachable', () => {
     render(<Harness />);
-    for (const col of ['Application', 'Applicant', 'Submitted', 'Age', 'Queries', 'Status']) {
+    for (const col of ['Application', 'Applicant', 'Submitted', 'Queries', 'Status']) {
       expect(within(header(col)).getByRole('button')).toBeInTheDocument();
     }
   });
@@ -176,18 +182,88 @@ describe('ReviewQueueTable — selection', () => {
   });
 });
 
-describe('ReviewQueueTable — age and category', () => {
-  test('urgency dot uses the same threshold as the Overdue tile', () => {
+describe('ReviewQueueTable — Age column removed', () => {
+  test('no Age header is rendered', () => {
     render(<Harness />);
-    // 30d and 40d rows are Under Review -> overdue; 2d Submitted is not.
-    expect(screen.getAllByTitle(`Open for more than ${OVERDUE_DAYS} days`).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('columnheader', { name: /^age$/i })).not.toBeInTheDocument();
   });
 
-  test('category chip carries full text in a title attribute', () => {
+  test('no day-count values such as 5d / 27d / 66d remain', () => {
     render(<Harness />);
-    const chips = screen.getAllByTitle('Homeopathic Products');
-    expect(chips.length).toBe(ROWS.length);
-    expect(chips[0]).toHaveTextContent('Homeopathic Products');
+    expect(screen.queryByText(/^\d+d$/)).not.toBeInTheDocument();
+  });
+
+  test('the urgency dot markup is gone with the column', () => {
+    const { container } = render(<Harness />);
+    expect(container.querySelector('.rq-age')).toBeNull();
+    expect(container.querySelector('.rq-age-dot')).toBeNull();
+  });
+});
+
+describe('ReviewQueueTable — Submitted shows date and time', () => {
+  test('renders the date on one line and the time with zone beneath it', () => {
+    const { container } = render(<Harness rows={[FIXED_ROW]} />);
+    const cell = container.querySelector('.rq-submitted');
+    expect(cell).toBeInTheDocument();
+    expect(cell.querySelector('.rq-submitted-date')).toHaveTextContent('26 Aug 2026');
+    expect(cell.querySelector('.rq-submitted-time')).toHaveTextContent(/\d{1,2}:\d{2}\s?(AM|PM) IST/);
+  });
+
+  test('converts the stored UTC instant into the business timezone', () => {
+    // 2026-08-26T05:12:00Z is 10:42 IST (+05:30).
+    expect(formatBusinessTime('2026-08-26T05:12:00.000Z')).toBe('10:42 AM IST');
+    expect(BUSINESS_TIMEZONE).toBe('Asia/Kolkata');
+  });
+
+  test('uses submittedAt, never updatedAt or the current time', () => {
+    const row = {
+      ...FIXED_ROW,
+      submittedAt: '2026-08-26T05:12:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      createdAt: '2026-02-02T00:00:00.000Z',
+    };
+    const { container } = render(<Harness rows={[row]} />);
+    const cell = container.querySelector('.rq-submitted');
+    expect(cell.textContent).toContain('26 Aug 2026');
+    expect(cell.textContent).not.toContain('Jan');
+    expect(cell.textContent).not.toContain('Feb');
+  });
+
+  test('a missing timestamp shows a dash, never an invented time', () => {
+    const { container } = render(<Harness rows={[{ ...FIXED_ROW, submittedAt: undefined }]} />);
+    expect(container.querySelector('.rq-submitted')).toBeNull();
+    expect(container.querySelector('.rq-muted')).toHaveTextContent('—');
+  });
+
+  test('an invalid timestamp is handled safely', () => {
+    const { container } = render(<Harness rows={[{ ...FIXED_ROW, submittedAt: 'not-a-date' }]} />);
+    expect(container.querySelector('.rq-submitted')).toBeNull();
+    expect(container.querySelector('.rq-muted')).toHaveTextContent('—');
+  });
+
+  test('the time stays visible in compact density', () => {
+    const { container } = render(<Harness rows={[FIXED_ROW]} density="compact" />);
+    expect(container.querySelector('.rq-table.is-compact')).toBeInTheDocument();
+    expect(container.querySelector('.rq-submitted-time')).toHaveTextContent(/IST/);
+  });
+
+  test('sorting still keys on the full timestamp, not the formatted date', () => {
+    // Two rows on the SAME day, three hours apart.
+    const early = { ...FIXED_ROW, applicationNumber: 'EARLY', submittedAt: '2026-08-26T01:00:00.000Z' };
+    const late = { ...FIXED_ROW, applicationNumber: 'LATE', submittedAt: '2026-08-26T04:00:00.000Z' };
+    const accessor = a => new Date(a.submittedAt || a.createdAt || 0).getTime();
+    expect(accessor(late)).toBeGreaterThan(accessor(early));
+    render(<Harness rows={[early, late]} />);
+    expect(screen.getByText('EARLY')).toBeInTheDocument();
+    expect(screen.getByText('LATE')).toBeInTheDocument();
+  });
+});
+
+describe('ReviewQueueTable — invalid stored data', () => {
+  test('labels an invalid category explicitly instead of presenting it as a valid chip', () => {
+    const { container } = render(<Harness rows={[{ ...FIXED_ROW, exportCategory: 'Y' }]} />);
+    expect(screen.getByText('Invalid category data: Y')).toHaveClass('rq-invalid');
+    expect(container.querySelector('.rq-chip')).toBeNull();
   });
 });
 
