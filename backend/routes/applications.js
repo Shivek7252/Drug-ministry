@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { newStoredUpload } = require('../services/documentStorage');
+const { sanitizeApplicantForm } = require('../services/applicantInput');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const Application = require('../models/Application');
@@ -773,7 +774,10 @@ async function uniqueRefNumber() {
 /* ── POST /api/applications/draft — auto-save draft ─────────────────────── */
 router.post('/draft', requireApplicant, async (req, res) => {
   try {
-    const { formData } = req.body;
+    /* Allowlist the applicant's payload before it touches the document. The
+       Application schema is `strict: false`, so an unfiltered spread would let
+       an applicant write reviewer- and audit-owned state. */
+    const formData = sanitizeApplicantForm(req.body?.formData);
     const user = req.auth.username;
 
     // Check if a draft already exists for this user (same email/org)
@@ -824,7 +828,10 @@ router.post('/draft', requireApplicant, async (req, res) => {
 /* ── POST /api/applications/submit — final submission ───────────────────── */
 router.post('/submit', requireApplicant, async (req, res) => {
   try {
-    const { formData } = req.body;
+    /* Allowlist the applicant's payload before validation or persistence, so
+       the fields that are validated below are exactly the fields that get
+       saved. See services/applicantInput.js. */
+    const formData = sanitizeApplicantForm(req.body?.formData);
     const user = req.auth.username;
 
     // DEBUG: log incoming document keys + sizes

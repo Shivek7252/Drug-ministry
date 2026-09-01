@@ -30,6 +30,7 @@ const FILES = [
   'documentQueryRoutes',
   'underReviewRoutes',
   'authOwnership',
+  'applicantMassAssignment',
 ];
 
 const totals = { pass: 0, fail: 0, skipped: 0 };
