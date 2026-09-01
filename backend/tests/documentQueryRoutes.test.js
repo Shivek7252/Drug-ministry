@@ -17,6 +17,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { haveCredentials, adoptSession } = require('./helpers/session');
 
 const API = process.env.TEST_API_URL || '';
 const MONGO = process.env.TEST_MONGO_URL || '';
@@ -31,7 +32,9 @@ function testDatabaseName(uri) {
 }
 
 const RUN_ID = `${Date.now()}-${process.pid}`;
-const REVIEWER = { 'x-user-role': 'reviewer', 'x-reviewer-name': `docq-reviewer-${RUN_ID}` };
+/* Populated in test.before by logging in; reviewer identity is server-issued. */
+const REVIEWER = {};
+const APPLICANT = {};
 
 const created = [];
 let mongoose = null;
@@ -90,7 +93,7 @@ async function getJson(path, headers) {
 
 /* Seeds the two documents with the verification payloads the draft reads. */
 async function seedApplication() {
-  const res = await post('/applications/submit', payload());
+  const res = await post('/applications/submit', payload(), APPLICANT);
   assert.equal(res.status < 400, true, `submit HTTP ${res.status}`);
   const appNo = res.body.applicationNumber || res.body.application?.applicationNumber;
   assert.ok(appNo, 'submission returned no application number');
@@ -134,6 +137,12 @@ test.before(async () => {
       liveError = `API is not attached to isolated test database ${expectedDatabase}`;
       return;
     }
+    if (!haveCredentials('TEST_REVIEWER', 'TEST_APPLICANT_A')) {
+      liveError = 'set TEST_REVIEWER and TEST_APPLICANT_A as user:pass';
+      return;
+    }
+    await adoptSession(REVIEWER, API, 'TEST_REVIEWER');
+    await adoptSession(APPLICANT, API, 'TEST_APPLICANT_A');
     mongoose = require('mongoose');
     await mongoose.connect(MONGO, { serverSelectionTimeoutMS: 2500 });
     live = true;
@@ -324,7 +333,9 @@ live_test('the applicant view groups queries by docId, not by filename', async (
   await post(`/applications/${appNo}/document/mfg_license/query`,
     { submissionId: `sub-${RUN_ID}-g2`, rows: [{ rowKey: 'r1', queryText: 'Please upload a valid licence.', rowSource: 'reviewer_added' }] }, REVIEWER);
 
-  const checklist = await getJson(`/applications/${appNo}/checklist`);
+  // The applicant view: fetched as the owning applicant, whose session now
+  // scopes the checklist to their own application.
+  const checklist = await getJson(`/applications/${appNo}/checklist`, APPLICANT);
   assert.equal(checklist.status, 200);
   const grouped = checklist.body.documentQueries;
 

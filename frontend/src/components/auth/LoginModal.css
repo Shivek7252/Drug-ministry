@@ -279,3 +279,58 @@
   .captcha-display-wrap { justify-content: center; }
   .login-submit-btn { width: 100%; }
 }
+
+/* ── Demo account hints (non-production builds only) ─────────────────────── */
+.login-demo {
+  margin: 10px 16px 0;
+  padding: 9px 11px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+
+.login-demo-title {
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #7c8ba1;
+}
+
+.login-demo-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.login-demo-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12px;
+  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.login-demo-row:hover { background: #eff6ff; border-color: #bfdbfe; }
+.login-demo-row:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 1px; }
+.login-demo-row code { font-size: 12px; color: #0f2b5b; }
+.login-demo-sep { color: #94a3b8; }
+
+.login-demo-role {
+  padding: 1px 7px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-radius: 20px;
+}
+
+.login-demo-role-applicant { color: #1e40af; background: #dbeafe; }
+.login-demo-role-reviewer  { color: #a16207; background: #fef3c7; }

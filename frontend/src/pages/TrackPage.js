@@ -44,7 +44,6 @@ export default function TrackPage() {
   const [loading,  setLoading]  = useState(false);
   const [recentApps, setRecentApps] = useState([]);
   const [dbOnline,   setDbOnline]   = useState(true);
-  const [checklistAppNo, setChecklistAppNo] = useState(null); // if set, show NocChecklistPage
   const [activeTab,  setActiveTab]  = useState('summary');    // 'summary' | 'checklist' | 'reconciliation'
 
   // Load recent applications on mount — DB only, no mock fallback

@@ -6,6 +6,7 @@
  */
 import { jsPDF } from 'jspdf';
 import { BACKEND_ORIGIN } from '../config/api';
+import { authenticatedFetch } from '../api/http';
 
 const BACKEND = BACKEND_ORIGIN;
 const APP_NO  = 'EXP-2026-000145';
@@ -13,7 +14,7 @@ const APP_NO  = 'EXP-2026-000145';
 /* ─── Try backend template fill first, fall back to jsPDF ─────────────── */
 export async function downloadFullApplicationPDF(formData) {
   try {
-    const resp = await fetch(`${BACKEND}/api/fill-templates`, {
+    const resp = await authenticatedFetch(`${BACKEND}/api/fill-templates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),
@@ -46,7 +47,7 @@ export async function downloadSectionPDF(formData, section) {
   const tmpl = templateMap[section];
   if (tmpl) {
     try {
-      const resp = await fetch(`${BACKEND}/api/fill-template/${tmpl}`, {
+      const resp = await authenticatedFetch(`${BACKEND}/api/fill-template/${tmpl}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

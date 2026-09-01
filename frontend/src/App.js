@@ -16,7 +16,8 @@ import './App.css';
 
 /* Reviewer queue and application detail routes share the existing role guard. */
 function ReviewerOnly({ children }) {
-  const { isLoggedIn, userRole } = useApp();
+  const { authReady, isLoggedIn, userRole } = useApp();
+  if (authReady === false) return null;
   if (!isLoggedIn) return <AuthGuard>{children}</AuthGuard>;
   if (userRole !== 'reviewer') return <Navigate to="/" replace />;
   return children;
@@ -34,7 +35,8 @@ function ReviewerRoutes() {
 
 /* Route guard that redirects reviewer to /review */
 function RoleRoute({ children }) {
-  const { isLoggedIn, userRole } = useApp();
+  const { authReady, isLoggedIn, userRole } = useApp();
+  if (authReady === false) return null;
   if (!isLoggedIn) return <AuthGuard>{children}</AuthGuard>;
   if (userRole === 'reviewer') return <Navigate to="/review" replace />;
   return children;

@@ -1,11 +1,9 @@
 function requireReviewer(req, res, next) {
-  /* A hosting layer may attach a verified principal. Prefer its immutable id
-     and never consult caller-controlled role headers in production. */
-  const principal = req.user || req.auth;
+  const principal = req.auth;
   if (principal && String(principal.role || '').toLowerCase() === 'reviewer'
-      && (principal.id || principal._id || principal.sub)) {
+      && principal.id && principal.verified === true) {
     req.reviewer = {
-      id: String(principal.id || principal._id || principal.sub),
+      id: String(principal.id),
       name: String(principal.name || principal.username || principal.email || 'Reviewer'),
       role: 'reviewer',
       verified: true,
@@ -13,23 +11,16 @@ function requireReviewer(req, res, next) {
     return next();
   }
 
-  const allowDevelopmentHeaders = process.env.NODE_ENV !== 'production'
-    || process.env.ALLOW_INSECURE_REVIEWER_HEADERS === 'true';
-  if (!allowDevelopmentHeaders) {
-    return res.status(401).json({ error: 'Verified reviewer authentication is required.' });
+  if (!principal) return res.status(401).json({ error: 'Verified authentication is required.' });
+  return res.status(403).json({ error: 'Reviewer authorization is required.' });
+}
+
+function requireApplicant(req, res, next) {
+  if (!req.auth) return res.status(401).json({ error: 'Verified authentication is required.' });
+  if (req.auth.verified !== true || req.auth.role !== 'applicant' || !req.auth.id) {
+    return res.status(403).json({ error: 'Applicant authorization is required.' });
   }
-  const role = String(req.get('x-user-role') || '').toLowerCase();
-  const reviewer = String(req.get('x-reviewer-name') || '').trim();
-  if (role !== 'reviewer' || !reviewer) {
-    return res.status(403).json({ error: 'Reviewer authorization is required.' });
-  }
-  req.reviewer = {
-    id: `dev:${reviewer.toLowerCase()}`,
-    name: reviewer,
-    role,
-    verified: false,
-  };
   return next();
 }
 
-module.exports = { requireReviewer };
+module.exports = { requireApplicant, requireReviewer };

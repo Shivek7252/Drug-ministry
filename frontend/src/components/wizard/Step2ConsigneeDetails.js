@@ -38,9 +38,6 @@ export default function Step2ConsigneeDetails() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setErr = (ref, field, msg) =>
-    setErrors(p => ({ ...p, [ref]: { ...(p[ref] || {}), [field]: msg } }));
-
   const clearErr = (ref, field) =>
     setErrors(p => {
       const row = { ...(p[ref] || {}) };

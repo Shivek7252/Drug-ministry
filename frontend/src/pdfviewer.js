@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
+import { pdfjsLib, pdfDocumentParams } from './config/pdfWorker'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
+/* pdf.js worker (served locally) and credentialed document requests are
+   configured centrally in config/pdfWorker.js */
 
 const DEBUG_OCR_BOXES = false
 
@@ -615,7 +615,7 @@ export default function PDFViewer({ file, url: urlProp, searchQuery, ocrText, oc
     let doc       = null
     let cancelled = false
 
-    pdfjsLib.getDocument({ url: resolvedUrl }).promise
+    pdfjsLib.getDocument(pdfDocumentParams(resolvedUrl)).promise
       .then(d => { if (!cancelled) { doc = d; setPdf(d); setPages(d.numPages) } })
       .catch(err => { if (!cancelled) console.error('PDFViewer load error:', err) })
 

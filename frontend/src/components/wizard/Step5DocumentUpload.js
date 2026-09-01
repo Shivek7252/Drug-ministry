@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib, pdfDocumentParams } from '../../config/pdfWorker';
 import { useApp } from '../../context/AppContext';
 import { REQUIRED_DOCUMENTS } from '../../data/mockData';
 import { BACKEND_ORIGIN } from '../../config/api';
+import { authenticatedFetch } from '../../api/http';
 import './WizardStep.css';
 import './DocumentViewer.css';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+/* pdf.js worker + credentials are configured centrally. */
 
 /* ─── module-level stores ───────────────────────────────────────────────── */
 const FILE_STORE = new Map();
@@ -181,7 +181,6 @@ function getHighlightsFromOcr(query, ocrWords) {
   const wordMap = []; // index in joined string → word index
   let joined = '';
   ocrWords.forEach((w, wi) => {
-    const start = joined.length;
     for (let ci = 0; ci < w.text.length; ci++) wordMap.push({ wi, ci });
     joined += w.text;
     if (wi < ocrWords.length - 1) { wordMap.push({ wi, ci: -1, sep: true }); joined += ' '; }
@@ -355,7 +354,7 @@ const DOC_CHECKLISTS = {
 };
 
 /* ─── ChecklistPanel ────────────────────────────────────────────────────── */
-function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
+export function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
   const [status, setStatus] = React.useState('idle');
   const [results, setResults] = React.useState(null);
   const [summary, setSummary] = React.useState(null);
@@ -368,14 +367,14 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
     setActiveItem(null);
     if (onSearch) onSearch('');
     try {
-      const resp = await fetch(viewUrl);
+      const resp = await authenticatedFetch(viewUrl);
       if (!resp.ok) throw new Error('Could not read document file.');
       const blob = await resp.blob();
       const form = new FormData();
       form.append('file', blob, docLabel + '.pdf');
       form.append('docType', DOC_CHECKLISTS[docId] || 'default');
       form.append('docLabel', docLabel);
-      const apiResp = await fetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
+      const apiResp = await authenticatedFetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
       const data = await apiResp.json();
       if (!apiResp.ok) {
         throw new Error('Anuvadini AI analysis is temporarily unavailable. Please try again shortly.');
@@ -463,8 +462,7 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
             <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
             <p style={{ fontWeight: 700, color: '#d97706', marginBottom: 6 }}>Analysis Temporarily Unavailable</p>
             <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7, marginBottom: 16 }}>
-              The Anuvadini AI analysis service encountered a network issue.
-              Please ensure the backend is running and try again.
+              {errMsg || 'The Anuvadini AI analysis service encountered a network issue. Please try again.'}
             </p>
             <button className="cl-btn-primary" onClick={run}>Retry</button>
           </div>
@@ -546,14 +544,13 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
   const [numPages, setPages] = useState(0);
   const [fitScale, setFit] = useState(null);
   const [zoom, setZoom] = useState(1.0);
-  const [query, setQuery] = useState('');
+  const [query] = useState('');
   const [pageHl, setPageHl] = useState({});
   const [activeIdx, setActive] = useState(0);
   const [ocrStatus, setOcrStatus] = useState({});
   const [ocrWords, setOcrWords] = useState({});
   const scrollRef = useRef();
   const pageRefs = useRef({});
-  const inputRef = useRef();
   const totalRef = useRef(0);
   const viewUrl = getStableUrl(docId, fallbackUrl);
 
@@ -561,7 +558,7 @@ function PdfViewerModal({ docId, docLabel, fallbackUrl, fileName, fileSize, onCl
     if (!viewUrl) return;
     let cancelled = false;
     setPdf(null); setPages(0); setFit(null); setPageHl({}); setActive(0);
-    pdfjsLib.getDocument({ url: viewUrl }).promise
+    pdfjsLib.getDocument(pdfDocumentParams(viewUrl)).promise
       .then(d => { if (!cancelled) { setPdf(d); setPages(d.numPages); } })
       .catch(e => { if (!cancelled) console.error('PDF:', e); });
     return () => { cancelled = true; };
@@ -916,7 +913,7 @@ export default function Step5DocumentUpload() {
       form.append('file', file, file.name);
       form.append('docType', DOC_CHECKLISTS[doc.id] || 'default');
       form.append('docLabel', doc.label);
-      const response = await fetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
+      const response = await authenticatedFetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Verification failed');
       const passed = data.documentTypeMatch === true &&
@@ -947,24 +944,11 @@ export default function Step5DocumentUpload() {
     if (missing.length > 0) { setSubmitError(`Please upload: ${missing.map(d => d.label).join(', ')}`); return; }
     setSubmitError(''); setCurrentStep(7);
   };
-  const uploaded = Object.keys(formData.documents).length;
-  const reqCount = REQUIRED_DOCUMENTS.filter(d => d.required).length;
-  const reqDone = REQUIRED_DOCUMENTS.filter(d => d.required && formData.documents[d.id]).length;
   return (
     <div className="wizard-step fade-in">
       <div className="step-header">
         <div className="step-header-icon">📁</div>
         <div><h2>Upload Supporting Documents</h2><p>Upload all required documents to support your Export NOC application</p></div>
-      </div>
-      <div className="upload-summary-bar">
-        <div className="upload-summary-item"><span className="summary-num">{uploaded}</span><span className="summary-label">Documents Uploaded</span></div>
-        <div className="upload-summary-divider" />
-        <div className="upload-summary-item"><span className="summary-num text-success">{reqDone}</span><span className="summary-label">Required Uploaded</span></div>
-        <div className="upload-summary-divider" />
-        <div className="upload-summary-item"><span className="summary-num text-danger">{reqCount - reqDone}</span><span className="summary-label">Required Pending</span></div>
-        <div className="upload-summary-progress">
-          <div className="upload-summary-bar-fill" style={{ width: `${reqCount ? (reqDone / reqCount) * 100 : 0}%` }} />
-        </div>
       </div>
       {submitError && <div className="alert alert-danger"><span>⚠️</span><span>{submitError}</span></div>}
       <div className="alert alert-info">

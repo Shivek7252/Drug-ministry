@@ -29,10 +29,10 @@ function StatusPill({ status }) {
 }
 
 export default function ShipmentsTab({ data, onLineAction, actionBusy }) {
-  const shipments = data.shipments || [];
-  const companies = data.companies || [];
-  const products = data.products || [];
-  const consignees = data.consignees || [];
+  const shipments = useMemo(() => data.shipments || [], [data.shipments]);
+  const companies = useMemo(() => data.companies || [], [data.companies]);
+  const products = useMemo(() => data.products || [], [data.products]);
+  const consignees = useMemo(() => data.consignees || [], [data.consignees]);
 
   const [groupBy, setGroupBy] = useState('country'); // 'country' | 'product' | 'company'
   const [expandedIdx, setExpandedIdx] = useState(null);

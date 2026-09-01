@@ -281,6 +281,7 @@ const ApplicationSchema = new mongoose.Schema({
   // Metadata
   submittedAt:  Date,
   lastSavedAt:  { type: Date, default: Date.now },
+  ownerId:      { type: String, index: true },
   submittedBy:  String,
   isDraft:      { type: Boolean, default: true },
 
@@ -330,6 +331,7 @@ ApplicationSchema.index({
   mfgLicenseNo:        'text',
 });
 ApplicationSchema.index({ isDraft: 1, status: 1, submittedAt: -1 });
+ApplicationSchema.index({ ownerId: 1, isDraft: 1, lastSavedAt: -1 });
 ApplicationSchema.index({ isDraft: 1, exportCategory: 1, submittedAt: -1 });
 ApplicationSchema.index({ isDraft: 1, destinationCountry: 1, submittedAt: -1 });
 ApplicationSchema.index({ 'auditLog.occurredAt': 1 });

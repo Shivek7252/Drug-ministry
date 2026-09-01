@@ -13,29 +13,27 @@ function responseStub() {
 
 test('reviewer middleware rejects missing/applicant roles', () => {
   for (const role of ['', 'applicant']) {
-    const req = { get: name => name === 'x-user-role' ? role : 'user' };
+    const req = role ? { auth: { id: 'user-1', role, verified: true } } : {};
     const res = responseStub();
     let called = false;
     requireReviewer(req, res, () => { called = true; });
-    assert.equal(res.statusCode, 403);
+    assert.equal(res.statusCode, role ? 403 : 401);
     assert.equal(called, false);
   }
 });
 
-test('reviewer middleware attaches the authenticated reviewer', () => {
+test('reviewer middleware refuses caller-controlled role headers', () => {
   const headers = { 'x-user-role': 'reviewer', 'x-reviewer-name': 'officer-1' };
   const req = { get: name => headers[name] };
   const res = responseStub();
   let called = false;
   requireReviewer(req, res, () => { called = true; });
-  assert.equal(called, true);
-  assert.deepEqual(req.reviewer, {
-    id: 'dev:officer-1', name: 'officer-1', role: 'reviewer', verified: false,
-  });
+  assert.equal(called, false);
+  assert.equal(res.statusCode, 401);
 });
 
 test('a verified principal supplies the immutable reviewer id', () => {
-  const req = { user: { id: 'user-123', role: 'reviewer', name: 'Officer' }, get: () => '' };
+  const req = { auth: { id: 'user-123', role: 'reviewer', name: 'Officer', verified: true } };
   const res = responseStub();
   let called = false;
   requireReviewer(req, res, () => { called = true; });
@@ -44,19 +42,11 @@ test('a verified principal supplies the immutable reviewer id', () => {
   assert.equal(req.reviewer.verified, true);
 });
 
-test('production refuses caller-controlled reviewer headers', () => {
-  const previous = process.env.NODE_ENV;
-  process.env.NODE_ENV = 'production';
-  try {
-    const headers = { 'x-user-role': 'reviewer', 'x-reviewer-name': 'forged' };
-    const req = { get: name => headers[name] };
-    const res = responseStub();
-    let called = false;
-    requireReviewer(req, res, () => { called = true; });
-    assert.equal(called, false);
-    assert.equal(res.statusCode, 401);
-  } finally {
-    if (previous === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = previous;
-  }
+test('an unverified principal is refused even if its role says reviewer', () => {
+  const req = { auth: { id: 'forged', role: 'reviewer', verified: false } };
+  const res = responseStub();
+  let called = false;
+  requireReviewer(req, res, () => { called = true; });
+  assert.equal(called, false);
+  assert.equal(res.statusCode, 403);
 });

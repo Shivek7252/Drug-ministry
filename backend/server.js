@@ -19,6 +19,7 @@ const {
 } = require('./services/verificationResponse');
 const { requestWithRetry } = require('./services/mistralRequest');
 const { requireReviewer } = require('./middleware/reviewerAuth');
+const { createAuthManager } = require('./middleware/auth');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const APPROVED_DRUGS_WORKBOOK = path.join(__dirname, '..', 'approved_drugs.xlsx');
@@ -83,13 +84,21 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } });
+const auth = createAuthManager();
 
-app.use(cors({ origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000' }));
+app.disable('x-powered-by');
+app.use(cors({
+  origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+  methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
 app.use(express.json({ limit: '50mb' }));
+app.use('/api/auth', auth.router);
 
 /* ── Application CRUD routes ────────────────────────────────────────────── */
 const applicationRoutes = require('./routes/applications');
-app.use('/api/applications', applicationRoutes);
+app.use('/api/applications', auth.authenticate, auth.requireCsrf, applicationRoutes);
 
 let approvedDrugs = [];
 readApprovedDrugsWorkbook()
@@ -118,6 +127,7 @@ app.get('/health', (_, res) => res.json({
   model: 'mistral-small-latest',
   database: mongoose.connection.name || null,
   testMode: process.env.NODE_ENV === 'test',
+  authConfigured: auth.userCount > 0,
 }));
 
 /* ─── Document checklist items per document type ───────────────────────── */
@@ -797,7 +807,7 @@ Reply ONLY: YES or NO`,
 };
 
 /* ─── POST /api/validate-template — strict template matching endpoint ───── */
-app.post('/api/validate-template', upload.single('file'), async (req, res) => {
+app.post('/api/validate-template', auth.authenticate, auth.requireCsrf, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
@@ -954,7 +964,7 @@ ${textForAI}
 });
 
 /* ─── POST /api/extract-doc-data — extract key fields from uploaded doc ──── */
-app.post('/api/extract-doc-data', upload.single('file'), async (req, res) => {
+app.post('/api/extract-doc-data', auth.authenticate, auth.requireCsrf, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
     const docType = req.body.docType || 'default';
@@ -1380,7 +1390,7 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
 }
 
 /* ─── POST /api/verify — main verification endpoint ────────────────────── */
-app.post('/api/verify', upload.single('file'), async (req, res) => {
+app.post('/api/verify', auth.authenticate, auth.requireCsrf, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
@@ -1518,7 +1528,7 @@ async function failVerificationJob(application, docId, job, err) {
   return validationResult;
 }
 
-app.post('/api/applications/:appNum/pre-verify', requireReviewer, async (req, res) => {
+app.post('/api/applications/:appNum/pre-verify', auth.authenticate, auth.requireCsrf, requireReviewer, async (req, res) => {
   try {
     const { appNum } = req.params;
     const force = req.query.force === '1' || req.body?.force === true;
@@ -1613,7 +1623,7 @@ app.post('/api/applications/:appNum/pre-verify', requireReviewer, async (req, re
    pass) for one stored application document and caches the full results on
    documents.<docId>.validationResult.fullResults. Subsequent calls hit the
    cache instantly. Pass ?force=1 to re-run and refresh the cache. */
-app.post('/api/applications/:appNum/document/:docId/verify', requireReviewer, async (req, res) => {
+app.post('/api/applications/:appNum/document/:docId/verify', auth.authenticate, auth.requireCsrf, requireReviewer, async (req, res) => {
   try {
     const { appNum, docId } = req.params;
     const force = req.query.force === '1' || req.body?.force === true;
@@ -1698,7 +1708,7 @@ app.post('/api/applications/:appNum/document/:docId/verify', requireReviewer, as
 });
 
 /* ─── POST /api/fill-templates — fill all PDF templates with form data ──── */
-app.post('/api/fill-templates', async (req, res) => {
+app.post('/api/fill-templates', auth.authenticate, auth.requireCsrf, async (req, res) => {
   try {
     const formData = req.body;
     if (!formData || typeof formData !== 'object') {
@@ -1742,7 +1752,7 @@ app.post('/api/fill-templates', async (req, res) => {
 });
 
 /* ─── POST /api/fill-template/:name — fill a single named template ──────── */
-app.post('/api/fill-template/:name', async (req, res) => {
+app.post('/api/fill-template/:name', auth.authenticate, auth.requireCsrf, async (req, res) => {
   try {
     const { name } = req.params;
     const formData = req.body;
@@ -1793,8 +1803,14 @@ const server = app.listen(PORT, () => {
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`\n❌ Port ${PORT} is already in use.`);
-    console.error(`   Run this command to free it, then restart:\n`);
-    console.error(`   lsof -ti :${PORT} | xargs kill -9\n`);
+    console.error(`   Identify the owner first — do not kill a process by port alone:\n`);
+    if (process.platform === 'win32') {
+      console.error(`   powershell "Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { Get-CimInstance Win32_Process -Filter \\"ProcessId = $($_.OwningProcess)\\" | Select-Object ProcessId, CommandLine }"`);
+      console.error(`   then, once confirmed:  taskkill /PID <pid> /F\n`);
+    } else {
+      console.error(`   lsof -i :${PORT} -sTCP:LISTEN -P -n`);
+      console.error(`   then, once confirmed:  kill <pid>\n`);
+    }
     process.exit(1);
   } else {
     throw err;

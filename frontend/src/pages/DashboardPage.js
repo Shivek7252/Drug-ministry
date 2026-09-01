@@ -4,7 +4,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { MOCK_APPLICATIONS, CHART_DATA } from '../data/mockData';
+import { CHART_DATA } from '../data/mockData';
 import { listApplications, getDashboardStats } from '../api/applicationService';
 import './DashboardPage.css';
 

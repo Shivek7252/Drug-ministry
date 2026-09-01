@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import './LoginModal.css';
 
+/* Demo credentials shown on the login form for the controlled demonstration.
+   These are seeded accounts on the demo backend, not ministry credentials, and
+   the list is empty in a production build so it cannot ship to a live portal. */
+const DEMO_ACCOUNTS = process.env.NODE_ENV === 'production' ? [] : [
+  { role: 'applicant', username: 'applicant', password: '1234' },
+  { role: 'reviewer', username: 'reviewer', password: '1234' },
+];
+
 // Generate a simple 5-digit captcha
 function generateCaptcha() {
   return Math.floor(10000 + Math.random() * 90000).toString();
@@ -47,24 +55,19 @@ export default function LoginModal() {
     return Object.keys(e).length === 0;
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!validate()) return;
 
-    // Credential check — applicant: shivek/1234, reviewer: reviewer/1234
-    const isApplicant = username.trim().toLowerCase() === 'shivek' && password === '1234';
-    const isReviewer  = username.trim().toLowerCase() === 'reviewer' && password === '1234';
-
-    if (!isApplicant && !isReviewer) {
-      setErrors({ general: 'Invalid username or password.' });
-      refreshCaptcha(); setCaptchaVal('');
-      return;
-    }
-
     setLoading(true);
-    setTimeout(() => {
-      login(username.trim(), isReviewer ? 'reviewer' : 'applicant');
+    try {
+      await login(username.trim(), password);
+    } catch (error) {
+      setErrors({ general: error.message || 'Login failed. Please try again.' });
+      refreshCaptcha();
+      setCaptchaVal('');
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   };
 
   const handleKey = (e) => { if (e.key === 'Enter') handleLogin(); };
@@ -150,6 +153,34 @@ export default function LoginModal() {
           </div>
         )}
 
+        {/* Demo credentials. Rendered only outside production so the hint can
+            never ship to a live ministry deployment. Clicking a row fills the
+            form so it does not have to be typed on stage. */}
+        {process.env.NODE_ENV !== 'production' && DEMO_ACCOUNTS.length > 0 && (
+          <div className="login-demo">
+            <div className="login-demo-title">Demo accounts — click to fill</div>
+            <div className="login-demo-rows">
+              {DEMO_ACCOUNTS.map(account => (
+                <button
+                  type="button"
+                  key={account.username}
+                  className="login-demo-row"
+                  onClick={() => {
+                    setUsername(account.username);
+                    setPassword(account.password);
+                    setErrors({});
+                  }}
+                >
+                  <span className={`login-demo-role login-demo-role-${account.role}`}>{account.role}</span>
+                  <code>{account.username}</code>
+                  <span className="login-demo-sep">/</span>
+                  <code>{account.password}</code>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Bottom links — Sign Up & Forgot Password */}
         <div className="login-bottom-links">
           <div className="login-link-item">
@@ -167,9 +198,6 @@ export default function LoginModal() {
           </div>
         </div>
 
-          <div className="login-hint">
-            <span>💡 Applicant: <strong>shivek / 1234</strong> &nbsp;|&nbsp; Review Officer: <strong>reviewer / 1234</strong></span>
-          </div>
       </div>
     </>
   );

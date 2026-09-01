@@ -7,16 +7,11 @@
 import { serializeReviewerFilters } from '../config/reviewerFilters';
 import { signalQueueChanged } from '../config/queueRefreshSignal';
 import { APPLICATIONS_API, BACKEND_ORIGIN } from '../config/api';
+import { authenticatedFetch } from './http';
 
 const BASE = APPLICATIONS_API;
 
 export function reviewerHeaders() {
-  try {
-    const identity = JSON.parse(sessionStorage.getItem('reviewer_identity') || '{}');
-    if (identity.role === 'reviewer' && identity.username) {
-      return { 'X-User-Role': 'reviewer', 'X-Reviewer-Name': identity.username };
-    }
-  } catch (_) { }
   return {};
 }
 
@@ -31,7 +26,7 @@ async function apiFetch(url, options = {}) {
     ? AbortSignal.any([caller, timeout])
     : (caller || timeout);
   try {
-    const res = await fetch(url, {
+    const res = await authenticatedFetch(url, {
       ...rest,
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       signal,
@@ -154,7 +149,7 @@ export async function getApplicationSummary(id, { signal } = {}) {
    docs, subsequent calls return instantly. */
 export async function preVerifyDocs(appNumber, { force = false } = {}) {
   try {
-    const res = await fetch(`${BASE}/${appNumber}/pre-verify${force ? '?force=1' : ''}`, {
+    const res = await authenticatedFetch(`${BASE}/${appNumber}/pre-verify${force ? '?force=1' : ''}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...reviewerHeaders() },
       signal: AbortSignal.timeout(240000), // 4 min — Mistral round-trips for up to ~10 docs
@@ -224,7 +219,7 @@ export async function getApplicationReviewSnapshot(appNumber, { signal } = {}) {
    carries the refused transition, both of which apiFetch would discard. */
 export async function submitUnderReview(appNumber, { submissionId, rows, applicantMessage }) {
   try {
-    const res = await fetch(`${BASE}/${encodeURIComponent(appNumber)}/under-review`, {
+    const res = await authenticatedFetch(`${BASE}/${encodeURIComponent(appNumber)}/under-review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...reviewerHeaders() },
       body: JSON.stringify({ submissionId, rows, applicantMessage }),
@@ -256,7 +251,7 @@ export async function getDocumentQueryDraft(appNumber, docId, { signal } = {}) {
    the modal shows beside each row, and apiFetch discards the response body. */
 export async function submitDocumentQuery(appNumber, docId, { submissionId, rows, expectedType }) {
   try {
-    const res = await fetch(
+    const res = await authenticatedFetch(
       `${BASE}/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/query`,
       {
         method: 'POST',
@@ -287,7 +282,7 @@ export async function replyChecklistQuery(appNumber, itemId, { reply, applicant 
     form.append('reply', reply);
     form.append('applicant', applicant);
     if (file) form.append('replyDoc', file);
-    const res = await fetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/reply`, {
+    const res = await authenticatedFetch(`${BASE}/${appNumber}/checklist/${encodeURIComponent(itemId)}/reply`, {
       method: 'POST',
       body: form,
       signal: AbortSignal.timeout(30000),
@@ -322,7 +317,7 @@ export async function addReconciliationEntry(appNumber, entry, docFile = null) {
       if (v !== null && v !== undefined) form.append(k, String(v));
     });
     if (docFile) form.append('doc', docFile);
-    const res = await fetch(`${BASE}/${appNumber}/reconciliation`, {
+    const res = await authenticatedFetch(`${BASE}/${appNumber}/reconciliation`, {
       method: 'POST',
       body: form,
       signal: AbortSignal.timeout(30000),
@@ -345,7 +340,7 @@ export async function updateReconciliationEntry(appNumber, entryId, patch, docFi
       if (v !== null && v !== undefined) form.append(k, String(v));
     });
     if (docFile) form.append('doc', docFile);
-    const res = await fetch(`${BASE}/${appNumber}/reconciliation/${entryId}`, {
+    const res = await authenticatedFetch(`${BASE}/${appNumber}/reconciliation/${entryId}`, {
       method: 'PATCH',
       body: form,
       signal: AbortSignal.timeout(30000),
@@ -392,7 +387,7 @@ export function checklistItemToDocType(itemId) {
 export async function verifyChecklistFile({ fileUrl, itemId, docLabel = 'document', fileName = 'file.pdf' }) {
   try {
     if (!fileUrl) return { success: false, error: 'No file URL provided.' };
-    const fileResp = await fetch(fileUrl);
+    const fileResp = await authenticatedFetch(fileUrl);
     if (!fileResp.ok) throw new Error(`Could not download file (HTTP ${fileResp.status}).`);
     const blob = await fileResp.blob();
 
@@ -402,7 +397,7 @@ export async function verifyChecklistFile({ fileUrl, itemId, docLabel = 'documen
     form.append('docType',  docType);
     form.append('docLabel', docLabel);
 
-    const apiResp = await fetch(`${BACKEND_ORIGIN}/api/verify`, {
+    const apiResp = await authenticatedFetch(`${BACKEND_ORIGIN}/api/verify`, {
       method: 'POST',
       body: form,
       signal: AbortSignal.timeout(60000),

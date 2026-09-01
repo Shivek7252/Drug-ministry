@@ -1,2 +1,6 @@
 node_modules/
 .env
+
+# Any .env variant (backups, per-environment files) — never commit secrets.
+.env.*
+!.env.example

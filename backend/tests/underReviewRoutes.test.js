@@ -17,6 +17,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { haveCredentials, adoptSession } = require('./helpers/session');
 
 const API = process.env.TEST_API_URL || '';
 const MONGO = process.env.TEST_MONGO_URL || '';
@@ -31,7 +32,9 @@ function testDatabaseName(uri) {
 }
 
 const RUN_ID = `${Date.now()}-${process.pid}`;
-const REVIEWER = { 'x-user-role': 'reviewer', 'x-reviewer-name': `ur-reviewer-${RUN_ID}` };
+/* Populated in test.before by logging in; reviewer identity is server-issued. */
+const REVIEWER = {};
+const APPLICANT = {};
 
 const created = [];
 let mongoose = null;
@@ -76,7 +79,7 @@ async function getJson(path, headers) {
 }
 
 async function seedApplication() {
-  const res = await post('/applications/submit', payload());
+  const res = await post('/applications/submit', payload(), APPLICANT);
   assert.equal(res.status < 400, true, `submit HTTP ${res.status}`);
   const appNo = res.body.applicationNumber || res.body.application?.applicationNumber;
   assert.ok(appNo, 'submission returned no application number');
@@ -120,6 +123,12 @@ test.before(async () => {
       liveError = `API is not attached to isolated test database ${expectedDatabase}`;
       return;
     }
+    if (!haveCredentials('TEST_REVIEWER', 'TEST_APPLICANT_A')) {
+      liveError = 'set TEST_REVIEWER and TEST_APPLICANT_A as user:pass';
+      return;
+    }
+    await adoptSession(REVIEWER, API, 'TEST_REVIEWER');
+    await adoptSession(APPLICANT, API, 'TEST_APPLICANT_A');
     mongoose = require('mongoose');
     await mongoose.connect(MONGO, { serverSelectionTimeoutMS: 2500 });
     live = true;
@@ -212,7 +221,7 @@ live_test('submission stores the structured review, changes status, and writes a
   assert.equal(review.applicationNumber, appNo);
   assert.equal(review.previousStatus, 'Submitted');
   assert.equal(review.newStatus, 'Under Review');
-  assert.equal(review.reviewer.name, REVIEWER['x-reviewer-name']);
+  assert.equal(review.reviewer.name, REVIEWER.principal.username);
   assert.ok(review.createdAt, 'a timestamp is stored');
   assert.equal(review.applicantMessage, 'Your application is under examination.');
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DocViewerModal.js
  * Shared PDF viewer + AI checklist panel, extracted from Step5DocumentUpload.
  * Used by both the applicant wizard and the reviewer detail page.
@@ -15,15 +15,15 @@
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib, pdfDocumentParams } from '../../config/pdfWorker';
 import '../wizard/DocumentViewer.css';
 import './ReviewerDocumentVerification.css';
 import { BACKEND_ORIGIN } from '../../config/api';
+import { authenticatedFetch } from '../../api/http';
 import { getVerificationPresentation, validateReviewerDecision } from './verificationViewModel';
 import DocumentQueryModal from './DocumentQueryModal';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+/* pdf.js worker + credentials are configured centrally. */
 
 /* ─── module-level caches (shared across all usages) ────────────────────── */
 const OCR_CACHE = new Map();
@@ -476,16 +476,6 @@ function ReviewerVerificationResult({ payload, onLocate, activeQuery, onRerun })
 }
 
 /* ─── AI Checklist Panel ─────────────────────────────────────────────────── */
-function storedReviewerHeaders() {
-  try {
-    const identity = JSON.parse(sessionStorage.getItem('reviewer_identity') || '{}');
-    if (identity.role === 'reviewer' && identity.username) {
-      return { 'X-User-Role': 'reviewer', 'X-Reviewer-Name': identity.username };
-    }
-  } catch (_) { }
-  return {};
-}
-
 function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber, reviewerMode = false, onVerificationChange, onVerificationPersisted }) {
   const [status, setStatus] = useState('idle');
   const [results, setResults] = useState(null);
@@ -513,18 +503,18 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
       let data;
       if (appNumber && docId) {
         const url = `${BACKEND_ORIGIN}/api/applications/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/verify${force ? '?force=1' : ''}`;
-        const apiResp = await fetch(url, { method: 'POST', headers: storedReviewerHeaders() });
+        const apiResp = await authenticatedFetch(url, { method: 'POST' });
         data = await apiResp.json();
         if (!apiResp.ok) throw new Error(data.error || 'AI analysis is temporarily unavailable. Please try again shortly.');
       } else {
-        const resp = await fetch(fileUrl);
+        const resp = await authenticatedFetch(fileUrl);
         if (!resp.ok) throw new Error('Could not read document file.');
         const blob = await resp.blob();
         const form = new FormData();
         form.append('file', blob, docLabel + '.pdf');
         form.append('docType', checklistKey);
         form.append('docLabel', docLabel);
-        const apiResp = await fetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
+        const apiResp = await authenticatedFetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
         data = await apiResp.json();
         if (!apiResp.ok) throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
       }
@@ -581,11 +571,11 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
     const cleaned = evidence.replace(/^["'`]+|["'`]+$/g, '').trim();
 
     // 1. Alphanumeric IDs — mix of letters + digits, minimum 3 chars, allow /-
-    const idMatch = cleaned.match(/\b[A-Z]{1,6}[\/\-][A-Z0-9]{2,}[A-Z0-9\/\-]*\b|\b[A-Z]{2,}[0-9]+[A-Z0-9]*\b|\b[0-9]+[A-Z]+[A-Z0-9]*\b/);
+    const idMatch = cleaned.match(/\b[A-Z]{1,6}[/-][A-Z0-9]{2,}[A-Z0-9/-]*\b|\b[A-Z]{2,}[0-9]+[A-Z0-9]*\b|\b[0-9]+[A-Z]+[A-Z0-9]*\b/);
     if (idMatch) return idMatch[0];
 
     // 2. Date patterns
-    const dateMatch = cleaned.match(/\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b/);
+    const dateMatch = cleaned.match(/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/);
     if (dateMatch) return dateMatch[0];
 
     // 3. Run of 2+ consecutive all-caps words (>=3 chars each)
@@ -848,6 +838,8 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   const isImg = fileType?.startsWith('image/');
 
   const [pdf, setPdf] = useState(null);
+  const [pdfError, setPdfError] = useState('');
+  const [pdfReloadKey, setPdfReloadKey] = useState(0);
   const [numPages, setPages] = useState(0);
   const [fitScale, setFit] = useState(null);
   const [zoom, setZoom] = useState(1.0);
@@ -882,12 +874,24 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   useEffect(() => {
     if (!isPDF || !fileUrl) return;
     let cancelled = false;
-    setPdf(null); setPages(0); setFit(null); setPageHl({}); setActive(0);
-    pdfjsLib.getDocument({ url: fileUrl }).promise
+    setPdf(null); setPages(0); setFit(null); setPageHl({}); setActive(0); setPdfError('');
+    pdfjsLib.getDocument(pdfDocumentParams(fileUrl)).promise
       .then(d => { if (!cancelled) { setPdf(d); setPages(d.numPages); } })
-      .catch(e => { if (!cancelled) console.error('DocViewerModal PDF load error:', e); });
+      .catch(e => {
+        if (cancelled) return;
+        console.error('DocViewerModal PDF load error:', e);
+        /* A 401 here means the session expired or the request was made without
+           credentials — distinguish it so the reviewer knows to sign in again
+           rather than staring at a spinner. */
+        const status = e?.status || e?.response?.status;
+        setPdfError(
+          status === 401 || status === 403
+            ? 'Your session has expired or you are not authorised to view this document. Sign in again and reopen it.'
+            : e?.message || 'The file could not be read.'
+        );
+      });
     return () => { cancelled = true; };
-  }, [fileUrl, isPDF]);
+  }, [fileUrl, isPDF, pdfReloadKey]);
 
   // compute fit scale after pdf loads
   useEffect(() => {
@@ -1106,10 +1110,23 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
                 <p>Preview unavailable</p>
               </div>
             )}
-            {fileUrl && !pdf && (
+            {fileUrl && !pdf && !pdfError && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#94a3b8' }}>
                 <div className="dv-spinner" />
                 <span style={{ fontSize: 13 }}>Loading PDF…</span>
+              </div>
+            )}
+            {/* A failed load used to leave the spinner running forever. Say what
+                went wrong and offer a retry instead. */}
+            {fileUrl && !pdf && pdfError && (
+              <div className="dv-no-preview" role="alert">
+                <div style={{ fontSize: 52 }}>⚠️</div>
+                <p style={{ fontWeight: 700 }}>The document preview could not be loaded</p>
+                <p style={{ fontSize: 12.5, maxWidth: 420, lineHeight: 1.55 }}>{pdfError}</p>
+                <button className="dv-tool-btn" style={{ width: 'auto', padding: '0 12px', marginTop: 8 }}
+                  onClick={() => setPdfReloadKey(k => k + 1)}>
+                  Retry
+                </button>
               </div>
             )}
             {pdf && numPages > 0 && scale > 0 && Array.from({ length: numPages }, (_, i) => i + 1).map(n => (

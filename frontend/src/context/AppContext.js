@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { saveDraft, submitApplication } from '../api/applicationService';
+import { getSession, loginSession, logoutSession } from '../api/authService';
 
 const AppContext = createContext();
 const MAX_DOCUMENT_SIZE = 5 * 1024 * 1024;
@@ -107,47 +108,44 @@ export function AppProvider({ children }) {
   const autoSaveTimer = useRef(null);
 
   // ── Auth ──────────────────────────────────────────────
-  // Initialise from sessionStorage so a hard-refresh keeps the user logged in.
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    try {
-      const stored = sessionStorage.getItem('reviewer_identity');
-      if (stored) { const p = JSON.parse(stored); return !!(p.username && p.role); }
-    } catch (_) { }
-    return false;
-  });
+  // Identity is authoritative server state. The browser stores no role or token.
+  const [authReady, setAuthReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const stored = sessionStorage.getItem('reviewer_identity');
-      if (stored) { const p = JSON.parse(stored); return p.username || null; }
-    } catch (_) { }
-    return null;
-  });
-  const [userRole, setUserRole] = useState(() => {
-    try {
-      const stored = sessionStorage.getItem('reviewer_identity');
-      if (stored) { const p = JSON.parse(stored); return p.role || 'applicant'; }
-    } catch (_) { }
-    return 'applicant';
-  });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState('applicant');
 
-  const login = (username, role = 'applicant') => {
+  const applyPrincipal = useCallback((user) => {
+    if (!user?.id || !user?.username || !['applicant', 'reviewer'].includes(user.role)) {
+      throw new Error('The authentication server returned an invalid identity.');
+    }
     setIsLoggedIn(true);
-    setCurrentUser(username);
-    setUserRole(role);
+    setCurrentUser(user.username);
+    setUserRole(user.role);
     setLoginOpen(false);
-    // Persist reviewer identity so detail tabs opened via window.open() can
-    // read the correct user name / role without re-authenticating.
-    try {
-      sessionStorage.setItem('reviewer_identity', JSON.stringify({ username, role }));
-    } catch (_) { }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    getSession()
+      .then(data => { if (active) applyPrincipal(data.user); })
+      .catch(() => { /* Missing or expired session: remain logged out. */ })
+      .finally(() => { if (active) setAuthReady(true); });
+    return () => { active = false; };
+  }, [applyPrincipal]);
+
+  const login = async (username, password) => {
+    const data = await loginSession(username, password);
+    applyPrincipal(data.user);
+    setAuthReady(true);
+    return data.user;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try { await logoutSession(); } catch (_) { /* Always clear local state. */ }
     setIsLoggedIn(false);
     setCurrentUser(null);
     setUserRole('applicant');
-    try { sessionStorage.removeItem('reviewer_identity'); } catch (_) { }
     resetForm();
   };
 
@@ -344,7 +342,7 @@ export function AppProvider({ children }) {
       notifOpen, setNotifOpen,
       resetForm,
       // auth
-      isLoggedIn, login, logout,
+      authReady, isLoggedIn, login, logout,
       loginOpen, setLoginOpen,
       currentUser, userRole
     }}>

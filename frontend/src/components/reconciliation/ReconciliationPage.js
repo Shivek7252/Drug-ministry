@@ -446,10 +446,6 @@ export default function ReconciliationPage({ applicationNumber }) {
   const openAdd  = ()      => { setEditEntry(null);  setShowForm(true); };
   const closeForm = ()     => { setShowForm(false); setEditEntry(null); };
 
-  const products = data?.entries
-    ? [] // products come from application, not reconciliation entries — pass empty for now
-    : [];
-
   /* extract product list from existing entries for the dropdown */
   const entryProducts = (data?.entries || [])
     .filter(e => e.productName)

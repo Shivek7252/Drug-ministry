@@ -22,6 +22,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { haveCredentials, adoptSession } = require('./helpers/session');
 
 const API = process.env.TEST_API_URL || '';
 const MONGO = process.env.TEST_MONGO_URL || '';
@@ -36,9 +37,11 @@ function testDatabaseName(uri) {
 }
 
 const RUN_ID = `${Date.now()}-${process.pid}`;
-const asReviewer = name => ({ 'x-user-role': 'reviewer', 'x-reviewer-name': name });
+/* Reviewer identity is server-issued; these are filled in by test.before. */
+const asReviewer = () => ({});
 /* Two distinct reviewers: read state must never cross between them. */
 const ALICE = asReviewer(`unread-alice-${RUN_ID}`);
+const APPLICANT = {};
 const BOB = asReviewer(`unread-bob-${RUN_ID}`);
 
 let payloadSequence = 0;
@@ -64,7 +67,8 @@ function payload(overrides = {}) {
   };
 }
 
-async function post(path, body, headers = {}) {
+/* Submissions and drafts are applicant actions; an explicit {} opts out. */
+async function post(path, body, headers = APPLICANT) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -86,7 +90,7 @@ async function unreadFor(headers, query = '') {
 }
 
 async function submit(overrides) {
-  const res = await post('/applications/submit', payload(overrides));
+  const res = await post('/applications/submit', payload(overrides), APPLICANT);
   assert.equal(res.status < 400, true, `submit HTTP ${res.status}`);
   const appNo = res.body.applicationNumber || res.body.application?.applicationNumber;
   assert.ok(appNo, 'submission returned no application number');
@@ -109,6 +113,13 @@ test.before(async () => {
       liveError = `API is not attached to isolated test database ${expectedDatabase}`;
       return;
     }
+    if (!haveCredentials('TEST_REVIEWER', 'TEST_REVIEWER_B', 'TEST_APPLICANT_A')) {
+      liveError = 'set TEST_REVIEWER, TEST_REVIEWER_B and TEST_APPLICANT_A as user:pass';
+      return;
+    }
+    await adoptSession(ALICE, API, 'TEST_REVIEWER');
+    if (typeof BOB === 'object' && BOB) await adoptSession(BOB, API, 'TEST_REVIEWER_B');
+    await adoptSession(APPLICANT, API, 'TEST_APPLICANT_A');
     mongoose = require('mongoose');
     await mongoose.connect(MONGO, { serverSelectionTimeoutMS: 2500 });
     live = true;
@@ -237,7 +248,7 @@ live_test('opening the same application twice does not reduce it twice', async (
 
   assert.equal(twice.unread, once.unread, 'the count moved on a repeat open');
   const receipts = await mongoose.connection.db.collection('applicationreads')
-    .countDocuments({ reviewerId: `dev:${ALICE['x-reviewer-name']}`, applicationNumber: appNo });
+    .countDocuments({ reviewerId: ALICE.principal.id, applicationNumber: appNo });
   assert.equal(receipts, 1, 'a repeat open wrote a duplicate receipt');
 });
 
@@ -325,7 +336,7 @@ live_test('a legacy name-keyed receipt is honoured everywhere or nowhere', async
   const filter = `?country=${encodeURIComponent(country)}`;
   const appNo = await submit({ destinationCountry: country });
   await mongoose.connection.db.collection('applicationreads').insertOne({
-    reviewer: ALICE['x-reviewer-name'],          // legacy shape: no reviewerId
+    reviewer: ALICE.principal.username,          // legacy shape: no reviewerId
     applicationNumber: appNo,
     readAt: new Date(),
   });
@@ -398,7 +409,7 @@ live_test('a filter that matches nothing reports zero, not the unfiltered count'
 live_test('marking read requires reviewer authentication', async () => {
   const appNo = await submit();
   const res = await post(`/applications/${appNo}/read`, undefined, {});
-  assert.equal(res.status, 403, 'an unauthenticated caller could write a read receipt');
+  assert.equal(res.status, 401, 'an unauthenticated caller could write a read receipt');
 });
 
 live_test('marking an application that does not exist does not invent a receipt', async () => {

@@ -111,20 +111,8 @@ export default function ReviewApplicationPage() {
   const location = useLocation();
   const { currentUser: ctxUser } = useApp();
 
-  // When this page opens in a new browser tab via window.open(), the React
-  // context is fresh (no login state). Fall back to the identity stored in
-  // sessionStorage by the login handler in AppContext.
-  const currentUser = useMemo(() => {
-    if (ctxUser) return ctxUser;
-    try {
-      const stored = sessionStorage.getItem('reviewer_identity');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.username || null;
-      }
-    } catch (_) { }
-    return null;
-  }, [ctxUser]);
+  // A new tab restores identity from the server-backed HttpOnly session.
+  const currentUser = ctxUser;
 
   const [full, setFull] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -134,7 +122,6 @@ export default function ReviewApplicationPage() {
   const [activeSection, setActiveSection] = useState('overview');
 
   // Doc verdict / verify state — ported from the modal
-  const [docResult, setDocResult] = useState({}); // filename-check cache
   const [docVerdict, setDocVerdict] = useState({}); // reviewer's explicit verify/decline
   const [verifiedDoc, setVerifiedDoc] = useState(null);
   const [mismatchDoc, setMismatchDoc] = useState(null);

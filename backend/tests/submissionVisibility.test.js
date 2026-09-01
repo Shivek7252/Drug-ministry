@@ -15,6 +15,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { haveCredentials, adoptSession } = require('./helpers/session');
 
 const API = process.env.TEST_API_URL || '';
 const MONGO = process.env.TEST_MONGO_URL || '';
@@ -28,7 +29,9 @@ function testDatabaseName(uri) {
   return name;
 }
 
-const REVIEWER = { 'x-user-role': 'reviewer', 'x-reviewer-name': 'itest-reviewer' };
+/* Reviewer and applicant identities are server-issued; filled in by before. */
+const REVIEWER = {};
+const APPLICANT = {};
 const RUN_ID = `${Date.now()}-${process.pid}`;
 let payloadSequence = 0;
 
@@ -55,7 +58,8 @@ function payload(overrides = {}) {
   };
 }
 
-async function post(path, body, headers = {}) {
+/* Submissions and drafts are applicant actions; an explicit {} opts out. */
+async function post(path, body, headers = APPLICANT) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -82,6 +86,12 @@ test.before(async () => {
       liveError = `API is not attached to isolated test database ${expectedDatabase}`;
       return;
     }
+    if (!haveCredentials('TEST_REVIEWER', 'TEST_APPLICANT_A')) {
+      liveError = 'set TEST_REVIEWER and TEST_APPLICANT_A as user:pass';
+      return;
+    }
+    await adoptSession(REVIEWER, API, 'TEST_REVIEWER');
+    await adoptSession(APPLICANT, API, 'TEST_APPLICANT_A');
     const res = await fetch(`${API}/applications/reviewer?pageSize=1`, { headers: REVIEWER });
     if (!res.ok) { liveError = `reviewer endpoint HTTP ${res.status}`; return; }
     mongoose = require('mongoose');
@@ -126,7 +136,7 @@ const it = (name, fn) => test(name, async t => {
 /* ---- Persistence --------------------------------------------------------- */
 
 it('a successful submission returns success and creates exactly one record', async () => {
-  const { status, body } = await post('/applications/submit', payload());
+  const { status, body } = await post('/applications/submit', payload(), APPLICANT);
   assert.equal(status, 200, `submit failed: ${JSON.stringify(body)}`);
   assert.ok(body.applicationNumber, 'response carried no applicationNumber');
   created.push(body.applicationNumber);
@@ -145,7 +155,7 @@ it('a successful submission returns success and creates exactly one record', asy
 /* ---- Reviewer endpoint --------------------------------------------------- */
 
 it('the same application is returned by the unfiltered reviewer endpoint', async () => {
-  const { body: sub } = await post('/applications/submit', payload());
+  const { body: sub } = await post('/applications/submit', payload(), APPLICANT);
   created.push(sub.applicationNumber);
 
   const { status, body } = await getJson('/applications/reviewer?pageSize=100');
@@ -157,7 +167,7 @@ it('the same application is returned by the unfiltered reviewer endpoint', async
 
 it('total, statusCounts and the returned page all include it', async () => {
   const before = await getJson('/applications/reviewer?pageSize=100');
-  const { body: sub } = await post('/applications/submit', payload());
+  const { body: sub } = await post('/applications/submit', payload(), APPLICANT);
   created.push(sub.applicationNumber);
   const after = await getJson('/applications/reviewer?pageSize=100');
 
@@ -172,7 +182,7 @@ it('total, statusCounts and the returned page all include it', async () => {
 });
 
 it('the newest application is first on page 1 sorted by submitted descending', async () => {
-  const { body: sub } = await post('/applications/submit', payload());
+  const { body: sub } = await post('/applications/submit', payload(), APPLICANT);
   created.push(sub.applicationNumber);
 
   const { body } = await getJson('/applications/reviewer?page=1&pageSize=20');
@@ -186,7 +196,7 @@ it('the newest application is first on page 1 sorted by submitted descending', a
 });
 
 it('pagination does not hide it and pages do not duplicate records', async () => {
-  const { body: sub } = await post('/applications/submit', payload());
+  const { body: sub } = await post('/applications/submit', payload(), APPLICANT);
   created.push(sub.applicationNumber);
 
   const { body: first } = await getJson('/applications/reviewer?page=1&pageSize=100');
@@ -203,7 +213,7 @@ it('pagination does not hide it and pages do not duplicate records', async () =>
 /* ---- Eligibility consistency --------------------------------------------- */
 
 it('a draft is excluded from the queue, so it can raise no notification either', async () => {
-  const { status, body } = await post('/applications/draft', payload());
+  const { status, body } = await post('/applications/draft', payload(), APPLICANT);
   assert.equal(status, 200, `draft save failed: ${JSON.stringify(body)}`);
   created.push(body.applicationNumber);
 
@@ -235,7 +245,7 @@ it('navbar and Review Queue read the same endpoint, so eligibility cannot diverg
 
 it('an incomplete submission is rejected and persists no record', async () => {
   const countBefore = await mongoose.connection.db.collection('applications').countDocuments({});
-  const { status, body } = await post('/applications/submit', payload({ applicantName: '' }));
+  const { status, body } = await post('/applications/submit', payload({ applicantName: '' }), APPLICANT);
   if (body.applicationNumber) created.push(body.applicationNumber);
   assert.equal(status, 400);
   assert.match(body.error, /required/i);
@@ -245,7 +255,7 @@ it('an incomplete submission is rejected and persists no record', async () => {
 
 it('a submission with an invalid category is rejected and persists no record', async () => {
   const countBefore = await mongoose.connection.db.collection('applications').countDocuments({});
-  const { status, body } = await post('/applications/submit', payload({ exportCategory: 'Y' }));
+  const { status, body } = await post('/applications/submit', payload({ exportCategory: 'Y' }), APPLICANT);
   /* Register for cleanup BEFORE asserting: if validation regresses and a record
      IS written, the failing assertion must not also leak it into the database. */
   if (body.applicationNumber) created.push(body.applicationNumber);
@@ -257,7 +267,7 @@ it('a submission with an invalid category is rejected and persists no record', a
 });
 
 it('a valid category alias is accepted and stored canonically', async () => {
-  const { status, body } = await post('/applications/submit', payload({ exportCategory: 'vaccines' }));
+  const { status, body } = await post('/applications/submit', payload({ exportCategory: 'vaccines' }), APPLICANT);
   assert.equal(status, 200, JSON.stringify(body));
   created.push(body.applicationNumber);
   const stored = await mongoose.connection.db.collection('applications')
@@ -289,7 +299,7 @@ it('invalid legacy values remain findable without assuming fixture counts', asyn
 
 it('a submission with an invalid country is rejected and persists no record', async () => {
   const countBefore = await mongoose.connection.db.collection('applications').countDocuments({});
-  const { status, body } = await post('/applications/submit', payload({ destinationCountry: 'X' }));
+  const { status, body } = await post('/applications/submit', payload({ destinationCountry: 'X' }), APPLICANT);
   if (body.applicationNumber) created.push(body.applicationNumber);
   assert.equal(status, 400);
   const countAfter = await mongoose.connection.db.collection('applications').countDocuments({});
@@ -299,7 +309,12 @@ it('a submission with an invalid country is rejected and persists no record', as
 /* ---- Reviewer scope ------------------------------------------------------ */
 
 it('the queue is refused without a reviewer role', async () => {
-  const { status } = await getJson('/applications/reviewer', { 'x-user-role': 'applicant' });
+  // A client-supplied role header carries no authority any more. An anonymous
+  // caller is stopped by authentication (401) before role checks run at all.
+  const anonymous = await getJson('/applications/reviewer', { 'x-user-role': 'reviewer' });
+  assert.equal(anonymous.status, 401, 'a forged role header reached the reviewer queue');
+  // A genuine applicant session is stopped by role authorization (403).
+  const { status } = await getJson('/applications/reviewer', APPLICANT);
   assert.equal(status, 403, 'a non-reviewer reached the reviewer queue');
 });
 

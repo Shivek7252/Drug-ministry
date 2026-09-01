@@ -12,7 +12,7 @@ const { readReceiptQuery } = require('../services/readReceipts');
 const { validateCountry, isValidCountry } = require('../services/countryValidation');
 const { v4: uuidv4 } = require('uuid');
 const { validateProductsApproval } = require('../approvedDrugs');
-const { requireReviewer } = require('../middleware/reviewerAuth');
+const { requireApplicant, requireReviewer } = require('../middleware/reviewerAuth');
 const { buildAnalytics } = require('../services/reviewerAnalytics');
 const { buildEventChartActivity } = require('../services/reviewerAnalytics');
 const {
@@ -62,6 +62,45 @@ const checklistUpload = multer({
 });
 
 const MAX_QUERY_ROUNDS = 5;
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function ownershipFilter(principal) {
+  const username = String(principal?.username || '').trim();
+  const legacy = username
+    ? { ownerId: { $exists: false }, submittedBy: { $regex: `^${escapeRegex(username)}$`, $options: 'i' } }
+    : { _id: null };
+  return { $or: [{ ownerId: String(principal?.id || '') }, legacy] };
+}
+
+function scopedQuery(req, query = {}) {
+  // Default-deny: a missing principal matches nothing rather than everything.
+  if (!req || !req.auth) return { _id: null };
+  if (req.auth.role === 'reviewer') return query;
+  return { $and: [query, ownershipFilter(req.auth)] };
+}
+
+function identityQuery(idOrRef) {
+  return {
+    $or: [
+      { applicationNumber: idOrRef },
+      { referenceNumber: idOrRef },
+      { _id: mongoose.isValidObjectId(idOrRef) ? idOrRef : null },
+    ],
+  };
+}
+
+router.param('id', async (req, res, next, id) => {
+  try {
+    const visible = await Application.exists(scopedQuery(req, identityQuery(id)));
+    if (!visible) return res.status(404).json({ error: 'Application not found' });
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+});
 
 /* Approval-section sub-items — same 2 rows for every destination country,
    in every type. Only the display numbering changes per type. */
@@ -732,24 +771,24 @@ async function uniqueRefNumber() {
 }
 
 /* ── POST /api/applications/draft — auto-save draft ─────────────────────── */
-router.post('/draft', async (req, res) => {
+router.post('/draft', requireApplicant, async (req, res) => {
   try {
-    const { formData, user = 'anonymous' } = req.body;
+    const { formData } = req.body;
+    const user = req.auth.username;
 
     // Check if a draft already exists for this user (same email/org)
     let app = null;
     if (formData.email) {
-      app = await Application.findOne({
-        email: formData.email,
+      app = await Application.findOne(scopedQuery(req, {
         isDraft: true,
         status: 'Draft',
-      }).sort({ lastSavedAt: -1 });
+      })).sort({ lastSavedAt: -1 });
     }
 
     if (app) {
       // Update existing draft
       const { documents, ...rest } = formData;
-      Object.assign(app, rest, { lastSavedAt: new Date() });
+      Object.assign(app, rest, { ownerId: req.auth.id, submittedBy: user, lastSavedAt: new Date() });
       const persisted = persistDocsToDisk(app.applicationNumber, documents);
       assignDocuments(app, persisted);
       app.auditLog.push({ action: 'draft_saved', detail: 'Auto-saved draft', user });
@@ -767,6 +806,7 @@ router.post('/draft', async (req, res) => {
       referenceNumber,
       status: 'Draft',
       isDraft: true,
+      ownerId: req.auth.id,
       submittedBy: user,
       auditLog: [{ action: 'draft_created', detail: 'New draft created', user }],
     });
@@ -782,9 +822,10 @@ router.post('/draft', async (req, res) => {
 });
 
 /* ── POST /api/applications/submit — final submission ───────────────────── */
-router.post('/submit', async (req, res) => {
+router.post('/submit', requireApplicant, async (req, res) => {
   try {
-    const { formData, user = 'anonymous' } = req.body;
+    const { formData } = req.body;
+    const user = req.auth.username;
 
     // DEBUG: log incoming document keys + sizes
     if (formData?.documents) {
@@ -850,7 +891,7 @@ router.post('/submit', async (req, res) => {
     // Find existing draft or create new
     let app = null;
     if (formData.email) {
-      app = await Application.findOne({ email: formData.email, isDraft: true }).sort({ lastSavedAt: -1 });
+      app = await Application.findOne(scopedQuery(req, { isDraft: true })).sort({ lastSavedAt: -1 });
     }
 
     const submittedAt = new Date();
@@ -869,6 +910,7 @@ router.post('/submit', async (req, res) => {
         isDraft: false,
         submittedAt,
         lastSavedAt: submittedAt,
+        ownerId: req.auth.id,
         submittedBy: user,
         timeline,
         drugApprovalCheck,
@@ -899,6 +941,7 @@ router.post('/submit', async (req, res) => {
       status: 'Submitted',
       isDraft: false,
       submittedAt,
+      ownerId: req.auth.id,
       submittedBy: user,
       timeline,
       drugApprovalCheck,
@@ -926,7 +969,7 @@ router.post('/submit', async (req, res) => {
 });
 
 /* ── GET /api/applications/search — search by appNo or refNo ────────────── */
-router.get('/search', async (req, res) => {
+router.get('/search', requireApplicant, async (req, res) => {
   try {
     const { appNo, refNo, q } = req.query;
     if (!appNo && !refNo && !q) {
@@ -951,7 +994,7 @@ router.get('/search', async (req, res) => {
     }
 
     const results = await Application
-      .find(query)
+      .find(scopedQuery(req, query))
       .select('-documents -auditLog')  // exclude heavy fields from list
       .sort({ createdAt: -1 })
       .limit(20);
@@ -963,20 +1006,21 @@ router.get('/search', async (req, res) => {
 });
 
 /* ── GET /api/applications/stats/summary — dashboard stats ──────────────── */
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', requireApplicant, async (req, res) => {
   try {
+    const owner = ownershipFilter(req.auth);
     const [total, approved, pending, rejected, underReview] = await Promise.all([
-      Application.countDocuments({ isDraft: false }),
-      Application.countDocuments({ status: 'Approved' }),
-      Application.countDocuments({ status: { $in: ['Submitted', 'Draft'] } }),
-      Application.countDocuments({ status: 'Rejected' }),
-      Application.countDocuments({ status: 'Under Review' }),
+      Application.countDocuments({ $and: [owner, { isDraft: false }] }),
+      Application.countDocuments({ $and: [owner, { status: 'Approved' }] }),
+      Application.countDocuments({ $and: [owner, { status: { $in: ['Submitted', 'Draft'] } }] }),
+      Application.countDocuments({ $and: [owner, { status: 'Rejected' }] }),
+      Application.countDocuments({ $and: [owner, { status: 'Under Review' }] }),
     ]);
 
     // Monthly counts for current year
     const year = new Date().getFullYear();
     const monthly = await Application.aggregate([
-      { $match: { createdAt: { $gte: new Date(`${year}-01-01`) }, isDraft: false } },
+      { $match: { $and: [owner, { createdAt: { $gte: new Date(`${year}-01-01`) }, isDraft: false }] } },
       {
         $group: {
           _id: { $month: '$createdAt' },
@@ -995,7 +1039,7 @@ router.get('/stats/summary', async (req, res) => {
 
     // Country distribution
     const byCountry = await Application.aggregate([
-      { $match: { isDraft: false } },
+      { $match: { $and: [owner, { isDraft: false }] } },
       { $group: { _id: '$destinationCountry', value: { $sum: 1 } } },
       { $sort: { value: -1 } },
       { $limit: 8 },
@@ -1004,7 +1048,7 @@ router.get('/stats/summary', async (req, res) => {
 
     // Category distribution
     const byCategory = await Application.aggregate([
-      { $match: { isDraft: false } },
+      { $match: { $and: [owner, { isDraft: false }] } },
       { $group: { _id: '$exportCategory', value: { $sum: 1 } } },
       { $sort: { value: -1 } },
       { $project: { name: '$_id', value: 1, _id: 0 } },
@@ -1086,7 +1130,7 @@ router.get('/reviewer/read-state', requireReviewer, async (req, res) => {
    distinct per reviewer instead of colliding on null. */
 router.post('/:id/read', requireReviewer, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return undefined;
     const readAt = new Date();
     const key = { reviewerId: req.reviewer.id, applicationNumber: app.applicationNumber };
@@ -1325,7 +1369,7 @@ function reviewApplicationHeader(app, summary) {
 
 router.get('/:id/review-snapshot', requireReviewer, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
 
     const transition = underReviewTransition(app.status);
@@ -1362,7 +1406,7 @@ router.get('/:id/review-snapshot', requireReviewer, async (req, res) => {
 
 router.post('/:id/under-review', requireReviewer, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
 
     const submissionId = String(req.body?.submissionId || '').trim();
@@ -1497,7 +1541,7 @@ function documentIdentity(docId, doc, payload, fallbackLabel = '') {
 
 router.get('/:id/document/:docId/query-draft', requireReviewer, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const doc = loadDocumentOr404(app, req.params.docId, res);
     if (!doc) return;
@@ -1526,7 +1570,7 @@ router.get('/:id/document/:docId/query-draft', requireReviewer, async (req, res)
 
 router.post('/:id/document/:docId/query', requireReviewer, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const docId = req.params.docId;
     const doc = loadDocumentOr404(app, docId, res);
@@ -1649,13 +1693,9 @@ router.get('/:id/summary', requireReviewer, async (req, res) => {
 router.get('/:id/document/:docId', async (req, res) => {
   try {
     const { id, docId } = req.params;
-    const app = await Application.findOne({
-      $or: [
-        { applicationNumber: id },
-        { referenceNumber: id },
-        { _id: mongoose.isValidObjectId(id) ? id : null },
-      ],
-    });
+    // Owner-scoped: uploaded files are readable only by their owner (or a
+    // reviewer, for whom scopedQuery leaves the query unchanged).
+    const app = await Application.findOne(scopedQuery(req, identityQuery(id)));
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     const doc = app.documents?.get ? app.documents.get(docId) : app.documents?.[docId];
@@ -1704,13 +1744,8 @@ router.get('/:id/document/:docId', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const app = await Application.findOne({
-      $or: [
-        { applicationNumber: id },
-        { referenceNumber: id },
-        { _id: mongoose.isValidObjectId(id) ? id : null },
-      ],
-    });
+    // Owner-scoped: an applicant may only read their own application.
+    const app = await Application.findOne(scopedQuery(req, identityQuery(id)));
     if (!app) return res.status(404).json({ error: 'Application not found' });
 
     // Strip raw bytes; emit a download URL instead
@@ -1736,7 +1771,7 @@ router.get('/:id', async (req, res) => {
 });
 
 /* ── GET /api/applications — list all (admin/dashboard) ─────────────────── */
-router.get('/', async (req, res) => {
+router.get('/', requireApplicant, async (req, res) => {
   try {
     const { status, limit = 20, skip = 0, isDraft } = req.query;
     const filter = {};
@@ -1744,13 +1779,14 @@ router.get('/', async (req, res) => {
     if (isDraft !== undefined) filter.isDraft = isDraft === 'true';
     else filter.isDraft = false; // default: only submitted apps
 
+    const scoped = scopedQuery(req, filter);
     const [apps, total] = await Promise.all([
-      Application.find(filter)
+      Application.find(scoped)
         .select('-documents -auditLog')
         .sort({ createdAt: -1 })
         .limit(Number(limit))
         .skip(Number(skip)),
-      Application.countDocuments(filter),
+      Application.countDocuments(scoped),
     ]);
 
     res.json({ success: true, total, count: apps.length, applications: apps });
@@ -1992,9 +2028,10 @@ router.post('/:id/shipments/:idx/action', requireReviewer, async (req, res) => {
 });
 
 /* ── PATCH /api/applications/:id/status — update status ─────────────────── */
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', requireReviewer, async (req, res) => {
   try {
-    const { status, note, user = 'system' } = req.body;
+    const { status, note } = req.body;
+    const user = req.reviewer.name;
     const app = await Application.findOne({
       $or: [{ applicationNumber: req.params.id }, { _id: req.params.id }],
     });
@@ -2017,14 +2054,8 @@ router.patch('/:id/status', async (req, res) => {
    Export NOC Check-List Query flow (Type 1: multi-country)
    ─────────────────────────────────────────────────────────────────────── */
 
-async function loadAppOr404(idOrRef, res) {
-  const app = await Application.findOne({
-    $or: [
-      { applicationNumber: idOrRef },
-      { referenceNumber: idOrRef },
-      { _id: mongoose.isValidObjectId(idOrRef) ? idOrRef : null },
-    ],
-  });
+async function loadAppOr404(idOrRef, res, req) {
+  const app = await Application.findOne(scopedQuery(req, identityQuery(idOrRef)));
   if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
   return app;
 }
@@ -2066,7 +2097,7 @@ async function documentQueriesByDocId(app) {
 /* ── GET /:id/checklist — full checklist tree for reviewer + applicant ── */
 router.get('/:id/checklist', async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     seedChecklist(app);
     await app.save();
@@ -2115,7 +2146,7 @@ router.post('/:id/checklist/:itemId/query', requireReviewer, async (req, res) =>
     if (!queryText || !String(queryText).trim()) {
       return res.status(400).json({ error: 'queryText is required' });
     }
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     seedChecklist(app);
 
@@ -2185,13 +2216,13 @@ router.post('/:id/checklist/:itemId/query', requireReviewer, async (req, res) =>
 });
 
 /* ── POST /:id/checklist/:itemId/reply — applicant replies to latest query ── */
-router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), async (req, res) => {
+router.post('/:id/checklist/:itemId/reply', requireApplicant, checklistUpload.single('replyDoc'), async (req, res) => {
   try {
     const reply = (req.body.reply || '').trim();
-    const applicant = req.body.applicant || 'applicant';
+    const applicant = req.auth.username;
     if (!reply) return res.status(400).json({ error: 'reply text is required' });
 
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     seedChecklist(app);
 
@@ -2273,7 +2304,7 @@ router.post('/:id/checklist/:itemId/reply', checklistUpload.single('replyDoc'), 
 /* ── GET /:id/checklist/:itemId/submission-file — stream at-submission doc ── */
 router.get('/:id/checklist/:itemId/submission-file', async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const item = app.checklistItems?.get(req.params.itemId);
     if (!item?.submissionDocPath) return res.status(404).json({ error: 'File not found' });
@@ -2295,7 +2326,7 @@ router.get('/:id/checklist/:itemId/submission-file', async (req, res) => {
 /* ── GET /:id/checklist/:itemId/reply-file/:version — stream applicant reply doc ── */
 router.get('/:id/checklist/:itemId/reply-file/:version', async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const item = app.checklistItems?.get(req.params.itemId);
     const round = item?.queries?.find(q => String(q.version) === String(req.params.version));
@@ -2355,7 +2386,7 @@ function residualShelfLifeMonths(expiryDate) {
 /* ── GET /:id/reconciliation — get all reconciliation entries + NOC meta ── */
 router.get('/:id/reconciliation', async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
 
     const obj = app.toObject();
@@ -2398,9 +2429,9 @@ router.get('/:id/reconciliation', async (req, res) => {
 
 /* ── POST /:id/reconciliation — add a new reconciliation entry ────────────
    Accepts multipart form data (with optional COA/EI doc attachment).       */
-router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (req, res) => {
+router.post('/:id/reconciliation', requireApplicant, reconciliationUpload.single('doc'), async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
 
     // Only allow if NOC is approved / active
@@ -2477,7 +2508,7 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
       shelfLifeStatus,
       docName, docPath, docType, docSize,
       status: b.status === 'Submitted' ? 'Submitted' : 'Draft',
-      submittedBy: b.submittedBy || 'applicant',
+      submittedBy: req.auth.username,
       submittedAt: new Date(),
     };
 
@@ -2488,7 +2519,7 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
     app.auditLog.push({
       action: 'reconciliation_entry',
       detail: `Reconciliation entry added (${entry.status}): ${entry.productName || 'product'} → ${entry.countryExported}, Qty: ${entry.packedExportedQty}`,
-      user: b.submittedBy || 'applicant',
+      user: req.auth.username,
       timestamp: new Date(),
     });
 
@@ -2511,9 +2542,9 @@ router.post('/:id/reconciliation', reconciliationUpload.single('doc'), async (re
 });
 
 /* ── PATCH /:id/reconciliation/:entryId — update/submit an entry ────────── */
-router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'), async (req, res) => {
+router.patch('/:id/reconciliation/:entryId', requireApplicant, reconciliationUpload.single('doc'), async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
 
     const idx = (app.reconciliations || []).findIndex(e => e.entryId === req.params.entryId);
@@ -2578,7 +2609,7 @@ router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'),
     app.auditLog.push({
       action: 'reconciliation_update',
       detail: `Reconciliation ${req.params.entryId} updated → status: ${updated.status}`,
-      user: b.updatedBy || 'applicant',
+      user: req.auth.username,
       timestamp: new Date(),
     });
     await app.save();
@@ -2600,15 +2631,15 @@ router.patch('/:id/reconciliation/:entryId', reconciliationUpload.single('doc'),
 });
 
 /* ── DELETE /:id/reconciliation/:entryId — delete a draft entry ────────── */
-router.delete('/:id/reconciliation/:entryId', async (req, res) => {
+router.delete('/:id/reconciliation/:entryId', requireApplicant, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const before = (app.reconciliations || []).length;
     app.reconciliations = (app.reconciliations || []).filter(e => e.entryId !== req.params.entryId);
     if (app.reconciliations.length === before) return res.status(404).json({ error: 'Entry not found' });
     app.markModified('reconciliations');
-    app.auditLog.push({ action: 'reconciliation_delete', detail: `Entry ${req.params.entryId} deleted`, user: 'applicant', timestamp: new Date() });
+    app.auditLog.push({ action: 'reconciliation_delete', detail: `Entry ${req.params.entryId} deleted`, user: req.auth.username, timestamp: new Date() });
     await app.save();
     res.json({ success: true });
   } catch (err) {
@@ -2619,7 +2650,7 @@ router.delete('/:id/reconciliation/:entryId', async (req, res) => {
 /* ── GET /:id/reconciliation/:entryId/doc — stream reconciliation doc ───── */
 router.get('/:id/reconciliation/:entryId/doc', async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const entry = (app.reconciliations || []).find(e => e.entryId === req.params.entryId);
     if (!entry?.docPath) return res.status(404).json({ error: 'Document not found' });
@@ -2637,9 +2668,9 @@ router.get('/:id/reconciliation/:entryId/doc', async (req, res) => {
 });
 
 /* ── POST /:id/noc-meta — set NOC metadata after approval ──────────────── */
-router.post('/:id/noc-meta', async (req, res) => {
+router.post('/:id/noc-meta', requireReviewer, async (req, res) => {
   try {
-    const app = await loadAppOr404(req.params.id, res);
+    const app = await loadAppOr404(req.params.id, res, req);
     if (!app) return;
     const { sanctionedQty, qtyUnit = 'units', nocIssuedDate, nocExpiryDate } = req.body;
     const issuedDate = nocIssuedDate ? new Date(nocIssuedDate) : new Date();
@@ -2661,7 +2692,7 @@ router.post('/:id/noc-meta', async (req, res) => {
     app.auditLog.push({
       action: 'noc_meta_set',
       detail: `NOC issued: qty=${sanctionedQty} ${qtyUnit}, valid until ${expiryDate.toLocaleDateString('en-IN')}`,
-      user: req.body.officer || 'reviewer',
+      user: req.reviewer.name,
       timestamp: new Date(),
     });
     await app.save();

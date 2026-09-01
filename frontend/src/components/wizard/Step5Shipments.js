@@ -18,9 +18,9 @@ export default function Step5Shipments() {
   } = useApp();
   const [errors, setErrors] = useState(''); // top-level string
 
-  const companies  = formData.companies  || [];
-  const products   = formData.products   || [];
-  const consignees = formData.consignees || [];
+  const companies  = useMemo(() => formData.companies || [], [formData.companies]);
+  const products   = useMemo(() => formData.products || [], [formData.products]);
+  const consignees = useMemo(() => formData.consignees || [], [formData.consignees]);
   const shipments  = formData.shipments  || [];
 
   /* Quick lookups for the summary strip */
