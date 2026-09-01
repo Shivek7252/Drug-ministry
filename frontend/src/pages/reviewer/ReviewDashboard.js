@@ -1,7 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { reviewerAction } from '../../api/applicationService';
 
 import useReviewQueue, { isUnread } from '../../hooks/useReviewQueue';
 import useReviewerAnalytics from '../../hooks/useReviewerAnalytics';
@@ -32,55 +31,32 @@ import './ReviewDashboard.css';
 
    All state lives in useReviewQueue; all derivation lives in aggregations.js;
    all presentation lives in the components below. This file only wires them
-   together and owns two pieces of pure view state (density, bulk-busy).
+   together.
    ============================================================================ */
-
-const DENSITY_KEY = 'reviewer_table_density';
 
 export default function ReviewDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { currentUser } = useApp();
   const q = useReviewQueue();
-  /* KPI comparisons come from the server: it can see the full filtered set and
-     the transition history, neither of which this client has. Same filters as
-     the table, so both describe the same population. */
+  /* KPI counts and the reviewer's unread total come from the server: it can
+     see the complete filtered set, which this client cannot — it only ever
+     holds the page it fetched. Same filters as the table, so both describe the
+     same population. */
   const analytics = useReviewerAnalytics({
     ...q.serverFilters,
     workflowStatus: q.kpiFilter,
   });
 
-  const [density, setDensityState] = useState(() => {
-    try { return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable'; }
-    catch { return 'comfortable'; }
-  });
-  const setDensity = useCallback(value => {
-    setDensityState(value);
-    try { localStorage.setItem(DENSITY_KEY, value); } catch { /* private mode */ }
-  }, []);
-
-  const [bulkBusy, setBulkBusy] = useState(false);
-
+  /* Navigate first so the click feels instant, then persist the read receipt.
+     markOpened signals the queue changed once the POST succeeds, which is what
+     refreshes the unread count — the count is never decremented locally, and
+     the refresh is never fired before the receipt it is meant to observe. */
   const openApplication = useCallback(app => {
-    q.markOpened(app.applicationNumber);
-    analytics.reload();
     const search = searchParams.toString();
     navigate(`/review/application/${app.applicationNumber}${search ? `?${search}` : ''}`);
-  }, [navigate, q, analytics, searchParams]);
-
-  /* The only bulk action with a backing endpoint. Loops the existing
-     per-application route; no API change. */
-  const bulkMarkInReview = useCallback(async () => {
-    setBulkBusy(true);
-    await Promise.all([...q.selected].map(appNo =>
-      reviewerAction(appNo, { status: 'Under Review', remarks: 'Marked in review from the queue' })
-        .catch(() => null)
-    ));
-    q.clearSelection();
-    setBulkBusy(false);
-    q.reload();
-    analytics.reload();
-  }, [q, analytics]);
+    return q.markOpened(app.applicationNumber);
+  }, [navigate, q, searchParams]);
 
   const chartData = analytics.analytics?.charts || null;
   const analyticsLoading = analytics.loading && !chartData;
@@ -112,7 +88,6 @@ export default function ReviewDashboard() {
           <KpiFilterRow
             tiles={q.tiles}
             counts={analytics.serverCounts}
-            deltas={analytics.comparison}
             analytics={analytics}
             value={q.kpiFilter}
             onChange={q.setKpiFilter}
@@ -161,15 +136,8 @@ export default function ReviewDashboard() {
             page={q.page} pageCount={q.pageCount} onPage={q.setPage}
             rowsPerPage={q.rowsPerPage} onRowsPerPage={q.setRowsPerPage}
             totalRows={q.totalRows}
-            selected={q.selected}
-            onToggleSelect={q.toggleSelect}
-            onToggleSelectAll={q.toggleSelectAllOnPage}
-            onClearSelection={q.clearSelection}
-            density={density} onDensity={setDensity}
             onOpen={openApplication}
             isUnread={app => isUnread(app, q.readSet)}
-            onBulkMarkInReview={bulkMarkInReview}
-            bulkBusy={bulkBusy}
           />
         </div>
       </main>

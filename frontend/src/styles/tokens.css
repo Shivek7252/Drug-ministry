@@ -145,6 +145,7 @@
   --r-pill: 999px;
 
   /* ---- Type scale (rem — scales with the A- / A / A+ control) ----------- */
+  --fs-10: 0.625rem;
   --fs-11: 0.6875rem;
   --fs-12: 0.75rem;
   --fs-13: 0.8125rem;

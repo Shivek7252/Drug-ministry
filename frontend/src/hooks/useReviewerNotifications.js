@@ -19,7 +19,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { listReviewerApplications, getReviewerAnalytics } from '../api/applicationService';
-import { REFRESH_KEY } from '../config/queueRefreshSignal';
+import { subscribeQueueChanged } from '../config/queueRefreshSignal';
 import { normalizeStatus, STATUS } from '../pages/reviewer/dashboard/statusModel';
 import { formatBusinessDateTime } from '../config/businessTime';
 
@@ -101,18 +101,18 @@ export default function useReviewerNotifications({ enabled = true } = {}) {
   useEffect(() => { load(); }, [load]);
 
   /* Same refresh contract as the queue: focus, tab visibility, and the
-     cross-tab signal the queue writes when read state changes. */
+     queue-changed signal written when read state changes — in this tab as
+     well as in others. */
   useEffect(() => {
     if (!enabled) return undefined;
     const onVisible = () => { if (!document.hidden) load(); };
-    const onStorage = e => { if (e.key === REFRESH_KEY) load(); };
+    const unsubscribe = subscribeQueueChanged(load);
     window.addEventListener('focus', load);
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('storage', onStorage);
     return () => {
       window.removeEventListener('focus', load);
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('storage', onStorage);
+      unsubscribe();
     };
   }, [enabled, load]);
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { REFRESH_KEY, signalQueueChanged } from '../config/queueRefreshSignal';
+import { REFRESH_KEY, signalQueueChanged, subscribeQueueChanged } from '../config/queueRefreshSignal';
 import {
   listReviewerApplications, getReviewerFilterOptions, markApplicationRead,
 } from '../api/applicationService';
@@ -9,11 +9,13 @@ import { canonicalReviewerFilters } from '../config/reviewerFilters';
 
 export { KPI_TILES, ROWS_PER_PAGE_OPTIONS, REFRESH_KEY, signalQueueChanged };
 
+export const QUEUE_POLL_INTERVAL_MS = 60000;
+
 export function isUnread(app, readSet = new Set()) {
   return app.isRead === false || (!app.isRead && !readSet.has(app.applicationNumber));
 }
 
-export default function useReviewQueue() {
+export default function useReviewQueue({ pollMs = QUEUE_POLL_INTERVAL_MS } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || searchParams.get('q') || '';
   const [searchQ, setSearchQ] = useState(initialSearch);
@@ -38,10 +40,13 @@ export default function useReviewQueue() {
   const [countries, setCountries] = useState([]);
   const [categories, setCategories] = useState([]);
   const [states, setStates] = useState([]);
-  const [selected, setSelected] = useState(() => new Set());
   const [readSet, setReadSet] = useState(() => new Set());
   const [readStateReady, setReadStateReady] = useState(false);
   const prevCountry = useRef(country);
+  /* Mirrors readSet for markOpened's rollback, so the callback identity does
+     not change every time a row is opened. */
+  const readSetRef = useRef(readSet);
+  useEffect(() => { readSetRef.current = readSet; }, [readSet]);
 
   const serverFilters = useMemo(() => canonicalReviewerFilters({
     search: debouncedQ, category: filterCat, country, state,
@@ -81,18 +86,35 @@ export default function useReviewQueue() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    let timer = null;
     const refresh = () => load({ background: true });
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    const onStorage = event => { if (event.key === REFRESH_KEY) refresh(); };
+    const stopPolling = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    const startPolling = () => {
+      stopPolling();
+      timer = setInterval(() => {
+        if (document.visibilityState === 'visible') refresh();
+      }, pollMs);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refresh();
+        startPolling();
+      } else stopPolling();
+    };
+    const unsubscribe = subscribeQueueChanged(refresh);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('storage', onStorage);
+    if (document.visibilityState === 'visible') startPolling();
     return () => {
+      stopPolling();
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('storage', onStorage);
+      unsubscribe();
     };
-  }, [load]);
+  }, [load, pollMs]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQ(searchQ.trim()), 350);
@@ -110,7 +132,6 @@ export default function useReviewQueue() {
 
   useEffect(() => {
     setPage(1);
-    setSelected(new Set());
   }, [debouncedQ, filterCat, country, state, datePreset, startDate, endDate, kpiFilter, rowsPerPage]);
 
   useEffect(() => {
@@ -140,26 +161,40 @@ export default function useReviewQueue() {
     setPage(1);
   }, []);
 
-  const toggleSelect = useCallback(appNo => setSelected(current => {
-    const next = new Set(current);
-    if (next.has(appNo)) next.delete(appNo); else next.add(appNo);
-    return next;
-  }), []);
-  const toggleSelectAllOnPage = useCallback(() => setSelected(current => {
-    const next = new Set(current);
-    const ids = rows.map(row => row.applicationNumber);
-    const allSelected = ids.length && ids.every(id => next.has(id));
-    ids.forEach(id => (allSelected ? next.delete(id) : next.add(id)));
-    return next;
-  }), [rows]);
-  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  /* Optimistic, then reconciled — never a blind decrement.
 
+     The badge disappears immediately, but the number the dashboard shows comes
+     from the server. On success we signal the queue changed, which makes the
+     analytics hook refetch the authoritative unread count for the current
+     filters. On failure the optimistic edit is rolled back so the row does not
+     claim to be read when no receipt was persisted.
+
+     Awaited by callers, so a navigation-triggered refresh cannot race ahead of
+     the receipt it is supposed to observe. */
   const markOpened = useCallback(async appNo => {
+    const wasRead = readSetRef.current.has(appNo);
     setReadSet(current => new Set(current).add(appNo));
-    setRows(current => current.map(row => row.applicationNumber === appNo ? { ...row, isRead: true } : row));
+    setRows(current => current.map(row => (
+      row.applicationNumber === appNo ? { ...row, isRead: true } : row
+    )));
+
     const res = await markApplicationRead(appNo);
-    if (!res.success) load({ background: true });
-    else signalQueueChanged();
+    if (!res.success) {
+      if (!wasRead) {
+        setReadSet(current => {
+          const next = new Set(current);
+          next.delete(appNo);
+          return next;
+        });
+        setRows(current => current.map(row => (
+          row.applicationNumber === appNo ? { ...row, isRead: false } : row
+        )));
+      }
+      await load({ background: true });
+      return res;
+    }
+    signalQueueChanged();
+    return res;
   }, [load]);
 
   const resetFilters = useCallback(() => {
@@ -182,7 +217,6 @@ export default function useReviewQueue() {
     kpiFilter, setKpiFilter, tiles: KPI_TILES,
     sort, toggleSort,
     page, setPage, pageCount, rowsPerPage, setRowsPerPage,
-    selected, toggleSelect, toggleSelectAllOnPage, clearSelection,
     readSet, readStateReady, markOpened,
   };
 }

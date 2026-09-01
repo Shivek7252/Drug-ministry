@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from '../../../components/ui/Icon';
 import { countryDisplayLabel, isInvalidCountryValue } from '../../../data/countries';
 import { EXPORT_CATEGORIES } from '../../../data/mockData';
@@ -6,20 +6,29 @@ import { ROWS_PER_PAGE_OPTIONS } from './aggregations';
 import { formatBusinessDateTime } from '../../../config/businessTime';
 import { normalizeStatus, STATUS, STATUS_LABEL } from './statusModel';
 
-/* The desktop table and mobile review cards are the same semantic table. At
-   small widths CSS turns each <tr> into a stacked card, so values are never
-   duplicated in the DOM and assistive technology keeps proper row context. */
+/* ============================================================================
+   Review Queue.
+
+   Seven data columns, each one a merge of what used to be two: the queue now
+   fits its container at every width instead of living inside a horizontal
+   scroller. The table is `table-layout: fixed` on percentage columns with no
+   min-width, so it can never be wider than the page; every cell either wraps
+   or ellipsises with a title, so nothing is clipped without a way to read it.
+
+   Below CARD_QUERY the table is swapped — in JS, not CSS — for a list of
+   <article> cards. One layout is in the DOM at a time: no duplicated values,
+   no table semantics left dangling on elements CSS has turned into blocks.
+   ============================================================================ */
+
+const CARD_QUERY = '(max-width: 767px)';
 
 const COLUMNS = [
   { key: 'application', label: 'Application', sortable: true },
-  { key: 'reference', label: 'Reference', sortable: false },
   { key: 'applicant', label: 'Applicant', sortable: true },
-  { key: 'state', label: 'State', sortable: false },
+  { key: 'route', label: 'Route', sortable: false },
   { key: 'category', label: 'Category', sortable: false },
-  { key: 'destination', label: 'Destination', sortable: false },
-  { key: 'submitted', label: 'Submitted', sortable: true, numeric: true },
-  { key: 'queries', label: 'Queries', sortable: true, numeric: true },
-  { key: 'status', label: 'Status', sortable: true },
+  { key: 'submitted', label: 'Submitted', sortable: true },
+  { key: 'status', label: 'Review Status', sortable: true },
   { key: 'action', label: 'Action', sortable: false },
 ];
 
@@ -33,6 +42,25 @@ const STATUS_CLASS = {
   [STATUS.REJECTED]: 'rejected',
   [STATUS.UNKNOWN]: 'unknown',
 };
+
+/* Card layout is a real DOM swap, so it needs a JS media query rather than a
+   stylesheet breakpoint. Falls back to the table when matchMedia is absent. */
+function useCardLayout() {
+  const [cards, setCards] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(CARD_QUERY).matches
+      : false
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const mq = window.matchMedia(CARD_QUERY);
+    const onChange = event => setCards(event.matches);
+    mq.addEventListener('change', onChange);
+    setCards(mq.matches);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return cards;
+}
 
 const categoryDisplay = value => {
   const raw = String(value || '').trim();
@@ -57,37 +85,12 @@ const ariaSort = (column, sort) => {
   return sort.dir === 'asc' ? 'ascending' : 'descending';
 };
 
-function TextValue({ value, className = '' }) {
-  const text = String(value || '').trim();
-  return (
-    <span className={className} title={text || undefined}>
-      {text || '—'}
-    </span>
-  );
-}
+const sortIcon = (key, sort) =>
+  (sort.key !== key ? 'arrowUpDown' : (sort.dir === 'asc' ? 'arrowUp' : 'arrowDown'));
 
-function SubmittedCell({ app }) {
-  const { date, time } = formatBusinessDateTime(app.submittedAt);
-  if (!date) return <span className="rq-muted">—</span>;
-  const full = `${date}, ${time || 'time unavailable'}`;
-  return (
-    <span className="rq-submitted" title={full}>
-      <span className="rq-submitted-date tnum">{date}</span>
-      <span className="rq-submitted-time tnum">{time || 'Time unavailable'}</span>
-    </span>
-  );
-}
+const text = value => String(value || '').trim();
 
-function StatusBadge({ status }) {
-  const canonical = normalizeStatus(status);
-  const label = STATUS_LABEL[canonical];
-  return (
-    <span className={`rq-status is-${STATUS_CLASS[canonical]}`} aria-label={`Status: ${label}`}>
-      <span className="rq-status-dot" aria-hidden="true" />
-      {label}
-    </span>
-  );
-}
+/* ---- Shared value renderers: the table and the cards read the same ones --- */
 
 function InvalidValue({ kind, value }) {
   return (
@@ -96,9 +99,321 @@ function InvalidValue({ kind, value }) {
       title={`Invalid stored ${kind} value: ${value}`}
       aria-label={`Invalid ${kind} data. Stored value: ${value}`}
     >
-      <Icon name="alertTriangle" size={13} />
+      <Icon name="alertTriangle" size={12} />
       Invalid data
     </span>
+  );
+}
+
+/* Application numbers are the row's identity: never truncated, never
+   ellipsised. They wrap before they would ever be shortened. */
+function ApplicationValue({ id, reference, unread }) {
+  return (
+    <span className="rq-application">
+      <span className="rq-appno-line">
+        <span className="rq-appno tnum">{id}</span>
+        {unread && <span className="rq-unread-dot" role="img" aria-label="Unread" />}
+      </span>
+      <span className="rq-ref tnum">{text(reference) || '—'}</span>
+    </span>
+  );
+}
+
+function ApplicantValue({ name, email }) {
+  return (
+    <span className="rq-applicant">
+      <span className="rq-applicant-name">{text(name) || '—'}</span>
+      {email && <span className="rq-email" title={email}>{email}</span>}
+    </span>
+  );
+}
+
+function RouteValue({ state, destination }) {
+  const from = text(state) || '—';
+  const full = destination.invalid ? from : `${from} → ${destination.label}`;
+  return (
+    <span className="rq-route" title={destination.invalid ? undefined : full}>
+      <span className="rq-route-from">{from}</span>
+      <span className="rq-route-arrow" aria-hidden="true">→</span>
+      <span className="sr-only"> to </span>
+      {destination.invalid
+        ? <InvalidValue kind="country" value={destination.raw} />
+        : <span className="rq-route-to">{destination.label}</span>}
+    </span>
+  );
+}
+
+function CategoryValue({ category }) {
+  return category.invalid
+    ? <InvalidValue kind="category" value={category.raw} />
+    : <span className="rq-chip">{category.label}</span>;
+}
+
+function SubmittedValue({ app }) {
+  const { date, time } = formatBusinessDateTime(app.submittedAt);
+  if (!date) return <span className="rq-muted">—</span>;
+  return (
+    <span className="rq-submitted" title={`${date}, ${time || 'time unavailable'}`}>
+      <span className="rq-submitted-date tnum">{date}</span>
+      <span className="rq-submitted-time tnum">{time || 'Time unavailable'}</span>
+    </span>
+  );
+}
+
+/* Status and query count are one fact — where the file stands — so they share
+   a cell. The count only appears when there is something to count. */
+function ReviewStatusValue({ status, queryCount }) {
+  const canonical = normalizeStatus(status);
+  const label = STATUS_LABEL[canonical];
+  return (
+    <span className="rq-reviewstate">
+      <span className={`rq-status is-${STATUS_CLASS[canonical]}`} aria-label={`Status: ${label}`}>
+        <span className="rq-status-dot" aria-hidden="true" />
+        {label}
+      </span>
+      {queryCount > 0 && (
+        <span className="rq-queries tnum">
+          {queryCount} {queryCount === 1 ? 'query' : 'queries'}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ReviewButton({ id, onOpen }) {
+  return (
+    <button type="button" className="rq-open" onClick={onOpen} aria-label={`Open application ${id}`}>
+      <span className="rq-open-label">Review</span>
+      <Icon name="chevronRight" size={14} />
+    </button>
+  );
+}
+
+/* ---- Row model: derived once, rendered by whichever layout is mounted ----- */
+
+const toRowModel = (app, isUnread) => {
+  const id = app.applicationNumber;
+  return {
+    app,
+    id,
+    reference: app.referenceNumber,
+    applicant: app.applicantOrganization || app.applicantName || '',
+    email: text(app.email),
+    unread: Boolean(isUnread(app)),
+    category: categoryDisplay(app.exportCategory),
+    destination: countryDisplay(app.destinationCountry || app.consigneeCountry),
+    queryCount: Number(app.queryCount) || 0,
+    statusLabel: STATUS_LABEL[normalizeStatus(app.status)],
+  };
+};
+
+const rowAriaLabel = row =>
+  `${row.id}, ${row.applicant || 'applicant unavailable'}, ${row.statusLabel}${row.unread ? ', unread' : ''}`;
+
+/* ---- States shared by both layouts --------------------------------------- */
+
+function ErrorState({ error, onRetry }) {
+  return (
+    <div className="rq-state rq-state-error" role="alert">
+      <Icon name="alertTriangle" size={22} />
+      <strong>Review queue could not be loaded</strong>
+      <span>{error}</span>
+      {onRetry && (
+        <button type="button" onClick={onRetry}>
+          <Icon name="refresh" size={14} /> Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ hasFilters }) {
+  return (
+    <div className="rq-state">
+      <Icon name={hasFilters ? 'search' : 'rows'} size={22} />
+      <strong>{hasFilters ? 'No applications match these filters' : 'The review queue is empty'}</strong>
+      <span>{hasFilters
+        ? 'Adjust or clear the filters to see more applications.'
+        : 'Submitted applications will appear here for review.'}</span>
+    </div>
+  );
+}
+
+/* ---- Mobile: one <article> per application ------------------------------- */
+
+function QueueCards({
+  rows, loading, initialError, empty, error, hasFilters, onRetry,
+  onOpen,
+}) {
+  if (loading) {
+    return (
+      <div className="rq-cards" aria-hidden="true">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="rq-card rq-card-skeleton">
+            <span className="rq-skel" style={{ width: '55%' }} />
+            <span className="rq-skel" style={{ width: '80%' }} />
+            <span className="rq-skel" style={{ width: '40%' }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (initialError) return <div className="rq-cards">{<ErrorState error={error} onRetry={onRetry} />}</div>;
+  if (empty) return <div className="rq-cards">{<EmptyState hasFilters={hasFilters} />}</div>;
+
+  return (
+    <ul className="rq-cards" aria-label="Review queue applications">
+      {rows.map(row => (
+          <li key={row.id}>
+            <article
+              className={`rq-card${row.unread ? ' is-unseen' : ''}`}
+              aria-label={rowAriaLabel(row)}
+              tabIndex={0}
+              onClick={() => onOpen(row.app)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(row.app);
+              }}
+            >
+              <div className="rq-card-head">
+                <ApplicationValue id={row.id} reference={row.reference} unread={row.unread} />
+                <ReviewStatusValue status={row.app.status} queryCount={row.queryCount} />
+              </div>
+
+              <dl className="rq-card-facts">
+                <div className="rq-fact">
+                  <dt>Applicant</dt>
+                  <dd><ApplicantValue name={row.applicant} email={row.email} /></dd>
+                </div>
+                <div className="rq-fact">
+                  <dt>Route</dt>
+                  <dd><RouteValue state={row.app.state} destination={row.destination} /></dd>
+                </div>
+                <div className="rq-fact">
+                  <dt>Category</dt>
+                  <dd><CategoryValue category={row.category} /></dd>
+                </div>
+                <div className="rq-fact">
+                  <dt>Submitted</dt>
+                  <dd><SubmittedValue app={row.app} /></dd>
+                </div>
+              </dl>
+
+              <div className="rq-card-foot" onClick={event => event.stopPropagation()}>
+                <ReviewButton id={row.id} onOpen={() => onOpen(row.app)} />
+              </div>
+            </article>
+          </li>
+      ))}
+    </ul>
+  );
+}
+
+/* ---- Desktop and tablet: the semantic table ------------------------------ */
+
+function QueueTable({
+  rows, loading, initialError, empty, error, hasFilters, onRetry,
+  sort, onSort, onOpen,
+}) {
+  const span = COLUMNS.length;
+  return (
+    <table className="rq-table">
+      <caption className="sr-only">
+        Reviewer applications. Use sortable column headers to change the server-side order.
+      </caption>
+      <colgroup>
+        <col className="rq-col-application" />
+        <col className="rq-col-applicant" />
+        <col className="rq-col-route" />
+        <col className="rq-col-category" />
+        <col className="rq-col-submitted" />
+        <col className="rq-col-status" />
+        <col className="rq-col-action" />
+      </colgroup>
+      <thead>
+        <tr>
+          {COLUMNS.map(column => (
+            <th key={column.key} scope="col" aria-sort={ariaSort(column, sort)}>
+              {column.sortable ? (
+                <button type="button" className="rq-sort" onClick={() => onSort(column.key)}>
+                  {column.label}
+                  <Icon name={sortIcon(column.key, sort)} size={13} />
+                </button>
+              ) : column.label}
+              {/* Queries merged into Review Status, so its sort lives here too. */}
+              {column.key === 'status' && (
+                <button
+                  type="button"
+                  className="rq-sort rq-sort-sub"
+                  onClick={() => onSort('queries')}
+                  aria-label={`Sort by queries, currently ${
+                    sort.key === 'queries' ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'unsorted'}`}
+                >
+                  Queries
+                  <Icon name={sortIcon('queries', sort)} size={11} />
+                </button>
+              )}
+            </th>
+          ))}
+        </tr>
+      </thead>
+
+      <tbody>
+        {loading && Array.from({ length: 6 }).map((_, rowIndex) => (
+          <tr key={`skeleton-${rowIndex}`} className="rq-skeleton" aria-hidden="true">
+            {Array.from({ length: span }).map((__, cellIndex) => (
+              <td key={cellIndex}><span className="rq-skel" /></td>
+            ))}
+          </tr>
+        ))}
+
+        {initialError && (
+          <tr className="rq-state-row">
+            <td colSpan={span}><ErrorState error={error} onRetry={onRetry} /></td>
+          </tr>
+        )}
+
+        {empty && (
+          <tr className="rq-state-row">
+            <td colSpan={span}><EmptyState hasFilters={hasFilters} /></td>
+          </tr>
+        )}
+
+        {!loading && rows.map(row => (
+            <tr
+              key={row.id}
+              className={`rq-row${row.unread ? ' is-unseen' : ''}`}
+              onClick={() => onOpen(row.app)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(row.app);
+              }}
+              tabIndex={0}
+              aria-label={rowAriaLabel(row)}
+            >
+              <td className="rq-cell-application">
+                <ApplicationValue id={row.id} reference={row.reference} unread={row.unread} />
+              </td>
+              <td className="rq-cell-applicant">
+                <ApplicantValue name={row.applicant} email={row.email} />
+              </td>
+              <td className="rq-cell-route">
+                <RouteValue state={row.app.state} destination={row.destination} />
+              </td>
+              <td className="rq-cell-category">
+                <CategoryValue category={row.category} />
+              </td>
+              <td className="rq-cell-submitted">
+                <SubmittedValue app={row.app} />
+              </td>
+              <td className="rq-cell-status">
+                <ReviewStatusValue status={row.app.status} queryCount={row.queryCount} />
+              </td>
+              <td className="rq-cell-action" onClick={event => event.stopPropagation()}>
+                <ReviewButton id={row.id} onOpen={() => onOpen(row.app)} />
+              </td>
+            </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -109,23 +424,24 @@ export default function ReviewQueueTable({
   page, pageCount, onPage,
   rowsPerPage, onRowsPerPage,
   totalRows,
-  selected, onToggleSelect, onToggleSelectAll, onClearSelection,
-  density, onDensity,
   onOpen, isUnread,
-  onBulkMarkInReview, bulkBusy,
 }) {
-  const pageIds = rows.map(row => row.applicationNumber);
-  const allOnPageSelected = pageIds.length > 0 && pageIds.every(id => selected.has(id));
-  const someOnPageSelected = pageIds.some(id => selected.has(id));
+  const cardLayout = useCardLayout();
+  const model = rows.map(app => toRowModel(app, isUnread));
   const from = totalRows === 0 ? 0 : (page - 1) * rowsPerPage + 1;
   const to = Math.min(page * rowsPerPage, totalRows);
-  const hasRows = rows.length > 0;
+  const hasRows = model.length > 0;
   const initialError = !loading && Boolean(error) && !hasRows;
   const empty = !loading && !error && !hasRows;
 
+  const shared = {
+    rows: model, loading, initialError, empty, error, hasFilters, onRetry,
+    onOpen,
+  };
+
   return (
     <section className="rq" aria-labelledby="rq-heading">
-      <header className={`rq-toolbar${selected.size > 0 ? ' is-selection' : ''}`}>
+      <header className="rq-toolbar">
         <div className="rq-title-group">
           <h2 className="rq-heading" id="rq-heading">Review Queue</h2>
           <span className="rq-result-count tnum" aria-live="polite">
@@ -135,224 +451,26 @@ export default function ReviewQueueTable({
           </span>
         </div>
 
-        {selected.size > 0 ? (
-          <div className="rq-bulk" aria-label="Selection actions">
-            <span className="rq-bulk-count tnum">{selected.size} selected</span>
-            <button
-              type="button"
-              className="rq-bulk-action"
-              onClick={onBulkMarkInReview}
-              disabled={bulkBusy}
-            >
-              <Icon name="search" size={14} />
-              {bulkBusy ? 'Marking…' : 'Mark In Review'}
-            </button>
-            <button type="button" className="rq-bulk-clear" onClick={onClearSelection}>Clear selection</button>
-          </div>
-        ) : (
-          <div className="rq-density-wrap">
-            <span className="rq-density-label">Density</span>
-            <div className="rq-density" role="group" aria-label="Row density">
-              {['comfortable', 'compact'].map(option => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => onDensity(option)}
-                  aria-pressed={density === option}
-                  className={density === option ? 'is-active' : ''}
-                >
-                  {option === 'comfortable' ? 'Comfortable' : 'Compact'}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </header>
 
       {(refreshing || (stale && hasRows)) && (
         <div className={`rq-sync${stale ? ' is-stale' : ''}`} role="status">
           <Icon name={stale ? 'alertTriangle' : 'refresh'} size={14} />
           <span>{stale ? 'Showing the last loaded results because refresh failed.' : 'Refreshing queue…'}</span>
-          {stale && onRetry && (
-            <button type="button" onClick={onRetry}>Retry</button>
-          )}
+          {stale && onRetry && <button type="button" onClick={onRetry}>Retry</button>}
         </div>
       )}
 
-      <div className="rq-scroll">
-        <table className={`rq-table is-${density}`}>
-          <caption className="sr-only">
-            Reviewer applications. Use sortable column headers to change the server-side order.
-          </caption>
-          <colgroup>
-            <col className="rq-col-check" />
-            <col className="rq-col-application" />
-            <col className="rq-col-reference" />
-            <col className="rq-col-applicant" />
-            <col className="rq-col-state" />
-            <col className="rq-col-category" />
-            <col className="rq-col-destination" />
-            <col className="rq-col-submitted" />
-            <col className="rq-col-queries" />
-            <col className="rq-col-status" />
-            <col className="rq-col-action" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col" className="rq-check">
-                <input
-                  type="checkbox"
-                  checked={allOnPageSelected}
-                  ref={element => { if (element) element.indeterminate = !allOnPageSelected && someOnPageSelected; }}
-                  onChange={onToggleSelectAll}
-                  aria-label="Select all applications on this page"
-                  disabled={!hasRows}
-                />
-              </th>
-              {COLUMNS.map(column => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  aria-sort={ariaSort(column, sort)}
-                  className={column.numeric ? 'rq-num' : undefined}
-                >
-                  {column.sortable ? (
-                    <button type="button" className="rq-sort" onClick={() => onSort(column.key)}>
-                      {column.label}
-                      <Icon
-                        name={sort.key !== column.key
-                          ? 'arrowUpDown'
-                          : (sort.dir === 'asc' ? 'arrowUp' : 'arrowDown')}
-                        size={13}
-                      />
-                    </button>
-                  ) : column.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading && Array.from({ length: 5 }).map((_, rowIndex) => (
-              <tr key={`skeleton-${rowIndex}`} className="rq-skeleton" aria-hidden="true">
-                {Array.from({ length: COLUMNS.length + 1 }).map((__, cellIndex) => (
-                  <td key={cellIndex}><span className="rq-skel" /></td>
-                ))}
-              </tr>
-            ))}
-
-            {initialError && (
-              <tr className="rq-state-row">
-                <td colSpan={COLUMNS.length + 1}>
-                  <div className="rq-state rq-state-error" role="alert">
-                    <Icon name="alertTriangle" size={22} />
-                    <strong>Review queue could not be loaded</strong>
-                    <span>{error}</span>
-                    {onRetry && (
-                      <button type="button" onClick={onRetry}>
-                        <Icon name="refresh" size={14} /> Retry
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            )}
-
-            {empty && (
-              <tr className="rq-state-row">
-                <td colSpan={COLUMNS.length + 1}>
-                  <div className="rq-state">
-                    <Icon name={hasFilters ? 'search' : 'rows'} size={22} />
-                    <strong>{hasFilters ? 'No applications match these filters' : 'The review queue is empty'}</strong>
-                    <span>{hasFilters
-                      ? 'Adjust or clear the filters to see more applications.'
-                      : 'Submitted applications will appear here for review.'}</span>
-                  </div>
-                </td>
-              </tr>
-            )}
-
-            {!loading && hasRows && rows.map(app => {
-              const id = app.applicationNumber;
-              const checked = selected.has(id);
-              const unread = Boolean(isUnread(app));
-              const applicant = app.applicantOrganization || app.applicantName || '—';
-              const category = categoryDisplay(app.exportCategory);
-              const destination = countryDisplay(app.destinationCountry || app.consigneeCountry);
-              const queryCount = Number(app.queryCount) || 0;
-              const statusLabel = STATUS_LABEL[normalizeStatus(app.status)];
-
-              return (
-                <tr
-                  key={id}
-                  className={`rq-row${checked ? ' is-selected' : ''}${unread ? ' is-unseen' : ''}`}
-                  onClick={() => onOpen(app)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(app);
-                  }}
-                  tabIndex={0}
-                  aria-label={`${id}, ${applicant}, ${statusLabel}${unread ? ', unread' : ''}`}
-                >
-                  <td className="rq-check rq-cell-check" onClick={event => event.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => onToggleSelect(id)}
-                      aria-label={`Select ${id}`}
-                    />
-                  </td>
-                  <td className="rq-cell-application" data-label="Application">
-                    <span className="rq-application-line">
-                      <TextValue value={id} className="rq-appno tnum" />
-                      {unread && <span className="rq-unread-badge">Unread</span>}
-                    </span>
-                  </td>
-                  <td className="rq-cell-reference" data-label="Reference">
-                    <TextValue value={app.referenceNumber} className="rq-ref tnum" />
-                  </td>
-                  <td className="rq-cell-applicant" data-label="Applicant">
-                    <TextValue value={applicant} className="rq-applicant" />
-                    {app.email && <TextValue value={app.email} className="rq-email" />}
-                  </td>
-                  <td className="rq-cell-state" data-label="State">
-                    <TextValue value={app.state} className="rq-truncate" />
-                  </td>
-                  <td className="rq-cell-category" data-label="Category">
-                    {category.invalid
-                      ? <InvalidValue kind="category" value={category.raw} />
-                      : <span className="rq-chip" title={category.label}>{category.label}</span>}
-                  </td>
-                  <td className="rq-cell-destination" data-label="Destination">
-                    {destination.invalid
-                      ? <InvalidValue kind="country" value={destination.raw} />
-                      : <TextValue value={destination.label} className="rq-truncate" />}
-                  </td>
-                  <td className="rq-num rq-cell-submitted" data-label="Submitted">
-                    <SubmittedCell app={app} />
-                  </td>
-                  <td
-                    className={`rq-num rq-cell-queries tnum${queryCount === 0 ? ' is-zero' : ''}`}
-                    data-label="Queries"
-                    aria-label={`${queryCount} ${queryCount === 1 ? 'query' : 'queries'}`}
-                  >
-                    {queryCount}
-                  </td>
-                  <td className="rq-cell-status" data-label="Status"><StatusBadge status={app.status} /></td>
-                  <td className="rq-cell-action" data-label="Action" onClick={event => event.stopPropagation()}>
-                    <button
-                      type="button"
-                      className="rq-open"
-                      onClick={() => onOpen(app)}
-                      aria-label={`Open application ${id}`}
-                    >
-                      Review <Icon name="chevronRight" size={14} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="rq-body">
+        {cardLayout
+          ? <QueueCards {...shared} />
+          : (
+            <QueueTable
+              {...shared}
+              sort={sort}
+              onSort={onSort}
+            />
+          )}
       </div>
 
       <footer className="rq-pagination">
@@ -378,11 +496,11 @@ export default function ReviewQueueTable({
             <Icon name="chevronsLeft" size={16} />
           </button>
           <button type="button" className="rq-page-step" onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page">
-            <Icon name="chevronLeft" size={16} /> Previous
+            <Icon name="chevronLeft" size={16} /> <span className="rq-page-word">Previous</span>
           </button>
           <span className="rq-pageno tnum" aria-current="page">Page {page} of {pageCount}</span>
           <button type="button" className="rq-page-step" onClick={() => onPage(page + 1)} disabled={page >= pageCount} aria-label="Next page">
-            Next <Icon name="chevronRight" size={16} />
+            <span className="rq-page-word">Next</span> <Icon name="chevronRight" size={16} />
           </button>
           <button type="button" className="rq-page-edge" onClick={() => onPage(pageCount)} disabled={page >= pageCount} aria-label="Last page">
             <Icon name="chevronsRight" size={16} />

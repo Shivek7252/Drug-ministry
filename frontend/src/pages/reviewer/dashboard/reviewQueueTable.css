@@ -1,27 +1,41 @@
 /* ============================================================================
-   Review Queue — dense operational table on desktop, stacked review cards on
-   mobile. All colours and spacing come from the CDSCO design tokens.
+   Review Queue.
+
+   Layout contract — the whole point of this file:
+
+   1. There is NO scroll container anywhere in the queue. `.rq-body` sets no
+      overflow, `.rq-table` sets no min-width, and the table is
+      `table-layout: fixed` on percentage columns. A fixed-layout table at
+      width:100% cannot be wider than its container, so the page can never
+      scroll sideways because of the queue.
+   2. Nothing is clipped without a way to read it. Application numbers and
+      names WRAP (never ellipsise); only long secondary strings — emails and
+      official country names — ellipsise, and those always carry a title.
+   3. The header is not sticky. It has no offset into the table, so it cannot
+      paint over the first data row.
+
+   All colours and spacing come from the CDSCO design tokens.
    ============================================================================ */
 
 .rq {
-  background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--r-lg);
-  overflow: hidden;
+  background: var(--surface-card);
 }
 
-/* ---- Header and contextual actions ------------------------------------- */
+/* ---- Header ------------------------------------------------------------- */
 .rq-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-4);
-  min-height: 64px;
-  padding: var(--sp-3) var(--sp-5);
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  min-height: 56px;
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--border-default);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
   background: var(--surface-card);
 }
-.rq-toolbar.is-selection { background: var(--c-navy-050); }
 
 .rq-title-group {
   display: flex;
@@ -32,7 +46,7 @@
 .rq-heading {
   margin: 0;
   color: var(--text-primary);
-  font-size: var(--fs-18);
+  font-size: var(--fs-16);
   font-weight: var(--fw-bold);
   line-height: var(--lh-tight);
 }
@@ -42,89 +56,9 @@
   white-space: nowrap;
 }
 
-.rq-bulk {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-2);
-  min-width: 0;
-}
-.rq-bulk-count {
-  color: var(--c-navy-800);
-  font-size: var(--fs-13);
-  font-weight: var(--fw-bold);
-  white-space: nowrap;
-}
-.rq-bulk-action,
-.rq-bulk-clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-1);
-  min-height: 34px;
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-md);
-  font: inherit;
-  font-size: var(--fs-12);
-  font-weight: var(--fw-bold);
-  cursor: pointer;
-}
-.rq-bulk-action {
-  border: 1px solid var(--c-navy-800);
-  background: var(--c-navy-800);
-  color: var(--text-inverse);
-}
-.rq-bulk-clear {
-  border: 1px solid var(--border-strong);
-  background: var(--surface-card);
-  color: var(--text-secondary);
-}
-.rq-bulk-action:hover:not(:disabled) { background: var(--c-navy-900); }
-.rq-bulk-clear:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.rq-bulk-action:disabled { opacity: 0.55; cursor: not-allowed; }
-.rq-bulk-action:focus-visible,
-.rq-bulk-clear:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-
-.rq-density-wrap { display: flex; align-items: center; gap: var(--sp-2); }
-.rq-density-label {
-  color: var(--text-muted);
-  font-size: var(--fs-11);
-  font-weight: var(--fw-bold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.rq-density {
-  display: inline-grid;
-  grid-template-columns: repeat(2, auto);
-  padding: 2px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-md);
-  background: var(--surface-sunken);
-}
-.rq-density button {
-  min-height: 30px;
-  padding: 0 var(--sp-3);
-  border: 1px solid transparent;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--fs-12);
-  cursor: pointer;
-}
-.rq-density button:hover { color: var(--text-primary); }
-.rq-density button.is-active {
-  border-color: var(--border-default);
-  background: var(--surface-card);
-  color: var(--c-navy-800);
-  font-weight: var(--fw-bold);
-}
-.rq-density button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-
 .rq-sync {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--sp-2);
   min-height: 32px;
   padding: var(--sp-1) var(--sp-4);
@@ -147,54 +81,46 @@
 }
 .rq-sync button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
-/* ---- Desktop table ------------------------------------------------------ */
-.rq-scroll {
-  overflow-x: auto;
-  position: relative;
-  overscroll-behavior-x: contain;
-}
+/* ---- The table ---------------------------------------------------------- */
+/* No overflow of any kind: the page owns all scrolling. */
+.rq-body { min-width: 0; }
+
 .rq-table {
   width: 100%;
-  min-width: 1180px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
   font-size: var(--fs-13);
 }
-.rq-col-check { width: 40px; }
-.rq-col-application { width: 155px; }
-.rq-col-reference { width: 100px; }
-.rq-col-applicant { width: 190px; }
-.rq-col-state { width: 105px; }
-.rq-col-category { width: 135px; }
-.rq-col-destination { width: 125px; }
-.rq-col-submitted { width: 125px; }
-.rq-col-queries { width: 70px; }
-.rq-col-status { width: 120px; }
-.rq-col-action { width: 92px; }
+
+/* Percentages, never pixels — the sum is 100, so the table always fits. */
+.rq-col-application { width: 20.5%; }
+.rq-col-applicant   { width: 19%; }
+.rq-col-route       { width: 14.5%; }
+.rq-col-category    { width: 12%; }
+.rq-col-submitted   { width: 11%; }
+.rq-col-status      { width: 13%; }
+.rq-col-action      { width: 10%; }
 
 .rq-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 10px var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--border-strong);
   background: var(--surface-sunken);
   color: var(--text-secondary);
   font-size: var(--fs-11);
   font-weight: var(--fw-bold);
-  letter-spacing: 0.055em;
+  letter-spacing: 0.04em;
   text-align: left;
   text-transform: uppercase;
-  white-space: nowrap;
+  vertical-align: middle;
 }
-.rq-table th.rq-num,
-.rq-table td.rq-num { text-align: right; }
+.rq-table thead th:last-child { text-align: right; }
 
 .rq-sort {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
+  max-width: 100%;
   padding: 2px;
   border: none;
   border-radius: var(--r-sm);
@@ -205,89 +131,126 @@
   font-weight: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  text-align: left;
   cursor: pointer;
 }
 .rq-sort:hover { color: var(--c-navy-800); }
 .rq-sort:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
+/* Queries lost its own column when it merged into Review Status; its sort
+   control moved into that header rather than disappearing. */
+.rq-sort-sub {
+  display: flex;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.03em;
+}
+
+/* ---- Rows --------------------------------------------------------------- */
 .rq-table tbody td {
-  height: 68px;
   padding: var(--sp-3);
   border-bottom: 1px solid var(--border-default);
   background: var(--surface-card);
   color: var(--text-secondary);
   vertical-align: middle;
 }
-.rq-table.is-compact tbody td {
-  height: 52px;
-  padding-top: var(--sp-2);
-  padding-bottom: var(--sp-2);
-}
 .rq-table tbody tr:last-child td { border-bottom: none; }
 
 .rq-row { cursor: pointer; outline: none; }
-.rq-row td:first-child { box-shadow: inset 3px 0 0 transparent; }
 .rq-row:hover td { background: var(--c-navy-050); }
-.rq-row:hover td:first-child { box-shadow: inset 3px 0 0 var(--c-navy-700); }
-.rq-row.is-unseen td:first-child { box-shadow: inset 3px 0 0 var(--c-info); }
-.rq-row.is-selected td { background: var(--c-navy-100); }
-.rq-row.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--c-navy-800); }
-.rq-row:focus-visible td { background: var(--c-navy-050); }
-.rq-row:focus-visible td:first-child { box-shadow: inset 3px 0 0 var(--focus-ring); }
+.rq-row:focus-visible td { background: var(--c-navy-050); box-shadow: inset 0 -2px 0 var(--focus-ring); }
 
-.rq-check { padding-right: 0 !important; text-align: center; }
-.rq-check input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--c-navy-800);
-  cursor: pointer;
+/* Unread is a quiet tint and a thin accent, never a competing status badge. */
+.rq-row.is-unseen td { background: var(--c-info-bg); }
+.rq-row.is-unseen:hover td { background: var(--c-navy-050); }
+.rq-row.is-unseen td:first-child { box-shadow: inset 3px 0 0 var(--st-submitted-fg); }
+.rq-row.is-unseen:focus-visible td:first-child {
+  box-shadow: inset 3px 0 0 var(--st-submitted-fg), inset 0 -2px 0 var(--focus-ring);
 }
-.rq-check input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.rq-row.is-unseen .rq-appno { font-weight: var(--fw-bold); color: var(--c-navy-900); }
 
-.rq-application-line { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
-.rq-appno,
-.rq-ref,
+/* ---- Cell values (shared by the table and the mobile cards) -------------- */
+.rq-application,
 .rq-applicant,
-.rq-email,
-.rq-truncate {
-  display: block;
+.rq-submitted,
+.rq-reviewstate {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
+}
+
+/* The application number is the row's identity: it wraps, it never
+   ellipsises, and it is never abbreviated to "EXP-2026…". */
+.rq-appno {
+  color: var(--c-navy-800);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-bold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.rq-appno-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.rq-ref { color: var(--text-muted); font-size: var(--fs-11); overflow-wrap: break-word; }
+
+.rq-unread-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st-submitted-fg);
+  box-shadow: 0 0 0 2px var(--st-submitted-bg);
+}
+
+.rq-applicant-name {
+  color: var(--text-primary);
+  font-weight: var(--fw-bold);
+  line-height: 1.3;
+  overflow-wrap: break-word;
+}
+/* Emails are the one long secondary string worth ellipsising — always with a
+   title, so the full address stays reachable. */
+.rq-email {
+  display: block;
+  max-width: 100%;
   overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-11);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rq-appno { color: var(--c-navy-800); font-weight: var(--fw-bold); }
-.rq-ref { color: var(--text-muted); font-size: var(--fs-12); }
-.rq-applicant { color: var(--text-primary); font-weight: var(--fw-bold); }
-.rq-email { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-11); }
 .rq-muted { color: var(--text-muted); }
 
-.rq-unread-badge {
-  flex: none;
-  padding: 1px var(--sp-1);
-  border: 1px solid var(--st-submitted-br);
-  border-radius: var(--r-sm);
-  background: var(--st-submitted-bg);
-  color: var(--st-submitted-fg);
-  font-size: var(--fs-11);
-  font-weight: var(--fw-bold);
-  line-height: 1.25;
+.rq-route {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+  line-height: 1.35;
 }
+.rq-route-from { color: var(--text-primary); overflow-wrap: break-word; }
+.rq-route-arrow { flex: none; color: var(--text-muted); }
+.rq-route-to { color: var(--text-secondary); overflow-wrap: break-word; }
 
 .rq-chip {
   display: inline-block;
   max-width: 100%;
-  overflow: hidden;
   padding: 3px var(--sp-2);
   border: 1px solid var(--border-default);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   background: var(--surface-sunken);
   color: var(--text-secondary);
   font-size: var(--fs-11);
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: break-word;   /* wraps at a word rather than truncating */
 }
 .rq-invalid {
   display: inline-flex;
@@ -296,32 +259,19 @@
   max-width: 100%;
   padding: 3px var(--sp-2);
   border: 1px solid var(--c-warning-br);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   background: var(--c-warning-bg);
   color: var(--c-warning);
   font-size: var(--fs-11);
   font-style: normal;
   font-weight: var(--fw-bold);
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
-.rq-submitted {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  max-width: 100%;
-  line-height: var(--lh-tight);
-}
-.rq-submitted-date { color: var(--text-primary); white-space: nowrap; }
-.rq-submitted-time {
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: var(--fs-11);
-  white-space: nowrap;
-}
-.rq-table.is-compact .rq-submitted-time { margin-top: 0; }
-.rq-cell-queries.is-zero { color: var(--text-muted); }
+.rq-submitted-date { color: var(--text-primary); line-height: 1.3; white-space: nowrap; }
+.rq-submitted-time { color: var(--text-muted); font-size: var(--fs-11); line-height: 1.3; white-space: nowrap; }
 
+.rq-reviewstate { align-items: flex-start; gap: 3px; }
 .rq-status {
   display: inline-flex;
   align-items: center;
@@ -332,26 +282,38 @@
   border-radius: var(--r-pill);
   font-size: var(--fs-11);
   font-weight: var(--fw-bold);
+  line-height: 1.35;
+}
+.rq-status-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
+
+/* These pairs resolve from the same --st-*-fg tokens the KPI tiles and the
+   chart palette use, so a status is one colour everywhere on the dashboard. */
+.rq-status.is-submitted { color: var(--st-submitted-fg); border-color: var(--st-submitted-br); background: var(--st-submitted-bg); }
+.rq-status.is-review    { color: var(--st-review-fg);    border-color: var(--st-review-br);    background: var(--st-review-bg); }
+.rq-status.is-query     { color: var(--st-query-fg);     border-color: var(--st-query-br);     background: var(--st-query-bg); }
+.rq-status.is-approved  { color: var(--st-approved-fg);  border-color: var(--st-approved-br);  background: var(--st-approved-bg); }
+.rq-status.is-rejected  { color: var(--st-rejected-fg);  border-color: var(--st-rejected-br);  background: var(--st-rejected-bg); }
+.rq-status.is-draft,
+.rq-status.is-unknown   { color: var(--st-draft-fg);     border-color: var(--st-draft-br);     background: var(--st-draft-bg); }
+
+.rq-queries {
+  color: var(--c-warning);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
   line-height: 1.3;
   white-space: nowrap;
 }
-.rq-status-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
-.rq-status.is-submitted { color: var(--st-submitted-fg); border-color: var(--st-submitted-br); background: var(--st-submitted-bg); }
-.rq-status.is-review { color: var(--st-review-fg); border-color: var(--st-review-br); background: var(--st-review-bg); }
-.rq-status.is-query { color: var(--st-query-fg); border-color: var(--st-query-br); background: var(--st-query-bg); }
-.rq-status.is-approved { color: var(--st-approved-fg); border-color: var(--st-approved-br); background: var(--st-approved-bg); }
-.rq-status.is-rejected { color: var(--st-rejected-fg); border-color: var(--st-rejected-br); background: var(--st-rejected-bg); }
-.rq-status.is-draft,
-.rq-status.is-unknown { color: var(--st-draft-fg); border-color: var(--st-draft-br); background: var(--st-draft-bg); }
 
 .rq-cell-action { text-align: right; }
 .rq-open {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-1);
-  min-height: 34px;
-  padding: 0 var(--sp-3);
+  gap: 3px;
+  width: 100%;
+  max-width: 104px;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
   border: 1px solid var(--c-navy-800);
   border-radius: var(--r-md);
   background: var(--c-navy-800);
@@ -365,8 +327,8 @@
 .rq-open:hover { background: var(--c-navy-900); }
 .rq-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-/* ---- Loading, empty and error states ----------------------------------- */
-.rq-state-row td { height: auto !important; padding: 0 !important; }
+/* ---- Loading, empty and error states ------------------------------------ */
+.rq-state-row td { padding: 0 !important; }
 .rq-state {
   display: flex;
   flex-direction: column;
@@ -408,26 +370,29 @@
   background: var(--surface-sunken);
   animation: rq-pulse 1.4s ease-in-out infinite;
 }
+.rq-skeleton td { height: 60px; }
 @keyframes rq-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 @media (prefers-reduced-motion: reduce) { .rq-skel { animation: none; } }
 
 /* ---- Pagination --------------------------------------------------------- */
 .rq-pagination {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
-  gap: var(--sp-4);
-  min-height: 56px;
-  padding: var(--sp-2) var(--sp-5);
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  min-height: 52px;
+  padding: var(--sp-2) var(--sp-4);
   border-top: 1px solid var(--border-default);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
   background: var(--surface-card);
 }
-.rq-perpage { display: inline-flex; align-items: center; gap: var(--sp-2); justify-self: start; }
+.rq-perpage { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .rq-perpage span {
   color: var(--text-muted);
   font-size: var(--fs-11);
   font-weight: var(--fw-bold);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -443,9 +408,9 @@
   cursor: pointer;
 }
 .rq-perpage select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.rq-range { margin: 0; color: var(--text-muted); font-size: var(--fs-12); text-align: center; }
+.rq-range { margin: 0; color: var(--text-muted); font-size: var(--fs-12); }
 .rq-range strong { color: var(--text-primary); }
-.rq-pager { display: inline-flex; align-items: center; gap: var(--sp-1); justify-self: end; }
+.rq-pager { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .rq-pager button {
   display: inline-flex;
   align-items: center;
@@ -460,6 +425,7 @@
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--fs-12);
+  white-space: nowrap;
   cursor: pointer;
 }
 .rq-pager button:hover:not(:disabled) { background: var(--surface-sunken); color: var(--text-primary); }
@@ -467,161 +433,118 @@
 .rq-pager button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .rq-pageno { padding: 0 var(--sp-2); color: var(--text-secondary); font-size: var(--fs-12); white-space: nowrap; }
 
-/* ---- Tablet: preserve the operational table inside its own scroller ----- */
-@media (max-width: 1024px) {
-  .rq-toolbar { padding-right: var(--sp-4); padding-left: var(--sp-4); }
-  .rq-table { min-width: 1120px; }
-  .rq-pagination { padding-right: var(--sp-4); padding-left: var(--sp-4); }
+/* ---- Tablet (768–1023px): same seven columns, tighter -------------------- */
+/* Spacing and type shrink and secondary values stack; no value is dropped. */
+@media (max-width: 1023px) {
+  .rq-toolbar,
+  .rq-pagination { padding-right: var(--sp-3); padding-left: var(--sp-3); }
+
+  .rq-table { font-size: var(--fs-12); }
+  .rq-col-application { width: 25%; }
+  .rq-col-applicant   { width: 15.5%; }
+  .rq-col-route       { width: 12.5%; }
+  .rq-col-category    { width: 11%; }
+  .rq-col-submitted   { width: 11.5%; }
+  .rq-col-status      { width: 14%; }
+  .rq-col-action      { width: 10.5%; }
+
+  .rq-table thead th { padding: var(--sp-2); letter-spacing: 0; }
+  .rq-table tbody td { padding: var(--sp-2); }
+  .rq-appno { font-size: var(--fs-12); }
+  .rq-ref,
+  .rq-email,
+  .rq-submitted-time,
+  .rq-queries { font-size: var(--fs-10); }
+  .rq-submitted-date { font-size: var(--fs-11); }
+  .rq-chip,
+  .rq-status { padding: 2px 6px; font-size: var(--fs-10); }
+  .rq-status { white-space: normal; }        /* wraps rather than overflowing */
+  .rq-route { gap: 4px; }
+
+  .rq-open { max-width: none; padding: 0 6px; font-size: var(--fs-11); }
+  .rq-open .ui-icon { display: none; }       /* the word carries the meaning */
+
+  .rq-page-word { display: none; }
 }
 
-/* ---- Mobile: each semantic row becomes a stacked review card ------------ */
-@media (max-width: 640px) {
-  .rq { border: none; border-radius: 0; background: transparent; overflow: visible; }
-  .rq-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-    min-height: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--border-default);
-    border-radius: var(--r-lg) var(--r-lg) 0 0;
-  }
+/* ---- Mobile (≤767px): cards, rendered as their own DOM ------------------- */
+.rq-cards {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: var(--sp-3);
+  list-style: none;
+}
+.rq-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  background: var(--surface-card);
+  cursor: pointer;
+  outline: none;
+}
+.rq-card:hover { border-color: var(--border-strong); background: var(--c-navy-050); }
+.rq-card.is-unseen {
+  border-color: var(--st-submitted-br);
+  background: var(--c-info-bg);
+  box-shadow: inset 3px 0 0 var(--st-submitted-fg);
+}
+.rq-card.is-unseen:hover { background: var(--c-navy-050); }
+.rq-card.is-unseen .rq-appno { color: var(--c-navy-900); }
+.rq-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.rq-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sp-2);
+}
+.rq-card-head .rq-reviewstate { align-items: flex-end; text-align: right; }
+
+.rq-card-facts {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-default);
+}
+.rq-fact {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.rq-fact dt {
+  color: var(--text-muted);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rq-fact dd { margin: 0; min-width: 0; color: var(--text-secondary); font-size: var(--fs-13); }
+.rq-fact .rq-submitted { flex-direction: row; align-items: baseline; gap: var(--sp-2); }
+
+.rq-card-foot { display: flex; }
+.rq-card-foot .rq-open { max-width: none; min-height: 38px; font-size: var(--fs-13); }
+.rq-card-skeleton { display: grid; gap: var(--sp-2); cursor: default; }
+
+@media (max-width: 767px) {
+  .rq-toolbar { padding: var(--sp-3); }
   .rq-title-group { width: 100%; justify-content: space-between; }
-  .rq-heading { font-size: var(--fs-16); }
-  .rq-density-wrap { width: 100%; justify-content: space-between; }
-  .rq-density { flex: 1; }
-  .rq-density button { width: 100%; }
-  .rq-bulk { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
-  .rq-bulk-count { width: 100%; }
-  .rq-bulk-action,
-  .rq-bulk-clear { flex: 1 1 auto; }
-  .rq-sync { align-items: flex-start; justify-content: flex-start; }
+  .rq-pagination { justify-content: center; padding: var(--sp-3); }
+  .rq-perpage { order: 2; }
+  .rq-range { order: 1; width: 100%; text-align: center; }
+  .rq-pager { order: 3; }
+  .rq-page-word { display: none; }
+  .rq-state { padding: var(--sp-8) var(--sp-3); }
+}
 
-  .rq-scroll {
-    overflow: visible;
-    padding: var(--sp-3);
-    border-right: 1px solid var(--border-default);
-    border-left: 1px solid var(--border-default);
-    background: var(--surface-page);
-  }
-  .rq-table,
-  .rq-table tbody { display: block; width: 100%; min-width: 0; }
-  .rq-table colgroup,
-  .rq-table thead { display: none; }
-  .rq-table tbody { display: grid; gap: var(--sp-3); }
-  .rq-table .rq-row {
-    display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) auto;
-    grid-template-areas:
-      'check application status'
-      '. applicant applicant'
-      '. submitted action'
-      '. reference queries'
-      '. state state'
-      '. category category'
-      '. destination destination';
-    column-gap: var(--sp-2);
-    row-gap: var(--sp-3);
-    padding: var(--sp-4);
-    border: 1px solid var(--border-default);
-    border-left: 3px solid transparent;
-    border-radius: var(--r-lg);
-    background: var(--surface-card);
-    cursor: pointer;
-  }
-  .rq-table.is-compact .rq-row { row-gap: var(--sp-2); padding: var(--sp-3); }
-  .rq-table .rq-row:hover { border-left-color: var(--c-navy-700); background: var(--c-navy-050); }
-  .rq-table .rq-row.is-unseen { border-left-color: var(--c-info); }
-  .rq-table .rq-row.is-selected { border-color: var(--c-navy-700); background: var(--c-navy-050); }
-  .rq-table .rq-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-  .rq-table .rq-row td {
-    display: block;
-    width: auto;
-    height: auto;
-    min-width: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    text-align: left;
-  }
-  .rq-table .rq-row:hover td,
-  .rq-table .rq-row.is-selected td,
-  .rq-table .rq-row:focus-visible td { background: transparent; box-shadow: none; }
-
-  .rq-cell-check { grid-area: check; padding-top: 2px !important; }
-  .rq-cell-application { grid-area: application; }
-  .rq-cell-reference { grid-area: reference; }
-  .rq-cell-applicant { grid-area: applicant; }
-  .rq-cell-state { grid-area: state; }
-  .rq-cell-category { grid-area: category; }
-  .rq-cell-destination { grid-area: destination; }
-  .rq-cell-submitted { grid-area: submitted; }
-  .rq-cell-queries { grid-area: queries; }
-  .rq-cell-status { grid-area: status; justify-self: end; }
-  .rq-cell-action { grid-area: action; align-self: end; justify-self: end; }
-
-  .rq-appno { font-size: var(--fs-14); }
-  .rq-unread-badge { font-size: var(--fs-11); }
-  .rq-applicant { font-size: var(--fs-13); }
-  .rq-email { font-size: var(--fs-12); }
-  .rq-submitted { align-items: flex-start; }
-  .rq-open { min-height: 36px; }
-
-  .rq-cell-reference,
-  .rq-cell-state,
-  .rq-cell-category,
-  .rq-cell-destination,
-  .rq-cell-queries {
-    display: grid !important;
-    grid-template-columns: 88px minmax(0, 1fr);
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--text-secondary);
-  }
-  .rq-cell-reference::before,
-  .rq-cell-state::before,
-  .rq-cell-category::before,
-  .rq-cell-destination::before,
-  .rq-cell-queries::before {
-    content: attr(data-label);
-    color: var(--text-muted);
-    font-size: var(--fs-11);
-    font-weight: var(--fw-bold);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-  .rq-cell-queries { justify-self: stretch; }
-  .rq-cell-queries::after { content: none; }
-
-  .rq-skeleton {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    border: 1px solid var(--border-default);
-    border-radius: var(--r-lg);
-    background: var(--surface-card);
-  }
-  .rq-skeleton td { display: block; height: auto !important; padding: 0 !important; border: none !important; }
-  .rq-skeleton td:nth-child(n + 7) { display: none; }
-  .rq-state-row { display: block; }
-  .rq-state-row td { display: block; }
-  .rq-state { min-height: 240px; border: 1px solid var(--border-default); border-radius: var(--r-lg); background: var(--surface-card); }
-
-  .rq-pagination {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    border: 1px solid var(--border-default);
-    border-top: none;
-    border-radius: 0 0 var(--r-lg) var(--r-lg);
-  }
-  .rq-perpage { justify-content: space-between; }
-  .rq-range { order: -1; text-align: left; }
-  .rq-pager { width: 100%; justify-content: space-between; }
-  .rq-pageno { padding: 0 var(--sp-1); }
-  .rq-page-edge { display: none !important; }
-  .rq-page-step { flex: 0 1 auto; }
+/* Very narrow phones (≤400px): the fact labels stack above their values. */
+@media (max-width: 400px) {
+  .rq-fact { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .rq-cards { padding: var(--sp-2); }
+  .rq-page-edge { display: none; }
 }

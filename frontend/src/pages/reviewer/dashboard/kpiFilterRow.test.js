@@ -1,8 +1,10 @@
+import fs from 'fs';
+import path from 'path';
 import React, { useState } from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import KpiFilterRow from './KpiFilterRow';
-import { kpiCounts, kpiDeltas, KPI_TILES } from './aggregations';
+import { kpiCounts, KPI_TILES } from './aggregations';
 import { SLA_DESCRIPTION } from './statusModel';
 
 const day = 86400000;
@@ -30,7 +32,6 @@ function Harness() {
     <KpiFilterRow
       tiles={KPI_TILES}
       counts={kpiCounts(BAR_FILTERED)}
-      deltas={kpiDeltas(BAR_FILTERED, { days: 7 })}
       value={value}
       onChange={setValue}
       loading={false}
@@ -112,89 +113,116 @@ describe('KpiFilterRow — Overdue tile', () => {
 });
 
 /* ============================================================================
-   Server-computed comparisons: what the arrow, percentage and label mean.
+   Week-to-date comparisons were removed from the KPI cards. A tile carries its
+   icon, its label and its count — nothing else.
    ============================================================================ */
-describe('KPI delta rendering from server analytics', () => {
-  const tiles = KPI_TILES;
+describe('KPI cards carry no week-to-date comparison', () => {
   const counts = { total: 13, submitted: 10, underReview: 1, queryRaised: 1, approved: 1, rejected: 0, overdue: 10 };
-  const partial = { windows: { currentWeekComplete: false } };
-
-  const renderRow = (deltas, analytics = partial) => render(
+  const renderRow = (props = {}) => render(
     <KpiFilterRow
-      tiles={tiles} counts={counts} deltas={deltas}
-      value="all" onChange={() => {}} loading={false}
-      unreadCount={12} readStateReady analytics={analytics}
+      tiles={KPI_TILES} counts={counts}
+      value="total" onChange={() => {}} loading={false}
+      unreadCount={12} readStateReady
+      {...props}
     />,
   );
 
-  test('an increase renders an up arrow, a signed value and the percentage', () => {
-    renderRow({ total: { available: true, current: 3, prior: 2, delta: 1, percent: 50, direction: 'up' } });
-    expect(screen.getByText(/\+1 WTD/)).toBeInTheDocument();
-    expect(screen.getByText(/\+50%/)).toBeInTheDocument();
+  test('no WTD text appears anywhere in the strip', () => {
+    const { container } = renderRow();
+    expect(container.textContent).not.toMatch(/WTD/i);
+    expect(container.textContent).not.toMatch(/week to date/i);
+    expect(container.textContent).not.toMatch(/last week/i);
+    expect(screen.queryByText(/No WTD change/i)).not.toBeInTheDocument();
   });
 
-  test('a decrease renders a down arrow and a negative value', () => {
-    renderRow({ total: { available: true, current: 0, prior: 2, delta: -2, percent: -100, direction: 'down' } });
-    expect(screen.getByText(/-2 WTD/)).toBeInTheDocument();
+  test('no comparison placeholder survives in place of a delta', () => {
+    const { container } = renderRow();
+    expect(screen.queryByText(/Not comparable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Historical data unavailable/i)).not.toBeInTheDocument();
+    expect(container.querySelector('.kpi-delta')).toBeNull();
+    expect(container.querySelector('.kpi-figures')).toBeNull();
   });
 
-  test('no percentage is shown when the previous week was zero', () => {
-    renderRow({ total: { available: true, current: 2, prior: 0, delta: 2, percent: null, direction: 'up' } });
-    expect(screen.getByText(/\+2 WTD/)).toBeInTheDocument();
-    expect(screen.queryByText(/%/)).toBeNull();
+  test('no percentage and no direction arrow is rendered on any tile', () => {
+    const { container } = renderRow();
+    expect(container.textContent).not.toMatch(/%/);
+    for (const tile of container.querySelectorAll('.kpi-tile')) {
+      // One icon per tile: the tile's own KPI icon, never an up/down arrow.
+      expect(tile.querySelectorAll('svg')).toHaveLength(1);
+    }
   });
 
-  test('an equal week renders no comparison text or empty delta element', () => {
-    renderRow({ rejected: { available: true, current: 0, prior: 0, delta: 0, percent: null, direction: 'flat' } });
-    const tile = screen.getByRole('radio', { name: /Rejected/ });
-    expect(tile).toHaveTextContent('0');
-    expect(tile.querySelector('.kpi-delta')).toBeNull();
-    expect(screen.queryByText(/No WTD change/)).not.toBeInTheDocument();
+  test('a tile renders exactly its icon, its label and its count', () => {
+    const { container } = renderRow();
+    const total = screen.getByRole('radio', { name: /Total/ });
+    expect(total.querySelector('.kpi-label')).toHaveTextContent('Total');
+    expect(total.querySelector('.kpi-value')).toHaveTextContent('13');
+    expect(total.querySelector('.kpi-head svg')).toBeInTheDocument();
+    expect(total.textContent.replace(/\s+/g, '').trim()).toBe('Total13');
   });
 
-  test('an unavailable comparison says so and never shows a number', () => {
-    renderRow({
-      overdue: {
-        available: false,
-        reason: 'Historical data unavailable',
-        detail: '3 application(s) have no reconcilable status history.',
-      },
+  test('passing a stray deltas prop cannot put a comparison back on screen', () => {
+    const { container } = renderRow({
+      deltas: { total: { available: true, current: 3, prior: 2, delta: 1, percent: 50 } },
     });
-    const el = screen.getAllByText('Historical data unavailable')[0];
-    expect(el).toBeInTheDocument();
-    expect(el).toHaveAttribute('title', expect.stringContaining('reconcilable status history'));
+    expect(container.textContent).not.toMatch(/WTD|%/);
   });
 
-  test('the tooltip states both weeks and the event being counted', () => {
-    renderRow({
-      approved: {
-        available: true, current: 1, prior: 4, delta: -3, percent: -75, direction: 'down',
-        basis: 'Applications approved in the window, even if later rejected.',
-      },
-    });
-    const el = screen.getByText(/-3 WTD/).closest('.kpi-delta');
-    expect(el).toHaveAttribute('title', expect.stringContaining('1 week to date vs 4 in the same period last week'));
-    expect(el).toHaveAttribute('title', expect.stringContaining('even if later rejected'));
-    expect(el).toHaveAttribute('title', expect.stringContaining('same period last week'));
+  test('the component source no longer contains delta rendering', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'KpiFilterRow.jsx'), 'utf8');
+    expect(source).not.toMatch(/WTD|kpi-delta|function Delta|deltas/);
   });
 
-  test('a complete week omits the in-progress note', () => {
-    renderRow(
-      { total: { available: true, current: 5, prior: 4, delta: 1, percent: 25, direction: 'up' } },
-      { windows: { currentWeekComplete: true } },
-    );
-    const el = screen.getByText(/\+1 WTD/).closest('.kpi-delta');
-    expect(el.getAttribute('title')).not.toContain('still in progress');
+  test('the stylesheet no longer carries delta rules', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'dashboardChrome.css'), 'utf8');
+    expect(css).not.toMatch(/\.kpi-delta/);
+    expect(css).not.toMatch(/\.kpi-figures/);
   });
 
-  test('a missing comparison degrades to Not comparable rather than crashing', () => {
-    renderRow({});
-    expect(screen.getAllByText('Not comparable').length).toBe(tiles.length);
+  test('the client-side delta helpers are gone from aggregations', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'aggregations.js'), 'utf8');
+    expect(source).not.toMatch(/kpiDeltas|DELTA_BASIS/);
   });
 
-  test('counts still come from the count prop, never from the delta', () => {
-    renderRow({ total: { available: true, current: 99, prior: 1, delta: 98, percent: 9800, direction: 'up' } });
-    const tile = screen.getByRole('radio', { name: /Total/ });
-    expect(tile.querySelector('.kpi-value')).toHaveTextContent('13');
+  test('counts still render while loading is false, dashes while loading', () => {
+    const { container } = renderRow({ loading: true });
+    expect(container.querySelectorAll('.kpi-value')[0]).toHaveTextContent('—');
+  });
+});
+
+/* ============================================================================
+   Unread is server state, rendered verbatim.
+   ============================================================================ */
+describe('KpiFilterRow — unread by you', () => {
+  const renderRow = props => render(
+    <KpiFilterRow
+      tiles={KPI_TILES} counts={kpiCounts(BAR_FILTERED)}
+      value="total" onChange={() => {}} loading={false}
+      {...props}
+    />,
+  );
+
+  test('renders the server count verbatim', () => {
+    renderRow({ unreadCount: 10, readStateReady: true });
+    const note = screen.getByTitle(/not opened yet/i);
+    expect(note).toHaveTextContent('10 unread by you');
+  });
+
+  test('zero renders as 0 unread by you, never as a hidden or blank note', () => {
+    renderRow({ unreadCount: 0, readStateReady: true });
+    expect(screen.getByTitle(/not opened yet/i)).toHaveTextContent('0 unread by you');
+  });
+
+  test('before the server answers it says so rather than guessing zero', () => {
+    renderRow({ unreadCount: 0, readStateReady: false });
+    const note = screen.getByTitle(/not opened yet/i);
+    expect(note).toHaveTextContent(/Loading read state/i);
+    expect(note).not.toHaveTextContent('0 unread by you');
+  });
+
+  test('the unread note sits outside the radiogroup — it is not a filter', () => {
+    renderRow({ unreadCount: 4, readStateReady: true });
+    const group = screen.getByRole('radiogroup');
+    expect(group).not.toContainElement(screen.getByTitle(/not opened yet/i));
   });
 });

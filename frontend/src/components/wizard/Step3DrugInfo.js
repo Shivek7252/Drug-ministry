@@ -7,7 +7,7 @@ import {
   findApprovedDrug,
 } from '../../data/approvedDrugs';
 import { loadBannedDrugs, checkBannedDrug } from '../../data/bannedDrugs';
-import useCdscoLookup, { resolveSeverity } from '../../hooks/useCdscoLookup';
+import useCdscoLookup, { resolveSeverity, checkGenericNameListed } from '../../hooks/useCdscoLookup';
 import DrugComplianceAlert from './DrugComplianceAlert';
 import './WizardStep.css';
 
@@ -101,7 +101,7 @@ const dropdownStyles = {
 const CHIP_TEXT = {
   banned: '⛔ Prohibited',
   restricted: '⚠ Restricted',
-  notFound: 'Not listed',
+  notFound: '⚠ Not listed',
 };
 
 const LISTBOX_ID = 'generic-name-listbox';
@@ -277,14 +277,21 @@ export default function Step3DrugInfo() {
         .filter(entry => entry.severity === 'banned' || entry.severity === 'restricted')
     : [];
 
+  // Added products whose generic name matches neither register. They can only
+  // reach the table from a draft saved before this rule existed, so the step
+  // refuses to advance until each one is corrected.
+  const unlistedProducts = drugsLoaded
+    ? formData.products.filter(p => !checkGenericNameListed(p.genericName).admissible)
+    : [];
 
   const validateProduct = () => {
     const e = {};
     if (!product.productName.trim())  e.productName  = 'Required';
-    // A name outside the CDSCO register is surfaced by the compliance alert as
-    // a 'notFound' notice, not blocked here — the applicant may still submit and
-    // let the reviewer verify the approval documentation.
-    if (!product.genericName.trim())  e.genericName  = 'Required';
+    // Admissible only when the name is in the CDSCO approved medicines list or
+    // matches the Section 26A banned medicines list; a name in neither register
+    // cannot be verified against anything, so it is refused here.
+    const listed = checkGenericNameListed(product.genericName);
+    if (!listed.admissible)           e.genericName  = listed.reason;
     if (!product.dosageForm)          e.dosageForm   = 'Required';
     if (!product.strength.trim())     e.strength     = 'Required';
     if (!product.batchNumber.trim())  e.batchNumber  = 'Required';
@@ -340,6 +347,15 @@ export default function Step3DrugInfo() {
   const handleNext = () => {
     if (formData.products.length === 0) {
       setTableError('Please add at least one drug/product before proceeding.');
+      return;
+    }
+    if (unlistedProducts.length > 0) {
+      const names = unlistedProducts.map(p => p.genericName).join(', ');
+      setTableError(
+        `Correct or remove ${names} — ` +
+        `${unlistedProducts.length === 1 ? 'that generic name is' : 'those generic names are'} in neither ` +
+        'the CDSCO approved medicines list nor the Section 26A banned medicines list.'
+      );
       return;
     }
     setCurrentStep(4);
@@ -404,6 +420,34 @@ export default function Step3DrugInfo() {
                   {severity === 'banned' && !item.exemptionAcknowledged && (
                     <strong> — exemption not yet acknowledged</strong>
                   )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Added products whose generic name is in neither register */}
+      {unlistedProducts.length > 0 && (
+        <div className="dca sev-notFound mb-3" role="alert">
+          <svg className="dca-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" />
+            <line x1="9" y1="9" x2="13" y2="13" /><line x1="13" y1="9" x2="9" y2="13" />
+          </svg>
+          <div className="dca-body">
+            <p className="dca-headline">
+              {unlistedProducts.length} added product{unlistedProducts.length === 1 ? '' : 's'} cannot be verified
+            </p>
+            <p className="dca-desc">
+              This step cannot continue until every generic name matches the CDSCO approved medicines
+              list or the Section 26A banned medicines list. Edit each product below and pick a name
+              from the lookup suggestions.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+              {unlistedProducts.map(p => (
+                <li key={p.id}>
+                  <strong>{p.productName || p.genericName}</strong> ({p.genericName}) — not listed
                 </li>
               ))}
             </ul>

@@ -3,6 +3,7 @@ const { BUSINESS_TIMEZONE, startOfBusinessWeek } = require('../config/businessTi
 const { REVIEW_SLA_DAYS, MS_PER_DAY } = require('../config/reviewSla');
 const { resolveCountry } = require('./countryValidation');
 const { categoryDisplayLabel } = require('./categoryValidation');
+const { readReceiptMatchExpression } = require('./readReceipts');
 
 const STATUS_LABELS = {
   DRAFT: 'Draft', SUBMITTED: 'Submitted', IN_REVIEW: 'In Review',
@@ -47,22 +48,10 @@ async function aggregateSummary(filter, reviewer, now = new Date()) {
       $lookup: {
         from: 'applicationreads',
         let: { appNo: '$applicationNumber' },
-        pipeline: [{
-          $match: {
-            $expr: {
-              $and: [
-                { $eq: ['$applicationNumber', '$$appNo'] },
-                { $or: [
-                  { $eq: ['$reviewerId', reviewer.id] },
-                  { $and: [
-                    { $eq: [{ $ifNull: ['$reviewerId', null] }, null] },
-                    { $eq: ['$reviewer', reviewer.name] },
-                  ] },
-                ] },
-              ],
-            },
-          },
-        }, { $limit: 1 }],
+        pipeline: [
+          { $match: { $expr: readReceiptMatchExpression(reviewer) } },
+          { $limit: 1 },
+        ],
         as: 'readReceipt',
       },
     },

@@ -35,6 +35,42 @@ describe('getVerificationPresentation', () => {
     expect(getVerificationPresentation('loading', null).key).toBe('pending');
   });
 
+  test('flags a wrong document type separately from a failed check', () => {
+    const wrongType = getVerificationPresentation('done', {
+      documentTypeMatch: false,
+      documentTypeReason: 'The document is a manufacturing license, not a product information sheet.',
+      expectedDocumentType: 'Product Information Sheet',
+      detectedDocumentType: 'Manufacturing License',
+      results: [],
+    });
+    expect(wrongType.key).toBe('rejected');
+    expect(wrongType.isWrongDocumentType).toBe(true);
+    // The status, reason and type comparison all survive for the panel to show.
+    expect(wrongType.label).toBe('Rejected by AI');
+    expect(wrongType.primaryReason).toMatch(/not a product information sheet/i);
+    expect(wrongType.detectedDocumentType).toBe('Manufacturing License');
+
+    // Right document type, failing content check — still rejected, not "wrong".
+    const failedCheck = getVerificationPresentation('done', {
+      documentTypeMatch: true,
+      results: [{ item: 'Valid approval date', present: false, note: 'Expired.' }],
+      summary: { total: 1, present: 0, missing: 1, unknown: 0, score: 0 },
+    });
+    expect(failedCheck.key).toBe('rejected');
+    expect(failedCheck.isWrongDocumentType).toBe(false);
+  });
+
+  test('never reports a wrong document type outside a completed rejection', () => {
+    expect(getVerificationPresentation('loading', null).isWrongDocumentType).toBe(false);
+    expect(getVerificationPresentation('error', null).isWrongDocumentType).toBe(false);
+    expect(getVerificationPresentation('done', null).isWrongDocumentType).toBe(false);
+    expect(getVerificationPresentation('done', {
+      documentTypeMatch: true,
+      results: [{ item: 'Licence number', present: true }],
+      summary: { total: 1, present: 1, missing: 0, unknown: 0, score: 100 },
+    }).isWrongDocumentType).toBe(false);
+  });
+
   test('handles incomplete backend results without empty-section failures', () => {
     const view = getVerificationPresentation('done', {
       documentTypeMatch: true,

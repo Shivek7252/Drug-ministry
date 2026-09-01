@@ -125,6 +125,13 @@ export default function NocChecklistPage({ applicationNumber, role = 'reviewer',
         );
       })()}
 
+      {!loading && !error && data && (
+        <DocumentQueriesSection
+          documentQueries={data.documentQueries}
+          documents={data.documents}
+        />
+      )}
+
       {loading && <div className="cl-loader">Loading checklist…</div>}
       {error && <div className="cl-error">⚠️ {error}</div>}
 
@@ -215,6 +222,82 @@ export default function NocChecklistPage({ applicationNumber, role = 'reviewer',
 }
 
 /* ── Row renderer ──────────────────────────────────────────────────────── */
+/* ── Document-specific queries ───────────────────────────────────────────────
+   Queries raised from a document's Open & Inspect view, grouped under the
+   document they were raised against. Grouping is keyed on the stable docId
+   supplied by the server, never on the filename or the document type — two
+   uploads can share either of those. Each query renders as the table the
+   reviewer confirmed rather than as one combined paragraph. */
+function DocumentQueriesSection({ documentQueries, documents = {} }) {
+  const groups = Object.entries(documentQueries || {}).filter(([, list]) => (list || []).length);
+  if (!groups.length) return null;
+
+  const fmt = value => (value
+    ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    : '—');
+
+  return (
+    <div className="cl-docq">
+      <div className="cl-docq-title">Document-Specific Queries</div>
+      {groups.map(([docId, queries]) => {
+        const heading = queries[0]?.expectedType || docId;
+        const fileName = queries[0]?.fileName || documents[docId]?.name || '';
+        return (
+          <section className="cl-docq-group" key={docId} aria-label={`Queries for ${heading}`}>
+            <header className="cl-docq-head">
+              <h4>{heading}</h4>
+              {fileName && <span className="cl-docq-file">📄 {fileName}</span>}
+            </header>
+
+            {queries.map(query => (
+              <article className="cl-docq-card" key={query.queryIdentifier}>
+                <div className="cl-docq-card-head">
+                  <code>{query.queryIdentifier}</code>
+                  <span className={`cl-docq-status cl-docq-${String(query.status || 'Open').toLowerCase()}`}>
+                    {query.status || 'Open'}
+                  </span>
+                  <span className="cl-docq-date">Raised {fmt(query.raisedAt)}</span>
+                </div>
+
+                <div className="cl-docq-table-wrap">
+                  <table className="cl-docq-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Sr. No.</th>
+                        <th scope="col">Checklist Item / Issue</th>
+                        <th scope="col">Detected Deficiency</th>
+                        <th scope="col">Query / Corrective Action Required</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(query.rows || []).map(row => (
+                        <tr key={`${query.queryIdentifier}-${row.order}`}>
+                          <td data-label="Sr. No.">{row.order}</td>
+                          <td data-label="Checklist Item / Issue">{row.checklistItem || '—'}</td>
+                          <td data-label="Detected Deficiency">{row.deficiency || '—'}</td>
+                          <td data-label="Query / Corrective Action Required">{row.queryText}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {query.applicantResponse && (
+                  <div className="cl-docq-response">
+                    <strong>Your response</strong>
+                    <p>{query.applicantResponse}</p>
+                    {query.responseAt && <small>{fmt(query.responseAt)}</small>}
+                  </div>
+                )}
+              </article>
+            ))}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChecklistRow({ item, onOpen, companyTag }) {
   const queryStatus = item.status || 'OK';
   // Derived doc status from backend (based on uploads + AI verdict).

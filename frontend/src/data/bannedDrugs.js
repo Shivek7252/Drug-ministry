@@ -8,6 +8,8 @@
 // The check is advisory only — it never blocks the application flow.
 // ============================================================
 
+import { BACKEND_ORIGIN } from '../config/api';
+
 let bannedList = [];
 let statusNotes = {};
 let loadPromise = null;
@@ -137,7 +139,7 @@ export async function loadBannedDrugs() {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/banned-drugs');
+      const response = await fetch(`${BACKEND_ORIGIN}/api/banned-drugs`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       if (Array.isArray(data.entries)) {

@@ -5,8 +5,9 @@
  * Fallback: generates a formatted PDF locally with jsPDF if backend is offline.
  */
 import { jsPDF } from 'jspdf';
+import { BACKEND_ORIGIN } from '../config/api';
 
-const BACKEND = 'http://localhost:5001';
+const BACKEND = BACKEND_ORIGIN;
 const APP_NO  = 'EXP-2026-000145';
 
 /* ─── Try backend template fill first, fall back to jsPDF ─────────────── */

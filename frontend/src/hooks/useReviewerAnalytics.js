@@ -1,16 +1,14 @@
 /* ============================================================================
-   Reviewer analytics: server-computed KPI comparisons.
+   Reviewer analytics: server-computed KPI counts and the reviewer's unread
+   total, both aggregated over the COMPLETE filtered dataset.
 
-   Why this exists rather than computing deltas in the browser:
+   Why the server owns these rather than the browser:
 
      - The client only ever sees the pages it fetched, so any client-side total
-       is really "totals of what I happened to load".
-     - Transition history lives in auditLog, which the reviewer list payload
-       deliberately does not expose. Without it the client cannot answer
-       "entered review this week" or reconstruct a previous-period overdue
-       count, and previously reported both as "Not comparable".
-     - Week boundaries must be the same for every reviewer. Computed on the
-       server in the business timezone, they are.
+       is really "totals of what I happened to load". Unread in particular must
+       count the whole filtered set, not the current page.
+     - Read receipts are per-reviewer rows in the database. Only the server can
+       join them against the filtered applications.
 
    The server owns the numbers. This hook owns fetching them safely: one
    in-flight request at a time, aborted on unmount and on filter change,
@@ -20,7 +18,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getReviewerAnalytics } from '../api/applicationService';
-import { REFRESH_KEY } from '../config/queueRefreshSignal';
+import { subscribeQueueChanged } from '../config/queueRefreshSignal';
 
 /* Background refresh cadence while the tab is visible. Long enough not to
    hammer the API, short enough that a decision made by another reviewer on
@@ -111,24 +109,21 @@ export default function useReviewerAnalytics(filters, { enabled = true, pollMs =
       else stop();
     };
     const onFocus = () => load({ background: true });
-    const onStorage = e => { if (e.key === REFRESH_KEY) load({ background: true }); };
+    const unsubscribe = subscribeQueueChanged(() => load({ background: true }));
 
     if (document.visibilityState === 'visible') start();
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
-    window.addEventListener('storage', onStorage);
     return () => {
       stop();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
-      window.removeEventListener('storage', onStorage);
+      unsubscribe();
     };
   }, [load, enabled, pollMs]);
 
   return {
     analytics: data,
-    /* Server comparisons keyed by tile, ready for the Delta component. */
-    comparison: data?.comparison || null,
     serverCounts: data?.current || null,
     unread: data?.unread || null,
     generatedAt: data?.generatedAt || null,

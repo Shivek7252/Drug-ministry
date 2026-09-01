@@ -1,5 +1,7 @@
+import fs from 'fs';
+import path from 'path';
 import {
-  kpiCounts, kpiDeltas, isOverdue, unknownStatusApps, tileForStatus, KPI_TILES,
+  kpiCounts, isOverdue, unknownStatusApps, tileForStatus, KPI_TILES,
 } from './aggregations';
 import { normalizeStatus, STATUS, SLA_DAYS, isTerminal, isNonTerminal } from './statusModel';
 
@@ -120,58 +122,11 @@ describe('Overdue excludes completed work', () => {
   });
 });
 
-describe('week-over-week deltas use each metric own timestamp', () => {
-  const d = kpiDeltas(FIXTURE, { days: 7, now: NOW });
-
-  test('approvals are measured on approvedAt, not submittedAt', () => {
-    expect(d.approved.basis).toBe('approvedAt');
-    expect(d.approved.current).toBe(1);     // A7 approved 3d ago
-    expect(d.approved.prior).toBe(1);       // A8 approved 10d ago
-    expect(d.approved.delta).toBe(0);
-  });
-
-  test('rejections are measured on rejectedAt and ignore a stale approvedAt', () => {
-    expect(d.rejected.basis).toBe('rejectedAt');
-    expect(d.rejected.current).toBe(1);     // A9 rejected 4d ago
-    expect(d.rejected.delta).toBe(1);
-  });
-
-  test('queries are measured on the query-raised timestamp', () => {
-    expect(d.queryRaised.basis).toBe('lastQueryRaisedAt');
-    expect(d.queryRaised.current).toBe(1);  // A6 raised 2d ago
-  });
-
-  test('submissions are measured on submittedAt', () => {
-    expect(d.submitted.basis).toBe('submittedAt');
-    expect(d.total.basis).toBe('submittedAt');
-  });
-
-  test('In Review reports unavailable rather than guessing from updatedAt', () => {
-    expect(d.underReview.available).toBe(false);
-    expect(d.underReview.reason).toMatch(/status-history/i);
-  });
-
-  test('Overdue reports unavailable — it is a point-in-time measure', () => {
-    expect(d.overdue.available).toBe(false);
-  });
-
-  test('an approval outside both windows contributes to neither', () => {
-    const old = [app({ n: 'Z', s: 'Approved', sub: 90, approvedAt: at(60) })];
-    const dd = kpiDeltas(old, { days: 7, now: NOW });
-    expect(dd.approved.current).toBe(0);
-    expect(dd.approved.prior).toBe(0);
-    expect(dd.approved.delta).toBe(0);
-  });
-
-  test('week windows are half-open [from, to): the boundary belongs to current', () => {
-    const edge = [
-      app({ n: 'E1', s: 'Approved', sub: 20, approvedAt: new Date(NOW - 7 * D).toISOString() }),
-      app({ n: 'E2', s: 'Approved', sub: 20, approvedAt: new Date(NOW - 7 * D - 1000).toISOString() }),
-    ];
-    const dd = kpiDeltas(edge, { days: 7, now: NOW });
-    expect(dd.approved.current).toBe(1);    // E1 sits exactly on now-7d
-    expect(dd.approved.prior).toBe(1);      // E2 is one second earlier
-  });
+/* Client-side week-over-week deltas were removed with the KPI comparison.
+   aggregations.js must not grow them back: the cards show a count only. */
+test('no client-side delta helper is exported any more', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'aggregations.js'), 'utf8');
+  expect(source).not.toMatch(/export function kpiDeltas|export const DELTA_BASIS/);
 });
 
 describe('tile filtering does not recalculate other tiles', () => {

@@ -332,7 +332,7 @@ export const KPI_TILES = [
 export const unknownStatusApps = apps =>
   apps.filter(a => normalizeStatus(a.status) === STATUS.UNKNOWN);
 
-/* ---- KPI counts and period-over-period deltas --------------------------- */
+/* ---- KPI counts ---------------------------------------------------------- */
 
 export function kpiCounts(apps) {
   // Derived from KPI_TILES so the number on a tile is always the number of
@@ -346,65 +346,6 @@ export function kpiCounts(apps) {
 export function tileForStatus(status) {
   const hit = KPI_TILES.find(t => t.key !== 'total' && t.match({ status }));
   return hit ? hit.key : 'total';
-}
-
-/* ---- Week-over-week deltas -------------------------------------------------
-   Each metric is measured on ITS OWN event timestamp. The previous
-   implementation windowed every tile by submittedAt and then counted statuses
-   inside that window, which answered "how many applications submitted this week
-   are currently approved" — not "how many approvals happened this week". With
-   live data that reported Approved as -1 in a week containing +1 approval.
-
-   Where the event timestamp does not exist in the payload the delta is returned
-   as { available: false } and the UI states that plainly, rather than
-   substituting updatedAt and producing a confident wrong number.
-
-   Weeks are [now-7d, now) against [now-14d, now-7d), evaluated in the browser's
-   local zone, which is the reviewer's working timezone.
-   -------------------------------------------------------------------------- */
-
-export const DELTA_BASIS = {
-  total:       { field: 'submittedAt', label: 'submissions' },
-  submitted:   { field: 'submittedAt', label: 'submissions' },
-  approved:    { field: 'approvedAt',  label: 'approvals' },
-  rejected:    { field: 'rejectedAt',  label: 'rejections' },
-  queryRaised: { field: 'lastQueryRaisedAt', label: 'queries raised' },
-  // No status-history timestamp is exposed on the reviewer list payload, so a
-  // truthful "entered review this week" cannot be computed. Reported as
-  // unavailable rather than approximated from updatedAt.
-  underReview: { field: null, reason: 'No status-history timestamp available' },
-  // Overdue is a point-in-time property of the current queue, not an event;
-  // there is no "became overdue" record to compare periods against.
-  overdue:     { field: null, reason: 'Point-in-time measure, not an event' },
-};
-
-const inWindow = (app, field, from, to) => {
-  const raw = app[field];
-  if (!raw) return false;
-  const t = new Date(raw).getTime();
-  return !Number.isNaN(t) && t >= from && t < to;
-};
-
-export function kpiDeltas(apps, { days = 7, now = Date.now() } = {}) {
-  const currentFrom = now - days * 86400000;
-  const priorFrom = now - 2 * days * 86400000;
-
-  return Object.fromEntries(KPI_TILES.map(tile => {
-    const basis = DELTA_BASIS[tile.key];
-    if (!basis || !basis.field) {
-      return [tile.key, { available: false, reason: basis?.reason || 'Not comparable' }];
-    }
-    // Count the EVENTS in each window, restricted to rows the tile represents,
-    // so "approvals this week" cannot be inflated by a later status change.
-    const eligible = tile.key === 'total' || tile.key === 'submitted'
-      ? apps
-      : apps.filter(tile.match);
-    const current = eligible.filter(a => inWindow(a, basis.field, currentFrom, now)).length;
-    const prior = eligible.filter(a => inWindow(a, basis.field, priorFrom, currentFrom)).length;
-    return [tile.key, {
-      available: true, current, prior, delta: current - prior, basis: basis.field, label: basis.label,
-    }];
-  }));
 }
 
 /* ----------------------------------------------------------------------------

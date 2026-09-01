@@ -6,10 +6,11 @@
 
 import { serializeReviewerFilters } from '../config/reviewerFilters';
 import { signalQueueChanged } from '../config/queueRefreshSignal';
+import { APPLICATIONS_API, BACKEND_ORIGIN } from '../config/api';
 
-const BASE = 'http://localhost:5001/api/applications';
+const BASE = APPLICATIONS_API;
 
-function reviewerHeaders() {
+export function reviewerHeaders() {
   try {
     const identity = JSON.parse(sessionStorage.getItem('reviewer_identity') || '{}');
     if (identity.role === 'reviewer' && identity.username) {
@@ -139,6 +140,14 @@ export async function getApplicationFull(id) {
   return apiFetch(`${BASE}/${id}/full`, { headers: reviewerHeaders() });
 }
 
+/** Narrow reviewer-only payload used by the decision summary dialog. */
+export async function getApplicationSummary(id, { signal } = {}) {
+  return apiFetch(`${BASE}/${encodeURIComponent(id)}/summary`, {
+    headers: reviewerHeaders(),
+    signal,
+  });
+}
+
 /* ── Reviewer: pre-verify every uploaded document so the Documents tab can
    show green/red doc-type-match badges without waiting for a manual click.
    Backend caches verdicts in Mongo — first call runs Mistral for uncached
@@ -147,7 +156,7 @@ export async function preVerifyDocs(appNumber, { force = false } = {}) {
   try {
     const res = await fetch(`${BASE}/${appNumber}/pre-verify${force ? '?force=1' : ''}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...reviewerHeaders() },
       signal: AbortSignal.timeout(240000), // 4 min — Mistral round-trips for up to ~10 docs
     });
     const data = await res.json();
@@ -199,6 +208,72 @@ export async function getReviewerAnalytics(filters = {}, { signal } = {}) {
 
 export async function getReviewerFilterOptions() {
   return apiFetch(`${BASE}/reviewer/options`, { headers: reviewerHeaders() });
+}
+
+/* ── Application-level Under Review workflow ─────────────────────────────
+   Whole-application scope. The server generates and validates the snapshot
+   from the stored record; nothing sent from here is trusted as evidence. */
+
+export async function getApplicationReviewSnapshot(appNumber, { signal } = {}) {
+  return apiFetch(`${BASE}/${encodeURIComponent(appNumber)}/review-snapshot`, {
+    headers: reviewerHeaders(), signal,
+  });
+}
+
+/* Own fetch, not apiFetch: a 400 carries per-row validation messages and a 409
+   carries the refused transition, both of which apiFetch would discard. */
+export async function submitUnderReview(appNumber, { submissionId, rows, applicantMessage }) {
+  try {
+    const res = await fetch(`${BASE}/${encodeURIComponent(appNumber)}/under-review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...reviewerHeaders() },
+      body: JSON.stringify({ submissionId, rows, applicantMessage }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || `HTTP ${res.status}`, rowErrors: data.rowErrors || null, code: data.code };
+    }
+    signalQueueChanged();
+    return { success: true, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/* ── Document-scoped query workflow ──────────────────────────────────────
+   Both calls address the document by its stable docId, so a query can never
+   be drafted from — or attached to — a different upload. */
+
+export async function getDocumentQueryDraft(appNumber, docId, { signal } = {}) {
+  return apiFetch(
+    `${BASE}/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/query-draft`,
+    { headers: reviewerHeaders(), signal }
+  );
+}
+
+/* Not routed through apiFetch: a 400 carries per-row validation messages that
+   the modal shows beside each row, and apiFetch discards the response body. */
+export async function submitDocumentQuery(appNumber, docId, { submissionId, rows, expectedType }) {
+  try {
+    const res = await fetch(
+      `${BASE}/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/query`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...reviewerHeaders() },
+        body: JSON.stringify({ submissionId, rows, expectedType }),
+        signal: AbortSignal.timeout(20000),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || `HTTP ${res.status}`, rowErrors: data.rowErrors || null };
+    }
+    signalQueueChanged();
+    return { success: true, ...data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
 
 export async function getQueryHistory(appNumber) {
@@ -327,7 +402,7 @@ export async function verifyChecklistFile({ fileUrl, itemId, docLabel = 'documen
     form.append('docType',  docType);
     form.append('docLabel', docLabel);
 
-    const apiResp = await fetch('http://localhost:5001/api/verify', {
+    const apiResp = await fetch(`${BACKEND_ORIGIN}/api/verify`, {
       method: 'POST',
       body: form,
       signal: AbortSignal.timeout(60000),

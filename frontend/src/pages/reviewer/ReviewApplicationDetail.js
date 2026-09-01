@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getApplicationFull, shipmentAction, setNocMeta, preVerifyDocs, reviewerAction } from '../../api/applicationService';
 import { useApp } from '../../context/AppContext';
 import DocViewerModal from '../../components/shared/DocViewerModal';
+import { applyPersistedVerification } from '../../components/shared/verificationState';
 import NocChecklistPage from '../../components/checklist/NocChecklistPage';
 import ShipmentsTab from './ShipmentsTab';
 import SummaryPanel from './SummaryPanel';
@@ -531,6 +532,13 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
     return res;
   };
 
+  /* The document query endpoint already moved the application to Query Raised,
+     so this only pulls the refreshed record back into the view. */
+  const refreshAfterDocumentQuery = async () => {
+    const refreshed = await getApplicationFull(data.applicationNumber);
+    if (refreshed.success) setFull(refreshed.application);
+  };
+
   /* Status badge color */
   const statusColor = { Approved: '#15803d', Rejected: '#dc2626', 'Under Review': '#a16207', Verified: '#15803d', 'Query Raised': '#c2410c', Submitted: '#1d4ed8' };
   const statusBg = { Approved: '#f0fdf4', Rejected: '#fef2f2', 'Under Review': '#fefce8', Verified: '#f0fdf4', 'Query Raised': '#fff7ed', Submitted: '#eff6ff' };
@@ -886,6 +894,8 @@ export default function ReviewApplicationDetail({ app, onClose, onAction, action
           appNumber={data.applicationNumber}
           reviewerMode
           onReviewerDecision={handleDocumentReviewDecision}
+          onDocumentQueryRaised={refreshAfterDocumentQuery}
+          onVerificationPersisted={(docId, payload) => setFull(prev => applyPersistedVerification(prev, docId, payload))}
           reviewActionsDisabled={data.status === 'Approved' || data.status === 'Rejected'}
           verificationResult={docVerdict[viewerDoc.docId]}
           onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}

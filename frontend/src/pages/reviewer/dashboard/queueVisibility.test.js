@@ -8,9 +8,11 @@
 
    jsdom does not lay out or paint, so the paint bug itself cannot be asserted
    by rendering. What can be asserted, and is asserted here, is the CSS
-   invariant that caused it, read from the stylesheet: while .rq-scroll is a
-   scroll container, the sticky header's `top` is measured from .rq-scroll, so
-   any non-zero `top` occludes the first data row.
+   invariant that made it possible, read from the stylesheet. The queue has
+   since been rebuilt with no scroll container and no sticky header at all,
+   which removes the whole class of bug — so these tests now hold that stronger
+   invariant: nothing in the queue can occlude a row, and nothing in it can
+   push the page sideways.
    ============================================================================ */
 
 import fs from 'fs';
@@ -24,36 +26,41 @@ import { sortRows } from './aggregations';
 
 const CSS = fs.readFileSync(path.join(__dirname, 'reviewQueueTable.css'), 'utf8');
 
+const escape = selector => selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** Extract one declaration from the first rule whose selector matches. */
 function decl(selector, prop) {
-  const rule = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`);
-  const body = CSS.match(rule);
+  const body = CSS.match(new RegExp(`(?:^|})\\s*${escape(selector)}\\s*\\{([^}]*)\\}`, 'm'));
   if (!body) return null;
   const hit = body[1].match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'm'));
   return hit ? hit[1].trim() : null;
 }
 
-describe('sticky header cannot cover the first row', () => {
-  test('.rq-scroll is still a scroll container, so the scrollport is the table', () => {
-    // If this ever stops being true the reasoning below has to be revisited.
-    expect(decl('.rq-scroll', 'overflow-x')).toBe('auto');
-    expect(decl('.rq-scroll', 'position')).toBe('relative');
+describe('nothing in the queue can cover the first row', () => {
+  test('the table header is not sticky, so it has no offset to get wrong', () => {
+    expect(decl('.rq-table thead th', 'position')).toBeNull();
+    expect(CSS).not.toMatch(/position\s*:\s*sticky/);
   });
 
-  test('the sticky header offset is exactly 0', () => {
-    const top = decl('.rq-table thead th', 'top');
-    expect(decl('.rq-table thead th', 'position')).toBe('sticky');
-    expect(top).toBe('0');
-  });
-
-  test('the header offset does not reference the filter-bar height', () => {
-    /* This is the exact regression: `top: var(--h-filterbar-actual)` resolved
+  test('the header offset never references the filter-bar height again', () => {
+    /* This was the exact regression: `top: var(--h-filterbar-actual)` resolved
        to 57px and pushed the header onto row 1, hiding the newest application.
-       The filter bar's height is a viewport-space value and is meaningless in
+       The filter bar's height is a viewport-space value and was meaningless in
        the table's own scrollport. */
-    const top = decl('.rq-table thead th', 'top');
-    expect(top).not.toMatch(/h-filterbar/);
-    expect(top).not.toMatch(/var\(/);
+    expect(CSS).not.toMatch(/h-filterbar/);
+    expect(decl('.rq-table thead th', 'top')).toBeNull();
+  });
+
+  test('the queue is no longer a scroll container, so the page owns scrolling', () => {
+    expect(CSS).not.toMatch(/\.rq-scroll/);
+    expect(CSS).not.toMatch(/overflow(-x|-y)?\s*:\s*(auto|scroll)/);
+  });
+
+  test('the table cannot be wider than the page it sits on', () => {
+    expect(decl('.rq-table', 'width')).toBe('100%');
+    expect(decl('.rq-table', 'table-layout')).toBe('fixed');
+    expect(decl('.rq-table', 'min-width')).toBeNull();
+    expect(CSS).not.toMatch(/min-width\s*:\s*\d{3,}px/);
   });
 });
 
@@ -82,11 +89,7 @@ function Harness({ data = rows }) {
       page={1} pageCount={1} onPage={() => {}}
       rowsPerPage={10} onRowsPerPage={() => {}}
       totalRows={data.length}
-      selected={new Set()} onToggleSelect={() => {}} onToggleSelectAll={() => {}}
-      onClearSelection={() => {}}
-      density="comfortable" onDensity={() => {}}
       onOpen={() => {}} isUnread={() => true}
-      onBulkMarkInReview={() => {}} bulkBusy={false}
     />
   );
 }

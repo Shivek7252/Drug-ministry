@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useApp } from '../../context/AppContext';
 import { REQUIRED_DOCUMENTS } from '../../data/mockData';
+import { BACKEND_ORIGIN } from '../../config/api';
 import './WizardStep.css';
 import './DocumentViewer.css';
 
@@ -374,7 +375,7 @@ function ChecklistPanel({ docId, docLabel, viewUrl, onSearch, activeQuery }) {
       form.append('file', blob, docLabel + '.pdf');
       form.append('docType', DOC_CHECKLISTS[docId] || 'default');
       form.append('docLabel', docLabel);
-      const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
+      const apiResp = await fetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
       const data = await apiResp.json();
       if (!apiResp.ok) {
         throw new Error('Anuvadini AI analysis is temporarily unavailable. Please try again shortly.');
@@ -915,10 +916,10 @@ export default function Step5DocumentUpload() {
       form.append('file', file, file.name);
       form.append('docType', DOC_CHECKLISTS[doc.id] || 'default');
       form.append('docLabel', doc.label);
-      const response = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
+      const response = await fetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Verification failed');
-      const passed = data.documentTypeMatch !== false &&
+      const passed = data.documentTypeMatch === true &&
         data.summary?.total > 0 && data.summary.missing === 0 && data.summary.unknown === 0;
       setVerification(prev => ({ ...prev, [doc.id]: { status: passed ? 'verified' : 'failed', data } }));
     } catch (error) {

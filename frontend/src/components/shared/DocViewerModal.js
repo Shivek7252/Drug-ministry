@@ -18,7 +18,9 @@ import { createPortal } from 'react-dom';
 import * as pdfjsLib from 'pdfjs-dist';
 import '../wizard/DocumentViewer.css';
 import './ReviewerDocumentVerification.css';
+import { BACKEND_ORIGIN } from '../../config/api';
 import { getVerificationPresentation, validateReviewerDecision } from './verificationViewModel';
+import DocumentQueryModal from './DocumentQueryModal';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -474,7 +476,17 @@ function ReviewerVerificationResult({ payload, onLocate, activeQuery, onRerun })
 }
 
 /* ─── AI Checklist Panel ─────────────────────────────────────────────────── */
-function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber, reviewerMode = false }) {
+function storedReviewerHeaders() {
+  try {
+    const identity = JSON.parse(sessionStorage.getItem('reviewer_identity') || '{}');
+    if (identity.role === 'reviewer' && identity.username) {
+      return { 'X-User-Role': 'reviewer', 'X-Reviewer-Name': identity.username };
+    }
+  } catch (_) { }
+  return {};
+}
+
+function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQuery, appNumber, reviewerMode = false, onVerificationChange, onVerificationPersisted }) {
   const [status, setStatus] = useState('idle');
   const [results, setResults] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -500,8 +512,8 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
     try {
       let data;
       if (appNumber && docId) {
-        const url = `http://localhost:5001/api/applications/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/verify${force ? '?force=1' : ''}`;
-        const apiResp = await fetch(url, { method: 'POST' });
+        const url = `${BACKEND_ORIGIN}/api/applications/${encodeURIComponent(appNumber)}/document/${encodeURIComponent(docId)}/verify${force ? '?force=1' : ''}`;
+        const apiResp = await fetch(url, { method: 'POST', headers: storedReviewerHeaders() });
         data = await apiResp.json();
         if (!apiResp.ok) throw new Error(data.error || 'AI analysis is temporarily unavailable. Please try again shortly.');
       } else {
@@ -512,7 +524,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
         form.append('file', blob, docLabel + '.pdf');
         form.append('docType', checklistKey);
         form.append('docLabel', docLabel);
-        const apiResp = await fetch('http://localhost:5001/api/verify', { method: 'POST', body: form });
+        const apiResp = await fetch(`${BACKEND_ORIGIN}/api/verify`, { method: 'POST', body: form });
         data = await apiResp.json();
         if (!apiResp.ok) throw new Error('AI analysis is temporarily unavailable. Please try again shortly.');
       }
@@ -522,6 +534,7 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
       setTypeReason(data.documentTypeReason || '');
       setCached(data.cached === true);
       setStatus('done');
+      if (appNumber && data.state === 'completed') onVerificationPersisted?.(docId, data);
     } catch (e) { setErrMsg(e.message); setStatus('error'); }
   };
 
@@ -533,6 +546,13 @@ function ChecklistPanel({ docId, docType, docLabel, fileUrl, onSearch, activeQue
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, appNumber, docId]);
+
+  /* Publish the normalised verification status upward. The modal footer decides
+     which reviewer actions to offer from this, never from the panel's styling. */
+  useEffect(() => {
+    if (!onVerificationChange) return;
+    onVerificationChange(getVerificationPresentation(status, verificationPayload));
+  }, [status, verificationPayload, onVerificationChange]);
 
   const getSearchTerm = (item, note) => {
     if (note) {
@@ -823,7 +843,7 @@ function ImageViewer({ fileUrl, fileName, fileSize, onClose }) {
 }
 
 /* ─── Main exported component ────────────────────────────────────────────── */
-export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, onRaiseQuery, verificationResult, appNumber, reviewerMode = false, onReviewerDecision, reviewActionsDisabled = false }) {
+export default function DocViewerModal({ docId, docType, docLabel, fileUrl, fileName, fileSize, fileType, onClose, onVerify, onDecline, onRaiseQuery, verificationResult, appNumber, reviewerMode = false, onReviewerDecision, onDocumentQueryRaised, onVerificationPersisted, reviewActionsDisabled = false }) {
   const isPDF = fileType?.includes('pdf') || fileName?.toLowerCase().endsWith('.pdf');
   const isImg = fileType?.startsWith('image/');
 
@@ -847,6 +867,11 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionFeedback, setDecisionFeedback] = useState(null);
   const [decisionComplete, setDecisionComplete] = useState(false);
+  // Normalised AI verdict lifted out of the checklist panel. `wrongDocument` is
+  // true only when the upload is not the expected document type at all.
+  const [verificationView, setVerificationView] = useState(null);
+  const wrongDocument = verificationView?.isWrongDocumentType === true;
+  const [queryOpen, setQueryOpen] = useState(false);
 
   const scrollRef = useRef();
   const pageRefs = useRef({});
@@ -924,6 +949,8 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
       setDecisionBusy(false);
     }
   };
+
+  const handleVerificationChange = useCallback(view => setVerificationView(view), []);
 
   const onReady = useCallback((pn, rects) => setPageHl(prev => ({ ...prev, [pn]: rects })), []);
   const onNeedsOcr = useCallback((pn, canvas) => {
@@ -1121,6 +1148,8 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
               }}
               activeQuery={effectiveQuery}
               reviewerMode={reviewerMode}
+              onVerificationChange={handleVerificationChange}
+              onVerificationPersisted={onVerificationPersisted}
             />
           </div>
         </div>
@@ -1131,22 +1160,36 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
               <div className="rvai-decision-feedback" aria-live="polite">
                 {decisionFeedback && <span className={`rvai-feedback-${decisionFeedback.type}`}>{decisionFeedback.message}</span>}
                 {!decisionFeedback && reviewActionsDisabled && <span>This application already has a final decision.</span>}
-                {!decisionFeedback && !reviewActionsDisabled && <span>Select a reviewer decision for this application.</span>}
+                {!decisionFeedback && !reviewActionsDisabled && (
+                  <span>
+                    {wrongDocument
+                      ? 'AI verification already classified this upload as the wrong document type.'
+                      : 'Select a reviewer decision for this application.'}
+                  </span>
+                )}
               </div>
               <div className="rvai-decision-actions">
                 <button type="button" className="rvai-action rvai-action-approve" title="Approve application"
                   disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Approved')}>
                   <StatusIcon state="approved" />Approve
                 </button>
-                <button type="button" className="rvai-action rvai-action-query" title="Raise a query requiring applicant clarification"
-                  disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Query Raised')}>
+                {/* Document-scoped: opens the structured query table for THIS
+                    document. The application-level Query action on the review
+                    page is a separate flow and is unchanged. */}
+                <button type="button" className="rvai-action rvai-action-query" title="Raise a query about this document"
+                  disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => setQueryOpen(true)}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" /><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.7.8-.7 1.1M12 15.5h.01" /></svg>
                   Query
                 </button>
-                <button type="button" className="rvai-action rvai-action-reject" title="Reject application"
-                  disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Rejected')}>
-                  <StatusIcon state="rejected" />Reject
-                </button>
+                {/* A document the AI has already classified as the wrong type has
+                    failed verification, so a second Reject here adds nothing. The
+                    application-level Reject on the review page is untouched. */}
+                {!wrongDocument && (
+                  <button type="button" className="rvai-action rvai-action-reject" title="Reject application"
+                    disabled={decisionBusy || decisionComplete || reviewActionsDisabled} onClick={() => openDecision('Rejected')}>
+                    <StatusIcon state="rejected" />Reject
+                  </button>
+                )}
               </div>
             </>
           ) : (onVerify || onDecline || onRaiseQuery) && (
@@ -1174,6 +1217,28 @@ export default function DocViewerModal({ docId, docType, docLabel, fileUrl, file
             </div>
           )}
         </div>
+
+        {reviewerMode && queryOpen && appNumber && (
+          <DocumentQueryModal
+            appNumber={appNumber}
+            docId={docId}
+            docLabel={docLabel}
+            fileName={fileName}
+            verificationLabel={verificationView?.label || ''}
+            onClose={() => setQueryOpen(false)}
+            onSubmitted={result => {
+              setQueryOpen(false);
+              setDecisionComplete(true);
+              setDecisionFeedback({
+                type: 'success',
+                message: result.duplicate
+                  ? `Query ${result.queryIdentifier} was already raised for this document.`
+                  : `Query ${result.queryIdentifier} raised for this document.`,
+              });
+              onDocumentQueryRaised?.(result);
+            }}
+          />
+        )}
 
         {reviewerMode && decisionDialog && (
           <div className="rvai-dialog-backdrop" onClick={e => e.target === e.currentTarget && !decisionBusy && setDecisionDialog(null)}>

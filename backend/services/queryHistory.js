@@ -22,6 +22,9 @@ async function createApplicationQuery(app, values) {
         reviewer: { name: values.officer || 'reviewer', role: 'reviewer' },
         source: values.source || 'application',
         sourceReference: values.sourceReference,
+        document: values.document,
+        rows: values.rows,
+        idempotencyKey: values.idempotencyKey,
         status: values.status || 'Open',
         applicantResponse: values.applicantResponse,
         responseAt: values.responseAt,
@@ -29,7 +32,13 @@ async function createApplicationQuery(app, values) {
         createdAt: values.createdAt,
       });
     } catch (err) {
-      if (err?.code !== 11000 || attempt === 3) throw err;
+      // Only an identifier collision is worth retrying. A duplicate
+      // idempotencyKey means this exact submission already landed, so it must
+      // surface to the caller rather than being retried into a second record.
+      const onIdentifier = err?.code === 11000
+        && !String(err?.message || '').includes('idempotencyKey')
+        && !err?.keyPattern?.idempotencyKey;
+      if (!onIdentifier || attempt === 3) throw err;
     }
   }
   throw new Error('Could not allocate a unique AI Query Identifier.');

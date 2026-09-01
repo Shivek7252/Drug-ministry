@@ -10,7 +10,7 @@
     "backfill:transitions": "node scripts/backfill-transition-fields.js",
     "verify:analytics": "node scripts/verify-reviewer-analytics.js",
     "test": "node --test tests/*.test.js",
-    "check": "node --check routes/applications.js && node --check services/reviewerFilters.js && node --check services/reviewerAnalytics.js && node --check services/reviewerAnalyticsDb.js && node --check services/transitionEvents.js && node --check middleware/reviewerAuth.js"
+    "check": "node --check routes/applications.js && node --check services/reviewerFilters.js && node --check services/reviewerAnalytics.js && node --check services/reviewerAnalyticsDb.js && node --check services/transitionEvents.js && node --check services/readReceipts.js && node --check middleware/reviewerAuth.js"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

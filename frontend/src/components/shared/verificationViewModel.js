@@ -37,7 +37,7 @@ export function normalizeVerificationResponse(payload) {
         : total > 0 ? Math.round((present / total) * 100) : null;
 
     return {
-        typeMatches: source.documentTypeMatch !== false,
+        typeMatches: typeof source.documentTypeMatch === 'boolean' ? source.documentTypeMatch : null,
         typeReason: text(source.documentTypeReason),
         typeEvidence: text(source.documentTypeEvidence),
         typePage: pageNumber(source.documentTypePage),
@@ -70,10 +70,10 @@ export function getVerificationPresentation(runtimeStatus, payload) {
     } else if (runtimeStatus === 'error' || !payload) {
         key = 'incomplete';
         label = 'Verification Incomplete';
-    } else if (!verification.typeMatches || verification.summary.missing > 0) {
+    } else if (verification.typeMatches === false || verification.summary.missing > 0) {
         key = 'rejected';
         label = 'Rejected by AI';
-    } else if (verification.summary.total === 0 || verification.summary.unknown > 0) {
+    } else if (verification.typeMatches !== true || verification.summary.total === 0 || verification.summary.unknown > 0) {
         key = 'incomplete';
         label = 'Verification Incomplete';
     } else {
@@ -81,16 +81,23 @@ export function getVerificationPresentation(runtimeStatus, payload) {
         label = 'AI Verified';
     }
 
-    const failedChecks = verification.typeMatches
+    const failedChecks = verification.typeMatches === true
         ? verification.checks.filter(check => check.present === false)
         : [];
     const pendingChecks = verification.checks.filter(check => check.present === null);
-    const primaryReason = !verification.typeMatches
+    const primaryReason = verification.typeMatches === false
         ? verification.typeReason
         : failedChecks.find(check => check.reason)?.reason || pendingChecks.find(check => check.reason)?.reason || '';
     const correctiveAction = verification.correctiveAction
         || failedChecks.find(check => check.correctiveAction)?.correctiveAction
         || '';
+
+    /* The uploaded file is not the expected document type at all — the "Wrong
+       Document" case on the reviewer's document grid. Deliberately narrower than
+       `key === 'rejected'`, which also covers a document of the right type that
+       merely failed some checks. Guarded on the key so a pending or errored run,
+       where typeMatches defaults to true, can never report a wrong document. */
+    const isWrongDocumentType = key === 'rejected' && verification.typeMatches === false;
 
     return {
         ...verification,
@@ -100,6 +107,7 @@ export function getVerificationPresentation(runtimeStatus, payload) {
         pendingChecks,
         primaryReason,
         correctiveAction,
+        isWrongDocumentType,
     };
 }
 

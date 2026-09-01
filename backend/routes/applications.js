@@ -2,11 +2,13 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
+const { newStoredUpload } = require('../services/documentStorage');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const Application = require('../models/Application');
 const ApplicationQuery = require('../models/ApplicationQuery');
 const ApplicationRead = require('../models/ApplicationRead');
+const { readReceiptQuery } = require('../services/readReceipts');
 const { validateCountry, isValidCountry } = require('../services/countryValidation');
 const { v4: uuidv4 } = require('uuid');
 const { validateProductsApproval } = require('../approvedDrugs');
@@ -29,6 +31,24 @@ const {
   queryCountsForApplications,
   latestQueryRaisedAt,
 } = require('../services/queryHistory');
+const { buildApplicationSummary } = require('../services/applicationSummary');
+const ApplicationReview = require('../models/ApplicationReview');
+const {
+  buildReviewSnapshot,
+  normalizeReviewRows,
+  normalizeApplicantMessage,
+  underReviewTransition,
+  DEFAULT_APPLICANT_MESSAGE,
+  ReviewRowValidationError,
+} = require('../services/applicationReviewSnapshot');
+const {
+  buildDocumentQueryDraft,
+  normalizeQueryRows,
+  deriveLegacyRemarks,
+  verificationStatus,
+  sanitizeQueryText,
+  QueryRowValidationError,
+} = require('../services/documentQueryDraft');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 /* ── Uploads root (PDF binaries live here, NOT in MongoDB) ───────────────── */
@@ -448,7 +468,10 @@ function shapeChecklist(app, baseUrl) {
         else if (vr && vr.documentTypeMatch === true) item.docStatus = 'ok';
         else item.docStatus = 'unchecked';
       } else {
-        item.docStatus = 'ok';
+        /* A filename-only association is useful evidence, but a verification
+           result produced for another upload slot cannot complete this
+           requirement. It must be confirmed by a reviewer. */
+        item.docStatus = 'unchecked';
       }
     } else {
       item.matchedDoc = null;
@@ -558,15 +581,9 @@ function persistDocsToDisk(appNumber, docs) {
       const filePath = path.join(appDir, fileName);
       try {
         fs.writeFileSync(filePath, Buffer.from(b64, 'base64'));
-        out[docId] = {
-          name: doc.name,
-          size: doc.size,
-          type: doc.type,
-          uploadedAt: doc.uploadedAt,
-          path: `${appNumber}/${fileName}`,   // relative under UPLOADS_DIR
-          validated: doc.validated,
-          validationResult: doc.validationResult,
-        };
+        // New bytes always represent a new file identity. Never trust a
+        // client-supplied verdict or carry the previous file's AI result.
+        out[docId] = newStoredUpload(doc, `${appNumber}/${fileName}`);
         continue;
       } catch (e) {
         console.error(`[persistDocsToDisk] failed to write ${filePath}:`, e.message);
@@ -1046,12 +1063,7 @@ router.get('/reviewer/options', requireReviewer, async (req, res) => {
    different machine, so it is persisted rather than kept in localStorage. */
 router.get('/reviewer/read-state', requireReviewer, async (req, res) => {
   try {
-    const rows = await ApplicationRead.find({
-      $or: [
-        { reviewerId: req.reviewer.id },
-        { reviewerId: { $exists: false }, reviewer: req.reviewer.name },
-      ],
-    })
+    const rows = await ApplicationRead.find(readReceiptQuery(req.reviewer))
       .select('applicationNumber readAt')
       .lean();
     res.json({
@@ -1064,19 +1076,43 @@ router.get('/reviewer/read-state', requireReviewer, async (req, res) => {
   }
 });
 
+/* Idempotent: the receipt is keyed by (reviewerId, applicationNumber), so
+   opening the same application twice writes the same row twice and the unread
+   count moves exactly once.
+
+   `reviewer` (the name) is written alongside `reviewerId` for two reasons: the
+   legacy read paths still resolve name-keyed receipts, and if a database has
+   not yet had the stale unique index dropped, a populated name keeps the key
+   distinct per reviewer instead of colliding on null. */
 router.post('/:id/read', requireReviewer, async (req, res) => {
   try {
     const app = await loadAppOr404(req.params.id, res);
     if (!app) return undefined;
     const readAt = new Date();
-    await ApplicationRead.updateOne(
-      { reviewerId: req.reviewer.id, applicationNumber: app.applicationNumber },
-      { $set: {
-        application: app._id, readAt, reviewerName: req.reviewer.name,
-      }, $setOnInsert: { reviewerId: req.reviewer.id } },
-      { upsert: true },
-    );
-    return res.json({ success: true, applicationNumber: app.applicationNumber, readAt });
+    const key = { reviewerId: req.reviewer.id, applicationNumber: app.applicationNumber };
+    const existing = await ApplicationRead.findOne(key).select('_id').lean();
+    try {
+      await ApplicationRead.updateOne(
+        key,
+        {
+          $set: { application: app._id, readAt, reviewerName: req.reviewer.name },
+          $setOnInsert: { reviewerId: req.reviewer.id, reviewer: req.reviewer.name },
+        },
+        { upsert: true },
+      );
+    } catch (err) {
+      /* Two concurrent opens of the same application race to insert the same
+         receipt. The loser gets E11000 — which means the row it wanted now
+         exists, so the operation succeeded. Anything else is a real error. */
+      if (err.code !== 11000) throw err;
+    }
+    return res.json({
+      success: true,
+      applicationNumber: app.applicationNumber,
+      readAt,
+      alreadyRead: Boolean(existing),
+      reviewer: { id: req.reviewer.id, name: req.reviewer.name },
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -1114,8 +1150,10 @@ router.get('/reviewer', requireReviewer, async (req, res) => {
     const [queryCounts, queryRaisedAt, readDocs] = await Promise.all([
       queryCountsForApplications(apps),
       latestQueryRaisedAt(apps),
+      /* Same predicate the KPI count uses. A private copy here once omitted
+         the legacy fallback, so the strip and the table disagreed. */
       ApplicationRead.find({
-        reviewerId: req.reviewer.id,
+        ...readReceiptQuery(req.reviewer),
         applicationNumber: { $in: apps.map(app => app.applicationNumber) },
       }).select('applicationNumber').lean(),
     ]);
@@ -1253,6 +1291,358 @@ router.get('/:id/query-history', requireReviewer, async (req, res) => {
     return res.json({ success: true, total: queries.length, queries });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── Application-level Under Review workflow ──────────────────────────────
+   Whole-application scope. The snapshot is generated on the server from the
+   stored record — no compliance value, document state, product verdict or
+   status supplied by the client is trusted. This is a status transition with
+   an internal review record; it never creates or touches an ApplicationQuery. */
+
+async function reviewContext(app, req) {
+  seedChecklist(app);
+  await app.save();
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const queries = await getCompleteQueryHistory(app);
+  const summary = buildApplicationSummary({
+    app, checklist: shapeChecklist(app, baseUrl), queries, baseUrl,
+  });
+  return { summary, queries };
+}
+
+function reviewApplicationHeader(app, summary) {
+  return {
+    applicationNumber: app.applicationNumber,
+    referenceNumber: app.referenceNumber,
+    applicant: summary.application?.applicant?.organisation
+      || summary.application?.applicant?.name
+      || app.applicantOrganization || app.applicantName || '',
+    submittedAt: app.submittedAt || app.createdAt || null,
+    currentStatus: app.status,
+  };
+}
+
+router.get('/:id/review-snapshot', requireReviewer, async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+
+    const transition = underReviewTransition(app.status);
+    const { summary, queries } = await reviewContext(app, req);
+    const snapshot = buildReviewSnapshot({ summary, app, queries });
+
+    // When the application is already Under Review the reviewer sees what was
+    // recorded last time rather than a blank slate.
+    const existing = transition.alreadyUnderReview
+      ? await ApplicationReview.findOne({ application: app._id }).sort({ createdAt: -1 }).lean()
+      : null;
+
+    res.set('Cache-Control', 'private, no-store');
+    return res.json({
+      success: true,
+      application: reviewApplicationHeader(app, summary),
+      metrics: snapshot.metrics,
+      rows: existing?.rows?.length ? existing.rows : snapshot.rows,
+      applicantMessage: existing?.applicantMessage || DEFAULT_APPLICANT_MESSAGE,
+      transition,
+      existingReview: existing
+        ? {
+          reviewedAt: existing.createdAt,
+          reviewer: existing.reviewer?.name || 'reviewer',
+          rowCount: (existing.rows || []).length,
+        }
+        : null,
+    });
+  } catch (err) {
+    console.error('review snapshot error:', err);
+    return res.status(500).json({ error: 'The review snapshot could not be generated.' });
+  }
+});
+
+router.post('/:id/under-review', requireReviewer, async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+
+    const submissionId = String(req.body?.submissionId || '').trim();
+    if (!submissionId) return res.status(400).json({ error: 'A submissionId is required for this action.' });
+    const idempotencyKey = `${app._id}:under_review:${submissionId}`;
+
+    // Idempotent: a repeated click resolves to the record the first attempt
+    // created, so review history and the audit log stay single-entry.
+    const already = await ApplicationReview.findOne({ idempotencyKey }).lean();
+    if (already) {
+      return res.json({ success: true, duplicate: true, status: app.status, review: already });
+    }
+
+    // The transition is validated against the STORED status, never the client's.
+    const transition = underReviewTransition(app.status);
+    if (!transition.allowed) {
+      return res.status(409).json({ error: transition.reason, code: 'TRANSITION_NOT_ALLOWED', status: app.status });
+    }
+
+    let rows;
+    try {
+      rows = normalizeReviewRows(req.body?.rows);
+    } catch (err) {
+      if (err instanceof ReviewRowValidationError) {
+        return res.status(400).json({ error: err.message, rowErrors: err.rowErrors });
+      }
+      throw err;
+    }
+    const applicantMessage = normalizeApplicantMessage(req.body?.applicantMessage);
+
+    // Metrics are recomputed here; the client's copy is display-only.
+    const { summary, queries } = await reviewContext(app, req);
+    const { metrics } = buildReviewSnapshot({ summary, app, queries });
+
+    const previousStatus = app.status;
+    const occurredAt = new Date();
+    const officer = req.reviewer.name;
+
+    let review;
+    try {
+      review = await ApplicationReview.create({
+        application: app._id,
+        applicationNumber: app.applicationNumber,
+        rows,
+        metrics,
+        applicantMessage,
+        reviewer: { id: req.reviewer.id ? String(req.reviewer.id) : undefined, name: officer, role: 'reviewer' },
+        previousStatus,
+        newStatus: 'Under Review',
+        statusChanged: !transition.alreadyUnderReview,
+        idempotencyKey,
+      });
+    } catch (err) {
+      if (err?.code === 11000) {
+        const winner = await ApplicationReview.findOne({ idempotencyKey }).lean();
+        if (winner) return res.json({ success: true, duplicate: true, status: app.status, review: winner });
+      }
+      throw err;
+    }
+
+    // Already Under Review: refresh the notes, write no second transition and
+    // no duplicate audit entry. recordStatusTransition also no-ops on from===to.
+    if (!transition.alreadyUnderReview) {
+      app.status = 'Under Review';
+      recordStatusTransition(app, {
+        fromStatus: previousStatus, toStatus: 'Under Review', occurredAt,
+        actorId: req.reviewer.id, actorName: officer,
+        action: 'reviewer_action', remarks: applicantMessage,
+      });
+    } else {
+      app.auditLog.push({
+        action: 'review_snapshot_updated',
+        detail: `Internal review notes updated (${rows.length} observation${rows.length === 1 ? '' : 's'}).`,
+        timestamp: occurredAt, user: officer,
+        applicationId: app._id, occurredAt,
+        actorId: req.reviewer.id ? String(req.reviewer.id) : undefined,
+      });
+    }
+
+    // The applicant-facing message rides the existing remarks trail. It is not
+    // a 'Query Raised' remark, so the legacy query collector ignores it.
+    if (!app.reviewerRemarks) app.reviewerRemarks = [];
+    app.reviewerRemarks.push({
+      text: applicantMessage, officer, timestamp: occurredAt, status: 'Under Review',
+    });
+
+    try {
+      await app.save();
+    } catch (saveError) {
+      // Keep the pair atomic: no review record without its status change.
+      await ApplicationReview.deleteOne({ _id: review._id });
+      throw saveError;
+    }
+
+    return res.json({
+      success: true,
+      duplicate: false,
+      status: app.status,
+      statusChanged: !transition.alreadyUnderReview,
+      review: review.toObject ? review.toObject() : review,
+      auditLog: app.auditLog,
+    });
+  } catch (err) {
+    console.error('under review error:', err);
+    return res.status(500).json({ error: 'The application could not be marked Under Review.' });
+  }
+});
+
+/* ── Document-scoped query workflow ───────────────────────────────────────
+   Both routes resolve the document by its stable `docId` key and read only
+   that document's own cached verification payload. No other upload on the
+   application is opened, so a finding from a different document can never
+   reach this draft or attach itself to this query. */
+
+function loadDocumentOr404(app, docId, res) {
+  const docs = app.documents;
+  const raw = docs?.get ? docs.get(docId) : docs?.[docId];
+  if (!raw) { res.status(404).json({ error: 'Document not found on this application.' }); return null; }
+  return raw.toObject ? raw.toObject() : raw;
+}
+
+/* The label is display metadata only — identity is always the docId. */
+function documentIdentity(docId, doc, payload, fallbackLabel = '') {
+  return {
+    docId,
+    expectedType: sanitizeQueryText(
+      payload?.expectedDocumentType || payload?.docLabel || fallbackLabel || doc.name || docId
+    ),
+    fileName: sanitizeQueryText(doc.name || ''),
+  };
+}
+
+router.get('/:id/document/:docId/query-draft', requireReviewer, async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    const doc = loadDocumentOr404(app, req.params.docId, res);
+    if (!doc) return;
+
+    const payload = doc.validationResult?.fullResults || null;
+    if (!payload) {
+      return res.status(409).json({
+        code: 'NOT_VERIFIED',
+        error: 'This document has not been verified yet. Run AI verification before raising a query.',
+      });
+    }
+
+    const document = documentIdentity(req.params.docId, doc, payload);
+    res.set('Cache-Control', 'private, no-store');
+    return res.json({
+      success: true,
+      applicationNumber: app.applicationNumber,
+      document: { ...document, status: verificationStatus(payload) },
+      rows: buildDocumentQueryDraft(payload, document.expectedType),
+    });
+  } catch (err) {
+    console.error('document query draft error:', err);
+    return res.status(500).json({ error: 'The query draft could not be generated.' });
+  }
+});
+
+router.post('/:id/document/:docId/query', requireReviewer, async (req, res) => {
+  try {
+    const app = await loadAppOr404(req.params.id, res);
+    if (!app) return;
+    const docId = req.params.docId;
+    const doc = loadDocumentOr404(app, docId, res);
+    if (!doc) return;
+
+    const submissionId = String(req.body?.submissionId || '').trim();
+    if (!submissionId) return res.status(400).json({ error: 'A submissionId is required for this query.' });
+    const idempotencyKey = `${app._id}:${docId}:${submissionId}`;
+
+    // Idempotent: a retried click or a replayed request resolves to the record
+    // the first attempt created rather than raising the query twice.
+    const alreadyRaised = await ApplicationQuery.findOne({ idempotencyKey }).lean();
+    if (alreadyRaised) {
+      return res.json({
+        success: true, duplicate: true, query: alreadyRaised,
+        status: app.status, queryCount: app.queryCount || 0,
+      });
+    }
+
+    let rows;
+    try {
+      rows = normalizeQueryRows(req.body?.rows);
+    } catch (err) {
+      if (err instanceof QueryRowValidationError) {
+        return res.status(400).json({ error: err.message, rowErrors: err.rowErrors });
+      }
+      throw err;
+    }
+
+    const payload = doc.validationResult?.fullResults || null;
+    const document = documentIdentity(docId, doc, payload, req.body?.expectedType);
+    const officer = req.reviewer.name;
+    // Legacy single-string remarks are derived here; the rows stay primary.
+    const remarks = deriveLegacyRemarks(document, rows);
+
+    let queryRecord;
+    try {
+      queryRecord = await createApplicationQuery(app, {
+        remarks, officer, source: 'document', sourceReference: docId,
+        document, rows, idempotencyKey,
+      });
+    } catch (err) {
+      // A concurrent identical submission won the unique index — return theirs.
+      if (err?.code === 11000) {
+        const winner = await ApplicationQuery.findOne({ idempotencyKey }).lean();
+        if (winner) {
+          return res.json({
+            success: true, duplicate: true, query: winner,
+            status: app.status, queryCount: app.queryCount || 0,
+          });
+        }
+      }
+      throw err;
+    }
+
+    const prev = app.status;
+    const occurredAt = new Date();
+    app.status = 'Query Raised';
+    app.queryCount = await ApplicationQuery.countDocuments({ application: app._id });
+    recordStatusTransition(app, {
+      fromStatus: prev, toStatus: 'Query Raised', occurredAt,
+      actorId: req.reviewer.id, actorName: officer,
+      action: 'document_query', remarks,
+    });
+    if (!app.reviewerRemarks) app.reviewerRemarks = [];
+    app.reviewerRemarks.push({
+      text: remarks, officer, timestamp: occurredAt,
+      status: 'Query Raised', queryIdentifier: queryRecord.queryIdentifier,
+    });
+
+    try {
+      await app.save();
+    } catch (saveError) {
+      // Keep the pair atomic: no orphaned query without the status change.
+      await ApplicationQuery.deleteOne({ _id: queryRecord._id });
+      throw saveError;
+    }
+
+    return res.json({
+      success: true,
+      duplicate: false,
+      status: app.status,
+      queryCount: app.queryCount || 0,
+      query: queryRecord.toObject ? queryRecord.toObject() : queryRecord,
+    });
+  } catch (err) {
+    console.error('document query submit error:', err);
+    return res.status(500).json({ error: 'The query could not be submitted.' });
+  }
+});
+
+/* Reviewer-only decision summary. This returns a narrow, presentation-ready
+   projection rather than raw audit records, document bytes/paths, or the
+   complete application model. */
+router.get('/:id/summary', requireReviewer, async (req, res) => {
+  try {
+    const app = await Application.findOne({
+      $or: [{ applicationNumber: req.params.id }, { referenceNumber: req.params.id }],
+    });
+    if (!app) return res.status(404).json({ error: 'Application not found' });
+
+    seedChecklist(app);
+    await app.save();
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const queries = await getCompleteQueryHistory(app);
+    const summary = buildApplicationSummary({
+      app,
+      checklist: shapeChecklist(app, baseUrl),
+      queries,
+      baseUrl,
+    });
+    res.set('Cache-Control', 'private, no-store');
+    return res.json({ success: true, summary });
+  } catch (err) {
+    console.error('application summary error:', err);
+    return res.status(500).json({ error: 'Application summary could not be generated.' });
   }
 });
 
@@ -1639,6 +2029,40 @@ async function loadAppOr404(idOrRef, res) {
   return app;
 }
 
+/* Document-scoped queries grouped under the docId they were raised against, so
+   the applicant sees each query beneath its own document. Keyed on the stable
+   docId — never the filename or label, which can repeat across uploads.
+   `aiQueryText` is reviewer-internal and deliberately not exposed here. */
+async function documentQueriesByDocId(app) {
+  const records = await ApplicationQuery.find({ application: app._id, source: 'document' })
+    .sort({ createdAt: 1 })
+    .lean();
+  const grouped = {};
+  for (const record of records) {
+    const docId = record.document?.docId;
+    if (!docId) continue;
+    if (!grouped[docId]) grouped[docId] = [];
+    grouped[docId].push({
+      queryIdentifier: record.queryIdentifier,
+      raisedAt: record.createdAt,
+      status: record.status,
+      reviewer: record.reviewer?.name || 'Reviewer',
+      expectedType: record.document?.expectedType || '',
+      fileName: record.document?.fileName || '',
+      applicantResponse: record.applicantResponse || '',
+      responseAt: record.responseAt || null,
+      rows: (record.rows || []).map(row => ({
+        order: row.order,
+        checklistItem: row.checklistItem || '',
+        deficiency: row.deficiency || '',
+        queryText: row.queryText || '',
+        rowSource: row.rowSource || 'ai_generated',
+      })),
+    });
+  }
+  return grouped;
+}
+
 /* ── GET /:id/checklist — full checklist tree for reviewer + applicant ── */
 router.get('/:id/checklist', async (req, res) => {
   try {
@@ -1675,6 +2099,7 @@ router.get('/:id/checklist', async (req, res) => {
       status: app.status,
       checklist: shapeChecklist(app, baseUrl),
       documents: uploadedDocs,
+      documentQueries: await documentQueriesByDocId(app),
     });
   } catch (err) {
     console.error('checklist load error:', err);

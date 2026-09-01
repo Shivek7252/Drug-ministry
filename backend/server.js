@@ -8,7 +8,17 @@ const fetch = require('node-fetch');
 const pdfParse = require('pdf-parse');
 const JSZip = require('jszip');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const { fillAllTemplates } = require('./templateFiller');
+const {
+  VerificationError,
+  extractAssistantJson,
+  failurePayload,
+  parseQuickVerificationResponse,
+  parseDeepVerificationResponse,
+} = require('./services/verificationResponse');
+const { requestWithRetry } = require('./services/mistralRequest');
+const { requireReviewer } = require('./middleware/reviewerAuth');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const APPROVED_DRUGS_WORKBOOK = path.join(__dirname, '..', 'approved_drugs.xlsx');
@@ -51,8 +61,21 @@ async function readApprovedDrugsWorkbook() {
 
 /* ── MongoDB connection ──────────────────────────────────────────────────── */
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/drug_ministry';
+const { reconcileReadReceiptIndexes } = require('./services/readReceipts');
 mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-  .then(() => console.log(`✅ MongoDB connected: ${MONGODB_URI}`))
+  .then(async () => {
+    const MONGODB_URI = mongoose.connection.name || 'unknown'; // safe shadow for the legacy log below
+    console.log(`✅ MongoDB connected: ${MONGODB_URI}`);
+    /* A stale unique index from the name-keyed read-receipt schema makes
+       "mark as read" fail for every reviewer but the first. Drop it on boot so
+       an existing database is corrected without a manual migration step. */
+    try {
+      const result = await reconcileReadReceiptIndexes();
+      if (result.dropped) console.log(`   read receipts: ${result.reason}`);
+    } catch (err) {
+      console.warn(`⚠️  Could not reconcile read-receipt indexes: ${err.message}`);
+    }
+  })
   .catch(err => {
     console.warn(`⚠️  MongoDB not available (${err.message}). Running without DB — application endpoints will return errors.`);
     console.warn('   Start MongoDB or set MONGODB_URI in backend/.env to enable persistence.');
@@ -61,7 +84,7 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } });
 
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000' }));
 app.use(express.json({ limit: '50mb' }));
 
 /* ── Application CRUD routes ────────────────────────────────────────────── */
@@ -519,7 +542,7 @@ function isNetworkError(err) {
 }
 
 /* ─── Mistral API call with exponential backoff on 429 ─────────────────── */
-async function fetchWithRetry(url, options, maxRetries = 4) {
+async function legacyFetchWithRetry(url, options, maxRetries = 4) {
   let delay = 2000; // start with 2 seconds
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let response;
@@ -547,6 +570,17 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
 }
 
 /* ─── Call Mistral chat completions (plain text response) ──────────────── */
+async function fetchWithRetry(url, options, maxRetries = 2) {
+  return requestWithRetry(fetch, url, options, {
+    maxRetries,
+    perAttemptTimeoutMs: Number(process.env.MISTRAL_ATTEMPT_TIMEOUT_MS) || 30000,
+    overallTimeoutMs: Number(process.env.MISTRAL_OVERALL_TIMEOUT_MS) || 75000,
+    onRetry: ({ attempt, status, error, waitMs }) => {
+      console.warn('[Verification retry]', { attempt, status: status || null, error: error || null, waitMs });
+    },
+  });
+}
+
 async function callMistral(messages, { model = 'mistral-small-latest', maxTokens = 2000 } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
@@ -590,7 +624,7 @@ async function callMistralJson(messages, { model = 'mistral-small-latest', maxTo
     throw new Error(`Mistral API error ${response.status}: ${err}`);
   }
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '{}';
+  return extractAssistantJson(data);
 }
 
 /* ─── Parse Mistral's checklist response ───────────────────────────────── */
@@ -1019,6 +1053,11 @@ async function identifyDocumentTypeQuick({ buffer, mimetype, docType, docLabel }
   }
 
   if (text.length < 100) {
+    throw new VerificationError(
+      'INSUFFICIENT_TEXT',
+      'Unable to verify document type because insufficient text could be extracted.',
+      { retryable: true, httpStatus: 422 },
+    );
     return {
       documentTypeMatch: true,
       documentTypeReason: 'Could not extract text from document — type check skipped, please deep-verify manually.',
@@ -1051,6 +1090,8 @@ Return JSON only.`;
     { model: 'mistral-small-latest', maxTokens: 200 }
   );
 
+  return parseQuickVerificationResponse(raw);
+
   let parsed;
   try { parsed = JSON.parse(raw); } catch { parsed = {}; }
   return {
@@ -1065,18 +1106,23 @@ Return JSON only.`;
 async function verifyDocumentBuffer({ buffer, mimetype, docType, docLabel }) {
   const items = CHECKLISTS[docType] || CHECKLISTS.default;
   const profile = DOC_TYPE_PROFILES[docType] || DOC_TYPE_PROFILES.default;
+  const totalStarted = Date.now();
+  const timings = { pdfExtractionMs: 0, ocrMs: 0, classificationMs: 0, visionMs: 0 };
 
   // ── Step 1: extract per-page text ──────────────────────────────────────
   let pages = [];
   let textSource = 'none';
   if (mimetype === 'application/pdf') {
+    const extractionStarted = Date.now();
     pages = await extractTextFromPdfPages(buffer);
+    timings.pdfExtractionMs = Date.now() - extractionStarted;
     if (pages.join('').trim().length > 50) textSource = 'pdf-text';
   }
 
   // ── Step 2: OCR fallback for scanned / image-only PDFs ────────────────
   const totalChars = pages.reduce((s, p) => s + (p || '').length, 0);
   if (mimetype === 'application/pdf' && totalChars < 200) {
+    const ocrStarted = Date.now();
     try {
       const ocrPages = await ocrPdfWithMistral(buffer);
       if (ocrPages.join('').trim().length > 50) {
@@ -1089,12 +1135,19 @@ async function verifyDocumentBuffer({ buffer, mimetype, docType, docLabel }) {
       } else {
         console.warn('[OCR] fallback failed:', e.message);
       }
+    } finally {
+      timings.ocrMs = Date.now() - ocrStarted;
     }
   }
 
   const hasText = pages.join('').trim().length > 100;
 
   if (!hasText) {
+    throw new VerificationError(
+      'INSUFFICIENT_TEXT',
+      'Unable to verify this document because text extraction and OCR produced insufficient text.',
+      { retryable: true, httpStatus: 422 },
+    );
     const blankResults = items.map(it => ({
       item: it, present: null, page: null, evidence: '',
       note: 'Text could not be extracted. Document appears to be a scanned image — AI checklist verification requires text extraction.'
@@ -1187,15 +1240,18 @@ ${items.map((it, i) => `${i + 1}. ${it}`).join('\n')}
 Return ONLY the JSON object described in the schema — no preamble, no markdown fences.`;
 
   // ── Step 4: call Mistral in strict JSON mode ──────────────────────────
+  const classificationStarted = Date.now();
   const raw = await callMistralJson([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
   ]);
+  timings.classificationMs = Date.now() - classificationStarted;
 
   // ── Step 5: parse and normalise ───────────────────────────────────────
   let parsed;
-  try { parsed = JSON.parse(raw); }
+  try { parsed = parseDeepVerificationResponse(raw, { expectedItemCount: items.length }); }
   catch (e) {
+    throw e;
     console.error('Failed to parse Mistral JSON:', e.message, '\nRaw:', raw.slice(0, 500));
     parsed = { items: [] };
   }
@@ -1254,6 +1310,7 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
     items.forEach((it, i) => { if (isVisualItem(it)) visualIdx.push(i); });
 
     if (visualIdx.length > 0) {
+      const visionStarted = Date.now();
       try {
         const vision = await verifyVisualItemsWithVision(buffer, visualIdx.map(i => items[i]));
         const visionByIdx = new Map();
@@ -1285,6 +1342,8 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
         visionUsed = true;
       } catch (e) {
         console.warn('[Vision] visual-item pass failed:', e.message);
+      } finally {
+        timings.visionMs = Date.now() - visionStarted;
       }
     }
   }
@@ -1308,6 +1367,7 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
     detectedDocumentType,
     suggestedCorrectiveAction,
     visionUsed,
+    timings: { ...timings, totalMs: Date.now() - totalStarted },
     results,
     summary: {
       total: items.length,
@@ -1316,7 +1376,6 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
       unknown: unknownCount,
       score: documentTypeMatch ? Math.round((presentCount / items.length) * 100) : 0,
     },
-    rawResponse: raw,
   };
 }
 
@@ -1333,6 +1392,9 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
     });
     return res.json(result);
   } catch (err) {
+    const failure = failurePayload(err);
+    console.error('Verify error:', { code: failure.code, retryable: failure.retryable });
+    return res.status(err?.httpStatus || 502).json(failure);
     const isApiIssue = err.message.includes('MISTRAL_API_KEY') ||
       err.message.includes('ENOTFOUND') ||
       err.message.includes('unreachable') ||
@@ -1372,7 +1434,91 @@ app.post('/api/verify', upload.single('file'), async (req, res) => {
 const Application = require('./models/Application');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
-app.post('/api/applications/:appNum/pre-verify', async (req, res) => {
+function verificationPath(docId, suffix = '') {
+  if (!/^[A-Za-z0-9_-]+$/.test(docId)) {
+    throw new VerificationError('INVALID_DOCUMENT_ID', 'Document identifier is invalid.', {
+      retryable: false,
+      httpStatus: 400,
+    });
+  }
+  return `documents.${docId}.validationResult${suffix ? `.${suffix}` : ''}`;
+}
+
+function fileHash(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+async function beginVerificationJob(application, docId, doc, buffer, operation) {
+  const jobId = crypto.randomUUID();
+  const hash = fileHash(buffer);
+  const version = Number(doc.validationResult?.version || 0) + 1;
+  const state = {
+    state: 'processing',
+    retryable: false,
+    operation,
+    jobId,
+    version,
+    fileHash: hash,
+    startedAt: new Date(),
+  };
+  const result = await Application.collection.updateOne(
+    { _id: application._id },
+    { $set: { [verificationPath(docId)]: state, [`documents.${docId}.validated`]: false } },
+  );
+  if (result.matchedCount !== 1) {
+    throw new VerificationError('PERSISTENCE_FAILED', 'Could not persist verification start state.', {
+      retryable: true,
+      httpStatus: 503,
+    });
+  }
+  return { jobId, hash, version, operation, startedAt: state.startedAt };
+}
+
+async function finishVerificationJob(application, docId, job, resultPayload) {
+  const verifiedAt = new Date();
+  const validationResult = {
+    state: 'completed',
+    retryable: false,
+    operation: job.operation,
+    jobId: job.jobId,
+    version: job.version,
+    fileHash: job.hash,
+    startedAt: job.startedAt,
+    verifiedAt,
+    ...resultPayload,
+  };
+  const result = await Application.collection.updateOne(
+    { _id: application._id, [verificationPath(docId, 'jobId')]: job.jobId },
+    { $set: { [verificationPath(docId)]: validationResult, [`documents.${docId}.validated`]: true } },
+  );
+  if (result.modifiedCount !== 1) {
+    throw new VerificationError('STALE_VERIFICATION_JOB', 'A newer verification replaced this result.', {
+      retryable: true,
+      httpStatus: 409,
+    });
+  }
+  return validationResult;
+}
+
+async function failVerificationJob(application, docId, job, err) {
+  const failure = failurePayload(err);
+  const validationResult = {
+    ...failure,
+    operation: job.operation,
+    jobId: job.jobId,
+    version: job.version,
+    fileHash: job.hash,
+    startedAt: job.startedAt,
+    finishedAt: new Date(),
+  };
+  await Application.collection.updateOne(
+    { _id: application._id, [verificationPath(docId, 'jobId')]: job.jobId },
+    { $set: { [verificationPath(docId)]: validationResult, [`documents.${docId}.validated`]: false } },
+  );
+  return validationResult;
+}
+
+app.post('/api/applications/:appNum/pre-verify', requireReviewer, async (req, res) => {
   try {
     const { appNum } = req.params;
     const force = req.query.force === '1' || req.body?.force === true;
@@ -1429,36 +1575,31 @@ app.post('/api/applications/:appNum/pre-verify', async (req, res) => {
       const docType = CHECKLISTS[docId] ? docId : 'default';
       const docLabel = doc.name || docId;
       const mimetype = doc.type || 'application/pdf';
+      let job;
 
       try {
+        job = await beginVerificationJob(application, docId, doc, buffer, 'quick');
         const quick = await identifyDocumentTypeQuick({ buffer, mimetype, docType, docLabel });
-        const cached = {
+        const completed = await finishVerificationJob(application, docId, job, {
           documentTypeMatch: quick.documentTypeMatch,
           documentTypeReason: quick.documentTypeReason,
           score: null,
-          verifiedAt: new Date(),
-        };
-        return [docId, { cached: false, updatedDoc: { ...doc, validated: true, validationResult: cached }, result: { ...cached, cached: false } }];
+        });
+        return [docId, { ...completed, cached: false }];
       } catch (verifyErr) {
-        console.warn(`[pre-verify] ${docId} failed:`, verifyErr.message);
-        return [docId, { error: verifyErr.message }];
+        const failed = job
+          ? await failVerificationJob(application, docId, job, verifyErr)
+          : failurePayload(verifyErr);
+        console.warn('[pre-verify failed]', { docId, code: failed.code, retryable: failed.retryable });
+        return [docId, failed];
       }
     };
 
     const settled = await Promise.all(entries.map(perDoc));
     for (const [docId, r] of settled) {
       if (!r) continue;
-      if (r.updatedDoc) {
-        if (docs?.set) docs.set(docId, r.updatedDoc);
-        else docs[docId] = r.updatedDoc;
-        results[docId] = r.result;
-      } else {
-        results[docId] = r;
-      }
+      results[docId] = r;
     }
-
-    application.markModified('documents');
-    await application.save();
 
     res.json({ success: true, results });
   } catch (err) {
@@ -1472,7 +1613,7 @@ app.post('/api/applications/:appNum/pre-verify', async (req, res) => {
    pass) for one stored application document and caches the full results on
    documents.<docId>.validationResult.fullResults. Subsequent calls hit the
    cache instantly. Pass ?force=1 to re-run and refresh the cache. */
-app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) => {
+app.post('/api/applications/:appNum/document/:docId/verify', requireReviewer, async (req, res) => {
   try {
     const { appNum, docId } = req.params;
     const force = req.query.force === '1' || req.body?.force === true;
@@ -1491,8 +1632,12 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
     if (!force && doc.validationResult?.fullResults) {
       return res.json({
         ...doc.validationResult.fullResults,
+        state: doc.validationResult.state || 'completed',
         cached: true,
         verifiedAt: doc.validationResult.verifiedAt || doc.validationResult.fullResults.verifiedAt || null,
+        jobId: doc.validationResult.jobId || null,
+        version: doc.validationResult.version || 0,
+        fileHash: doc.validationResult.fileHash || null,
       });
     }
 
@@ -1515,33 +1660,40 @@ app.post('/api/applications/:appNum/document/:docId/verify', async (req, res) =>
     const docType = CHECKLISTS[docId] ? docId : 'default';
     const docLabel = TEMPLATE_REQUIREMENTS[docId]?.label || doc.name || docId;
     const mimetype = doc.type || 'application/pdf';
+    const job = await beginVerificationJob(application, docId, doc, buffer, 'deep');
 
-    const verifyResult = await verifyDocumentBuffer({ buffer, mimetype, docType, docLabel });
-    const verifiedAt = new Date();
-
-    // Persist full result + refresh the top-level type match/reason too so
-    // the reviewer's Documents-tab badge stays in sync.
-    const updatedDoc = {
-      ...doc,
-      validated: true,
-      validationResult: {
-        ...(doc.validationResult || {}),
+    try {
+      const verifyResult = await verifyDocumentBuffer({ buffer, mimetype, docType, docLabel });
+      const validationResult = await finishVerificationJob(application, docId, job, {
         documentTypeMatch: verifyResult.documentTypeMatch,
         documentTypeReason: verifyResult.documentTypeReason,
         score: verifyResult.summary?.score ?? null,
-        verifiedAt,
         fullResults: verifyResult,
-      },
-    };
-    if (docs?.set) docs.set(docId, updatedDoc);
-    else docs[docId] = updatedDoc;
-    application.markModified('documents');
-    await application.save();
-
-    res.json({ ...verifyResult, cached: false, verifiedAt });
+      });
+      res.json({
+        ...verifyResult,
+        state: 'completed',
+        cached: false,
+        verifiedAt: validationResult.verifiedAt,
+        jobId: validationResult.jobId,
+        version: validationResult.version,
+        fileHash: validationResult.fileHash,
+      });
+    } catch (verifyErr) {
+      const failed = await failVerificationJob(application, docId, job, verifyErr);
+      console.error('[document verification failed]', {
+        appNum,
+        docId,
+        jobId: job.jobId,
+        code: failed.code,
+        retryable: failed.retryable,
+      });
+      res.status(verifyErr?.httpStatus || 502).json(failed);
+    }
   } catch (err) {
-    console.error('Doc verify error:', err.message);
-    res.status(500).json({ error: sanitizeError(err) });
+    const failed = failurePayload(err);
+    console.error('Doc verify error:', { code: failed.code, retryable: failed.retryable });
+    res.status(err?.httpStatus || 500).json(failed);
   }
 });
 
@@ -1628,7 +1780,7 @@ const PORT = process.env.PORT || 5001;
 
 const server = app.listen(PORT, () => {
   console.log(`\n✅ Drug Ministry backend running on http://localhost:${PORT}`);
-  console.log(`   Mistral key: ${process.env.MISTRAL_API_KEY?.slice(0, 8)}...`);
+  console.log(`   Verification API configured: ${Boolean(process.env.MISTRAL_API_KEY)}`);
   console.log(`   Endpoints:`);
   console.log(`     GET  /health`);
   console.log(`     POST /api/verify`);

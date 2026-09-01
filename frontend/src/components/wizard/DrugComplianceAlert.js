@@ -102,7 +102,7 @@ function shortNotification(notification) {
     .trim();
 }
 
-function copyFor(severity, drug, gazette) {
+function copyFor(severity, drug, gazette, readOnly) {
   const name = (drug && drug.name) || '';
   switch (severity) {
     case 'banned':
@@ -128,9 +128,11 @@ function copyFor(severity, drug, gazette) {
     case 'notFound':
       return {
         headline: `${name} is not in the CDSCO approved list`,
-        subline: 'No matching entry in the CDSCO approved drugs register.',
-        description:
-          'Select a name from the lookup suggestions, or attach valid approval documentation for this product before submitting.',
+        subline: 'No matching entry in the CDSCO approved drugs register or the Section 26A prohibited list.',
+        description: readOnly
+          ? 'The applicant entered a generic name that matches neither register.'
+          : 'This product cannot be added until its generic name matches an approved medicine or a ' +
+            'Section 26A prohibited entry. Select a name from the lookup suggestions.',
       };
     case 'approved':
       return {
@@ -155,7 +157,7 @@ export default function DrugComplianceAlert({
   const isWide = useIsWide(900);
   if (!severity) return null;
 
-  const copy = copyFor(severity, drug, gazette);
+  const copy = copyFor(severity, drug, gazette, readOnly);
   if (!copy) return null;
 
   const requiresAcknowledgement = severity === 'banned' && !readOnly && typeof onAcknowledge === 'function';

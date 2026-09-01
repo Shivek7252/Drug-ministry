@@ -1,3 +1,5 @@
+import { BACKEND_ORIGIN } from '../config/api';
+
 let approvedDrugs = [];
 let loadPromise = null;
 
@@ -7,7 +9,7 @@ export async function loadApprovedDrugs() {
 	if (loadPromise) return loadPromise;
 	loadPromise = (async () => {
 		try {
-			const response = await fetch('http://localhost:5001/api/approved-drugs');
+			const response = await fetch(`${BACKEND_ORIGIN}/api/approved-drugs`);
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			const data = await response.json();
 			if (Array.isArray(data.drugs)) approvedDrugs = data.drugs;
@@ -18,6 +20,12 @@ export async function loadApprovedDrugs() {
 		return approvedDrugs;
 	})();
 	return loadPromise;
+}
+
+// True once the register has actually arrived. A "listed in neither register"
+// verdict is only meaningful when both lists are in memory.
+export function isApprovedListLoaded() {
+	return approvedDrugs.length > 0;
 }
 
 export function searchApprovedDrugs(query, limit = 8) {

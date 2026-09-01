@@ -5,6 +5,11 @@ import { SLA_DESCRIPTION } from './statusModel';
 /* ============================================================================
    KpiFilterRow — the KPI strip is the primary filter affordance.
 
+   A tile carries exactly three things: its icon, its label and its current
+   count. There is no week-to-date comparison, arrow, percentage or "not
+   comparable" placeholder — those were removed, along with the client-side
+   delta helpers that fed them.
+
    Counts come from barFiltered (filter bar only), NEVER from the tile
    selection, so choosing a tile never changes the numbers on the tiles.
 
@@ -37,51 +42,8 @@ const TILE_HINT = {
   overdue: SLA_DESCRIPTION,
 };
 
-/* What the reader is looking at, stated once:
-
-     "this week"   the calendar week to date in the business timezone, Monday
-                   00:00 IST up to now. The window is half-open, so an event on
-                   the boundary belongs to the later week.
-     the number    EVENTS in that window (approvals, rejections, queries
-                   raised, submissions, entries into review) minus the same
-                   count for the whole previous week — not a change in the
-                   tile's current count.
-     arrow/colour  up + green = more of that event than last week; down + red =
-                   fewer. Direction only. More rejections is "up", which is not
-                   necessarily good; the arrow reports volume, not sentiment.
-     percentage    change against last week. Omitted when last week was zero,
-                   because a percentage of nothing is not a number.
-     unavailable   the history needed to reconstruct last week is missing. Says
-                   so rather than showing a zero that reads as "no change". */
-function Delta({ delta }) {
-  if (!delta || delta.available === false) {
-    return (
-      <span
-        className="kpi-delta is-na"
-        title={delta?.detail || delta?.reason
-          || 'The previous period cannot be reconstructed from the recorded history.'}
-      >
-        {delta?.reason === 'Historical data unavailable' ? 'Historical data unavailable' : 'Not comparable'}
-      </span>
-    );
-  }
-
-  const pct = typeof delta.percent === 'number' ? ` (${delta.percent > 0 ? '+' : ''}${delta.percent}%)` : '';
-  const title = `${delta.current} week to date vs ${delta.prior} in the same period last week${pct}.`
-    + ` ${delta.basis || delta.label || ''}`;
-
-  if (delta.delta === 0) return null;
-  const up = delta.delta > 0;
-  return (
-    <span className={`kpi-delta ${up ? 'is-up' : 'is-down'} tnum`} title={title}>
-      <Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} />
-      {up ? '+' : ''}{delta.delta} WTD{pct}
-    </span>
-  );
-}
-
 export default function KpiFilterRow({
-  tiles, counts, deltas, value, onChange, loading,
+  tiles, counts, value, onChange, loading,
   unreadCount = 0, readStateReady = false, unknownCount = 0,
   unavailable = false,
 }) {
@@ -139,12 +101,8 @@ export default function KpiFilterRow({
               <Icon name={TILE_ICON[tile.key]} size={16} />
               <span className="kpi-label">{tile.label}</span>
             </span>
-            <span className="kpi-figures">
-              <span className="kpi-value tnum">
-                {loading || unavailable ? '—' : (counts?.[tile.key] ?? 0)}
-              </span>
-              {!loading && !unavailable && <Delta delta={deltas?.[tile.key]} />}
-              {!loading && unavailable && <span className="kpi-delta is-na">Unavailable</span>}
+            <span className="kpi-value tnum">
+              {loading || unavailable ? '—' : (counts?.[tile.key] ?? 0)}
             </span>
           </button>
         );

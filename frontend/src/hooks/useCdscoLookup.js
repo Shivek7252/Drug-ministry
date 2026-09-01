@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadApprovedDrugs, findApprovedDrug } from '../data/approvedDrugs';
-import { loadBannedDrugs, checkBannedDrug } from '../data/bannedDrugs';
+import { loadApprovedDrugs, findApprovedDrug, isApprovedListLoaded } from '../data/approvedDrugs';
+import { loadBannedDrugs, checkBannedDrug, isBannedListLoaded } from '../data/bannedDrugs';
 
 /* ============================================================
    useCdscoLookup(genericName)
@@ -80,6 +80,37 @@ export function resolveSeverity(genericName) {
     drug: { name: String(genericName).trim(), approvalDate: '', indication: '' },
     gazette: null,
   };
+}
+
+/* ── Admissibility gate ──────────────────────────────────────────────────────
+   A product may only be added when its generic name is listed somewhere: in the
+   CDSCO approved register, or in the Section 26A prohibited list (whether that
+   match resolves to 'banned' or 'restricted'). A name in neither register cannot
+   be verified against any official list, so Step 3 refuses it.
+   ────────────────────────────────────────────────────────────────────────────*/
+
+/* Both registers must be in memory before "listed in neither" means anything.
+   With either list missing every name looks unlisted, which would refuse every
+   product whenever a fetch fails — so an unloaded register never blocks. */
+export function isRegistryLoaded() {
+  return isApprovedListLoaded() && isBannedListLoaded();
+}
+
+export function unlistedMessage(name) {
+  return `“${name}” is not in the CDSCO approved medicines list or the Section 26A ` +
+    'banned medicines list. Pick a name from the lookup suggestions.';
+}
+
+/** Gate for one generic name — { admissible, severity, reason }. */
+export function checkGenericNameListed(genericName) {
+  const name = String(genericName || '').trim();
+  if (!name) return { admissible: false, severity: null, reason: 'Required' };
+  if (!isRegistryLoaded()) return { admissible: true, severity: null, reason: '' };
+
+  const { severity } = resolveSeverity(name);
+  return severity === 'notFound'
+    ? { admissible: false, severity, reason: unlistedMessage(name) }
+    : { admissible: true, severity, reason: '' };
 }
 
 /* Cache lives for the session; both source lists are static per deployment. */

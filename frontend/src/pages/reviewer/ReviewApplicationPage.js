@@ -9,12 +9,17 @@ import {
   reviewerAction,
   getChecklist,
   getQueryHistory,
+  markApplicationRead,
 } from '../../api/applicationService';
 import DocViewerModal from '../../components/shared/DocViewerModal';
+import { applyPersistedVerification } from '../../components/shared/verificationState';
+import ApplicationReviewModal from '../../components/shared/ApplicationReviewModal';
 import DrugComplianceAlert from '../../components/wizard/DrugComplianceAlert';
 import { loadApprovedDrugs } from '../../data/approvedDrugs';
 import { loadBannedDrugs } from '../../data/bannedDrugs';
 import { resolveSeverity } from '../../hooks/useCdscoLookup';
+import { signalQueueChanged } from '../../config/queueRefreshSignal';
+import { BACKEND_ORIGIN } from '../../config/api';
 import ShipmentsTab from './ShipmentsTab';
 import SummaryPanel from './SummaryPanel';
 import './ReviewApplicationPage.css';
@@ -143,6 +148,10 @@ export default function ReviewApplicationPage() {
 
   // Action form
   const [showForm, setShowForm] = useState(false);
+  // Application-level Under Review has its own modal; Approve and Reject
+  // keep the existing decision form unchanged.
+  const [showUnderReview, setShowUnderReview] = useState(false);
+  const [toast, setToast] = useState(null);
   const [actionStatus, setActionStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
@@ -177,6 +186,31 @@ export default function ReviewApplicationPage() {
   }, [appNumber]);
 
   useEffect(() => { load(); }, [load]);
+
+  /* Reaching this page IS opening the application, however the reviewer got
+     here — the queue's Review button, a bookmarked URL, a link in an email.
+     The receipt is written only after the application actually loaded, so a
+     404 or a failed fetch never marks anything read.
+
+     `markedRead` keeps it to one request per application per mount; the
+     endpoint is idempotent regardless, so a repeat is harmless rather than a
+     second decrement. On success the queue-changed signal refreshes the
+     dashboard's unread count in this tab and in any other. */
+  const markedRead = useRef(new Set());
+  useEffect(() => {
+    const appNo = full?.applicationNumber;
+    if (!appNo || markedRead.current.has(appNo)) return;
+    markedRead.current.add(appNo);
+    let cancelled = false;
+    markApplicationRead(appNo).then(res => {
+      if (cancelled) return;
+      if (res.success) signalQueueChanged();
+      /* Failed: drop the guard so a later render can try again rather than
+         leaving the application silently unread forever. */
+      else markedRead.current.delete(appNo);
+    });
+    return () => { cancelled = true; };
+  }, [full?.applicationNumber]);
 
   /* Compliance snapshot for KPIs — cheap fetch since /checklist is cached. */
   useEffect(() => {
@@ -396,7 +430,7 @@ export default function ReviewApplicationPage() {
           {/* Submitted / Query Raised / Partially Approved — full action set */}
           {(data.status === 'Submitted' || data.status === 'Query Raised' || data.status === 'Partially Approved') && (
             <>
-              <button className="rap-btn rap-btn-warn" onClick={() => { setActionStatus('Under Review'); setShowForm(true); }}>🔍 Under Review</button>
+              <button className="rap-btn rap-btn-warn" onClick={() => setShowUnderReview(true)}>🔍 Under Review</button>
               <button className="rap-btn rap-btn-danger" onClick={() => { setActionStatus('Rejected'); setShowForm(true); }}>✕ Reject</button>
               <button className="rap-btn rap-btn-primary" onClick={() => { setActionStatus('Approved'); setShowForm(true); }}>✓ Approve</button>
             </>
@@ -532,6 +566,8 @@ export default function ReviewApplicationPage() {
           appNumber={data.applicationNumber}
           reviewerMode
           onReviewerDecision={handleDocumentReviewDecision}
+          onDocumentQueryRaised={() => { load(); }}
+          onVerificationPersisted={(docId, payload) => setFull(prev => applyPersistedVerification(prev, docId, payload))}
           reviewActionsDisabled={data.status === 'Approved' || data.status === 'Rejected'}
           verificationResult={docVerdict[viewerDoc.docId]}
           onVerify={(id) => setDocVerdict(p => ({ ...p, [id]: 'ok' }))}
@@ -578,6 +614,30 @@ export default function ReviewApplicationPage() {
         />
       )}
 
+      {showUnderReview && (
+        <ApplicationReviewModal
+          appNumber={data.applicationNumber}
+          onClose={() => setShowUnderReview(false)}
+          onCompleted={async (result) => {
+            setShowUnderReview(false);
+            setToast(result.duplicate
+              ? "This review was already recorded."
+              : result.statusChanged
+                ? `Application marked Under Review. ${result.rowCount} internal observation${result.rowCount === 1 ? "" : "s"} saved.`
+                : "Internal review notes updated. The status was already Under Review.");
+            // Refresh status, KPI counters and history without a page reload.
+            await load();
+          }}
+        />
+      )}
+
+      {toast && (
+        <div className="rap-toast" role="status" aria-live="polite">
+          <span>{toast}</span>
+          <button type="button" onClick={() => setToast(null)} aria-label="Dismiss notification">×</button>
+        </div>
+      )}
+
       {showForm && (
         <ActionFormOverlay
           actionStatus={actionStatus}
@@ -607,7 +667,7 @@ function OverviewSection({ data, compliance, uploadStats, onNavigate, onOpenSumm
   // Fetch CDSCO approved-drugs list and match against each product's genericName
   const [approvedDrugs, setApprovedDrugs] = useState([]);
   useEffect(() => {
-    fetch('http://localhost:5001/api/approved-drugs')
+    fetch(`${BACKEND_ORIGIN}/api/approved-drugs`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.drugs)) setApprovedDrugs(d.drugs); })
       .catch(() => { });
@@ -888,6 +948,7 @@ function QueryHistorySection({ queries, error, onRetry }) {
     application: 'Application decision',
     shipment: 'Shipment line',
     checklist: 'Checklist item',
+    document: 'Document',
     legacy: 'Legacy query',
   };
 
@@ -916,7 +977,47 @@ function QueryHistorySection({ queries, error, onRetry }) {
                   {' · '}{query.reviewer?.name || 'Reviewer'}
                   {' · '}{query.createdAt ? new Date(query.createdAt).toLocaleString('en-IN') : 'Date unavailable'}
                 </div>
-                <p className="rap-query-remarks">{query.remarks}</p>
+                {/* Structured document queries render as the table they were
+                    raised as; every other source keeps its remarks paragraph. */}
+                {Array.isArray(query.rows) && query.rows.length > 0 ? (
+                  <>
+                    {query.document?.expectedType && (
+                      <p className="rap-query-doc">
+                        <strong>{query.document.expectedType}</strong>
+                        {query.document.fileName ? ` · ${query.document.fileName}` : ''}
+                      </p>
+                    )}
+                    <div className="rap-query-rows-wrap">
+                      <table className="rap-query-rows">
+                        <thead>
+                          <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Checklist Item / Issue</th>
+                            <th scope="col">AI-Detected Deficiency</th>
+                            <th scope="col">Query Raised</th>
+                            <th scope="col">Source</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {query.rows.map(row => (
+                            <tr key={`${query.queryIdentifier}-${row.order}`}>
+                              <td data-label="#">{row.order}</td>
+                              <td data-label="Checklist Item / Issue">{row.checklistItem || '—'}</td>
+                              <td data-label="AI-Detected Deficiency">{row.deficiency || '—'}</td>
+                              <td data-label="Query Raised">{row.queryText}</td>
+                              <td data-label="Source">
+                                {row.rowSource === 'reviewer_added' ? 'Added by Reviewer' : 'AI Generated'}
+                                {row.edited ? ' (edited)' : ''}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="rap-query-remarks">{query.remarks}</p>
+                )}
                 {query.applicantResponse && (
                   <div className="rap-query-response">
                     <strong>Applicant response</strong>
@@ -1195,7 +1296,6 @@ function ActionFormOverlay({ actionStatus, setActionStatus, remarks, setRemarks,
           <label className="rap-mini-label">Decision</label>
           <select className="rap-select" value={actionStatus} onChange={e => setActionStatus(e.target.value)}>
             <option value="">— select —</option>
-            <option value="Under Review">Under Review</option>
             <option value="Approved">Approved</option>
             <option value="Query Raised">Query Raised</option>
             <option value="Rejected">Rejected</option>

@@ -111,32 +111,13 @@
   text-overflow: ellipsis;
 }
 
-/* Count and delta on one line so the tile holds 72px. */
-.kpi-figures {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  min-width: 0;
-}
+/* Icon + label above, count below: the tile holds 72px without a comparison. */
 .kpi-value {
   font-size: var(--fs-20);
   font-weight: var(--fw-bold);
   line-height: 1;
   color: var(--text-primary);
 }
-.kpi-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: var(--fs-11);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-muted);
-}
-.kpi-delta.is-up { color: var(--c-info); }
-.kpi-delta.is-down { color: var(--text-muted); }
-
 /* Active: filled tint + 3px bottom rule, colour from the status token so the
    tile and its status pill can never disagree. */
 .kpi-tile.is-active { border-bottom-color: currentColor; }
@@ -264,14 +245,6 @@
 .kpi-unread strong { color: var(--text-primary); font-weight: var(--fw-bold); }
 .kpi-unknown { color: var(--c-warning); }
 .kpi-unknown strong { color: var(--c-warning); }
-
-/* A comparison that cannot be made truthfully says so, and is never styled as
-   an up/down movement. */
-.kpi-delta.is-na {
-  color: var(--text-muted);
-  font-style: italic;
-  opacity: 0.85;
-}
 
 /* ---- Country combobox ---------------------------------------------------- */
 .cs { position: relative; }
