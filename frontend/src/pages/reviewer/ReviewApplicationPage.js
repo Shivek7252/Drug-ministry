@@ -149,7 +149,9 @@ export default function ReviewApplicationPage() {
 
   // Pre-verify background sweep
   const [aiCheckLoading, setAiCheckLoading] = useState(false);
-  const preVerifyAttempted = useRef(new Set());
+  /* { key, promise, done } — owns the in-flight pre-verify sweep so a
+     re-render cannot abandon it. */
+  const preVerifyAttempted = useRef({ key: '', promise: null, done: false });
 
   const data = full || {};
 
@@ -218,33 +220,59 @@ export default function ReviewApplicationPage() {
     return () => { cancelled = true; };
   }, [appNumber]);
 
-  /* Pre-verify sweep — one-shot per app, using cached endpoint. */
-  useEffect(() => {
-    if (!full?.applicationNumber) return;
-    if (preVerifyAttempted.current.has(full.applicationNumber)) return;
-
-    const docs = full.documents || {};
+  /* True while any uploaded document still lacks a settled AI verdict. Derived
+     rather than read inside the effect so the effect does not have to depend on
+     the whole `full` object — a dependency that previously let any unrelated
+     refresh cancel the in-flight sweep. */
+  const needsPreVerify = useMemo(() => {
+    const docs = full?.documents || {};
     const uploaded = REQUIRED_DOCS.filter(d => docs[d.id]);
-    if (uploaded.length === 0) return;
-    const needsCheck = uploaded.some(d => {
+    if (uploaded.length === 0) return false;
+    return uploaded.some(d => {
       const vr = docs[d.id]?.validationResult;
       return !vr || typeof vr.documentTypeMatch !== 'boolean';
     });
-    if (!needsCheck) return;
-
-    preVerifyAttempted.current.add(full.applicationNumber);
-    let cancelled = false;
-    setAiCheckLoading(true);
-    preVerifyDocs(full.applicationNumber).then(async (res) => {
-      if (cancelled) return;
-      if (res.success) {
-        const refreshed = await getApplicationFull(full.applicationNumber);
-        if (!cancelled && refreshed.success) setFull(refreshed.application);
-      }
-      if (!cancelled) setAiCheckLoading(false);
-    });
-    return () => { cancelled = true; };
   }, [full]);
+
+  /* Pre-verify sweep — one-shot per application, using the cached endpoint. */
+  useEffect(() => {
+    const appNo = full?.applicationNumber;
+    if (!appNo || !needsPreVerify) return undefined;
+
+    /* The sweep is owned by a ref rather than by this effect's lifetime.
+       Previously the cleanup set a `cancelled` flag while a ref recorded that
+       the sweep had been attempted — so StrictMode's mount → cleanup → mount
+       cycle (and any other `setFull` during the sweep) cancelled the only run
+       and the second pass returned early, leaving aiCheckLoading true forever.
+       That is the permanent "Checking…" state. Now a re-run adopts the
+       in-flight promise instead of abandoning it. */
+    if (preVerifyAttempted.current.key !== appNo) {
+      preVerifyAttempted.current = { key: appNo, promise: preVerifyDocs(appNo), done: false };
+    } else if (preVerifyAttempted.current.done) {
+      // Already swept this application; never loop on a document that failed.
+      return undefined;
+    }
+
+    let active = true;
+    setAiCheckLoading(true);
+
+    const settle = async () => {
+      try {
+        await preVerifyAttempted.current.promise;
+      } catch (_) {
+        /* handled below by refreshing anyway */
+      }
+      preVerifyAttempted.current.done = true;
+      /* Refresh regardless of the sweep's outcome: documents that completed
+         must appear even when a later one failed or the request timed out. */
+      const refreshed = await getApplicationFull(appNo);
+      if (active && refreshed.success) setFull(refreshed.application);
+      if (active) setAiCheckLoading(false);
+    };
+    settle();
+
+    return () => { active = false; };
+  }, [full?.applicationNumber, needsPreVerify]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Compliance derived counts (from `data` — not from /checklist) ────── */
   const uploadStats = useMemo(() => {
