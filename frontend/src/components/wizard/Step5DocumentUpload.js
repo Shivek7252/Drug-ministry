@@ -757,6 +757,8 @@ function ImageViewerModal({ docId, fallbackUrl, fileName, fileSize, onClose }) {
 }
 
 /* ─── Upload Card ───────────────────────────────────────────────────────── */
+const notFoundItems = (data) => (data?.results || []).filter(r => r.present !== true).map(r => r.item);
+
 function UploadCard({ doc, uploaded, verification, onUpload, onRemove }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -798,7 +800,7 @@ function UploadCard({ doc, uploaded, verification, onUpload, onRemove }) {
 
   return (
     <>
-      <div className={`upload-card ${uploaded ? 'uploaded' : ''} ${verification?.status === 'verified' ? 'verification-verified' : ''} ${verification?.status === 'failed' || verification?.status === 'error' ? 'verification-failed' : ''} ${dragging ? 'dragging' : ''}`}>
+      <div className={`upload-card ${uploaded ? 'uploaded' : ''} ${verification?.status === 'verified' ? 'verification-verified' : ''} ${verification?.status === 'failed' ? 'verification-failed' : ''} ${verification?.status === 'error' ? 'verification-unavailable' : ''} ${dragging ? 'dragging' : ''}`}>
         <div className="upload-card-header">
           <div className="upload-doc-info">
             <span className="upload-doc-icon">{uploaded ? fileIcon(uploaded.type) : '📎'}</span>
@@ -813,7 +815,8 @@ function UploadCard({ doc, uploaded, verification, onUpload, onRemove }) {
             {uploaded && !verification && <span className="upload-status-badge">✓ Uploaded</span>}
             {verification?.status === 'loading' && <span className="upload-status-badge verification-loading">🤖 Analyzing...</span>}
             {verification?.status === 'verified' && <span className="upload-status-badge verification-badge-ok">✓ AI Verified</span>}
-            {(verification?.status === 'failed' || verification?.status === 'error') && <span className="upload-status-badge verification-badge-failed">✕ AI Issue</span>}
+            {verification?.status === 'failed' && <span className="upload-status-badge verification-badge-failed">✕ AI Issue</span>}
+            {verification?.status === 'error' && <span className="upload-status-badge verification-badge-unavailable">⚠ Not Verified</span>}
           </div>
         </div>
         {uploaded ? (
@@ -838,10 +841,20 @@ function UploadCard({ doc, uploaded, verification, onUpload, onRemove }) {
             </div>
           </div>
           {verification?.status === 'verified' && (
-            <div className="document-verification-message verification-message-ok">✓ AI verification passed. Document appears correct and complete.</div>
+            <div className="document-verification-message verification-message-ok">
+              ✓ AI verification passed ({verification.data.summary.present}/{verification.data.summary.total} checks).
+              {notFoundItems(verification.data).length > 0 && <div>Not found: {notFoundItems(verification.data).join('; ')}</div>}
+            </div>
           )}
-          {(verification?.status === 'failed' || verification?.status === 'error') && (
-            <div className="document-verification-message verification-message-failed">✕ AI verification found an issue. Review this document before continuing.</div>
+          {verification?.status === 'failed' && (
+            <div className="document-verification-message verification-message-failed">
+              ✕ AI verification found an issue. Review this document before continuing.
+              {verification.data?.documentTypeMatch === false && verification.data.documentTypeReason && <div>{verification.data.documentTypeReason}</div>}
+              {verification.data?.documentTypeMatch === true && <div>Not found: {notFoundItems(verification.data).join('; ')}</div>}
+            </div>
+          )}
+          {verification?.status === 'error' && (
+            <div className="document-verification-message verification-message-unavailable">⚠ AI verification could not run ({verification.error}). Your document is uploaded; re-upload it later to verify.</div>
           )}
           </>
         ) : uploading ? (
@@ -900,6 +913,10 @@ function UploadCard({ doc, uploaded, verification, onUpload, onRemove }) {
   );
 }
 
+/* A document passes when it is the right type and at least this share of its
+   checklist items were found. */
+const VERIFICATION_PASS_RATIO = 0.75;
+
 /* ─── Step 5 Main ───────────────────────────────────────────────────────── */
 export default function Step5DocumentUpload() {
   const { formData, addDocument, removeDocument, setCurrentStep, saveDraft, draftSaved } = useApp();
@@ -917,7 +934,7 @@ export default function Step5DocumentUpload() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Verification failed');
       const passed = data.documentTypeMatch === true &&
-        data.summary?.total > 0 && data.summary.missing === 0 && data.summary.unknown === 0;
+        data.summary?.total > 0 && data.summary.present / data.summary.total >= VERIFICATION_PASS_RATIO;
       setVerification(prev => ({ ...prev, [doc.id]: { status: passed ? 'verified' : 'failed', data } }));
     } catch (error) {
       setVerification(prev => ({ ...prev, [doc.id]: { status: 'error', error: error.message } }));

@@ -22,6 +22,7 @@ const { requireReviewer } = require('./middleware/reviewerAuth');
 const { createAuthManager } = require('./middleware/auth');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MISTRAL_TEXT_MODEL = process.env.MISTRAL_TEXT_MODEL || 'mistral-small-latest';
 const APPROVED_DRUGS_WORKBOOK = path.join(__dirname, '..', 'approved_drugs.xlsx');
 const BANNED_DRUGS_FILE = path.join(__dirname, 'data', 'bannedDrugs.json');
 
@@ -124,7 +125,7 @@ app.get('/api/banned-drugs', (_, res) => res.json(bannedDrugs));
 /* ─── Health check ─────────────────────────────────────────────────────── */
 app.get('/health', (_, res) => res.json({
   status: 'ok',
-  model: 'mistral-small-latest',
+  model: MISTRAL_TEXT_MODEL,
   database: mongoose.connection.name || null,
   testMode: process.env.NODE_ENV === 'test',
   authConfigured: auth.userCount > 0,
@@ -276,15 +277,28 @@ CHECKLISTS.qa_cert = CHECKLISTS.quality_assurance;
 /* Used by the AI to first decide whether the upload is the right TYPE of
    document before scoring individual items. Each entry: short identity statement
    + must-have words/phrases that genuine examples of this document type contain. */
+// Applicant upload slots (and per-company copies like mfg_license_<Company>)
+// use ids that differ from the checklist keys for some documents.
+const UPLOAD_SLOT_DOC_TYPES = {
+  mfg_license: 'manufacturing_license',
+  export_auth: 'export_authorization',
+  qa_cert: 'quality_assurance',
+};
+function docTypeForSlot(docId) {
+  const slot = docId.startsWith('mfg_license_') ? 'mfg_license' : docId;
+  const key = UPLOAD_SLOT_DOC_TYPES[slot] || slot;
+  return CHECKLISTS[key] ? key : 'default';
+}
+
 const DOC_TYPE_PROFILES = {
   manufacturing_license: {
-    identity: 'A Manufacturing License (typically Form 25, Form 28, Form 28D, Loan Licence, or DSIR / Form 29) issued by an Indian State Drug Authority under the Drugs and Cosmetics Act, 1940, authorising a company to manufacture drugs at a specified site.',
-    mustHaveAny: ['manufacturing licence', 'manufacturing license', 'licence to manufacture', 'form 25', 'form 28', 'form 28d', 'form-25', 'form-28', 'loan licence', 'state drug', 'drugs and cosmetics', 'drug controller', 'dsir', 'form 29'],
+    identity: 'A Manufacturing License (typically Form 25, Form 28, Form 28D, Loan Licence, or DSIR / Form 29) issued by an Indian State Drug Authority under the Drugs and Cosmetics Act, 1940, authorising a company to manufacture drugs at a specified site. A Certificate of Retention / Licence Validity Certificate (e.g. Form 26) confirming such a licence is still in force also counts as a Manufacturing License.',
+    mustHaveAny: ['manufacturing licence', 'manufacturing license', 'licence to manufacture', 'form 25', 'form 28', 'form 28d', 'form-25', 'form-28', 'loan licence', 'state drug', 'drugs and cosmetics', 'drug controller', 'dsir', 'form 29', 'form 26', 'retention of licence', 'licence validity'],
     mustNotBe: 'It must NOT be a product approval certificate, GMP / quality assurance certificate, batch analysis report, export authorisation, product information sheet, invoice, or undertaking.',
   },
   product_approval: {
-    identity: 'A Product Approval Certificate / Registration Certificate issued by a regulatory authority (CDSCO, DCGI, or an importing country regulator) approving a specific drug product for marketing.',
-    mustHaveAny: ['product approval', 'approval certificate', 'registration certificate', 'marketing authorisation', 'marketing authorization', 'cdsco', 'dcgi', 'approved indications', 'permission to import', 'new drug approval', 'subsequent new drug'],
+    identity: 'A Product Approval Certificate / Registration Certificate issued by a regulatory authority (CDSCO, DCGI, or an importing country regulator) approving a specific drug product for marketing. An approval letter from a foreign national regulatory authority (NRA) of the importing country — e.g. a US FDA NDA/ANDA approval letter, EMA, MHRA or similar — also counts as a Product Approval Certificate.',
+    mustHaveAny: ['product approval', 'approval certificate', 'registration certificate', 'marketing authorisation', 'marketing authorization', 'cdsco', 'dcgi', 'approved indications', 'permission to import', 'new drug approval', 'subsequent new drug', 'nda approval', 'anda approval', 'approval letter', 'food and drug administration'],
     mustNotBe: 'It must NOT be a manufacturing licence, GMP certificate, batch analysis report, export authorisation, undertaking, or invoice.',
   },
   export_authorization: {
@@ -493,11 +507,17 @@ Return STRICT JSON in exactly this shape — no preamble, no markdown fences:
 }
 
 /* ─── Mistral OCR fallback for scanned / image-only PDFs ───────────────── */
+// When the OCR model is blocked for the account (403 tier / 429 quota), skip it
+// for a while instead of re-uploading every document just to be refused.
+const OCR_UNAVAILABLE_COOLDOWN_MS = 10 * 60 * 1000;
+let ocrUnavailableUntil = 0;
+
 async function ocrPdfWithMistral(buffer) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured');
   }
+  if (Date.now() < ocrUnavailableUntil) return [];
   const b64 = buffer.toString('base64');
   const response = await fetchWithRetry('https://api.mistral.ai/v1/ocr', {
     method: 'POST',
@@ -507,18 +527,27 @@ async function ocrPdfWithMistral(buffer) {
       document: { type: 'document_url', document_url: `data:application/pdf;base64,${b64}` },
       include_image_base64: false,
     }),
-  });
+  }, 0); // no retries — verification falls back to the model reading the file directly
   if (!response.ok) {
     const err = await response.text();
-    // 403 = model not in subscription tier — treat as unavailable, not fatal
-    if (response.status === 403) {
-      console.warn('[OCR] mistral-ocr-latest not available on this subscription tier — skipping OCR fallback.');
+    // 403 = model not in subscription tier, 429 = no quota — treat as unavailable, not fatal
+    if (response.status === 403 || response.status === 429) {
+      ocrUnavailableUntil = Date.now() + OCR_UNAVAILABLE_COOLDOWN_MS;
+      console.warn(`[OCR] mistral-ocr-latest unavailable (${response.status}) — skipping OCR for 10 minutes.`);
       return [];
     }
     throw new Error(`Mistral OCR error ${response.status}: ${err}`);
   }
   const data = await response.json();
   return (data.pages || []).map(p => p.markdown || p.text || '');
+}
+
+/* ─── Attach a file to a chat message so the model reads it directly ───── */
+function documentAttachment(buffer, mimetype) {
+  const dataUrl = `data:${mimetype};base64,${buffer.toString('base64')}`;
+  if (mimetype === 'application/pdf') return { type: 'document_url', document_url: dataUrl };
+  if (mimetype === 'image/jpeg' || mimetype === 'image/png') return { type: 'image_url', image_url: dataUrl };
+  return null;
 }
 
 /* ─── Sleep helper ──────────────────────────────────────────────────────── */
@@ -580,18 +609,18 @@ async function legacyFetchWithRetry(url, options, maxRetries = 4) {
 }
 
 /* ─── Call Mistral chat completions (plain text response) ──────────────── */
-async function fetchWithRetry(url, options, maxRetries = 2) {
+async function fetchWithRetry(url, options, maxRetries = 2, { timeoutMs } = {}) {
   return requestWithRetry(fetch, url, options, {
     maxRetries,
-    perAttemptTimeoutMs: Number(process.env.MISTRAL_ATTEMPT_TIMEOUT_MS) || 30000,
-    overallTimeoutMs: Number(process.env.MISTRAL_OVERALL_TIMEOUT_MS) || 75000,
+    perAttemptTimeoutMs: timeoutMs || Number(process.env.MISTRAL_ATTEMPT_TIMEOUT_MS) || 30000,
+    overallTimeoutMs: timeoutMs ? timeoutMs * 2 : Number(process.env.MISTRAL_OVERALL_TIMEOUT_MS) || 75000,
     onRetry: ({ attempt, status, error, waitMs }) => {
       console.warn('[Verification retry]', { attempt, status: status || null, error: error || null, waitMs });
     },
   });
 }
 
-async function callMistral(messages, { model = 'mistral-small-latest', maxTokens = 2000 } = {}) {
+async function callMistral(messages, { model = MISTRAL_TEXT_MODEL, maxTokens = 2000 } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
@@ -613,7 +642,7 @@ async function callMistral(messages, { model = 'mistral-small-latest', maxTokens
 }
 
 /* ─── Call Mistral chat completions in strict JSON mode ────────────────── */
-async function callMistralJson(messages, { model = 'mistral-small-latest', maxTokens = 3500 } = {}) {
+async function callMistralJson(messages, { model = MISTRAL_TEXT_MODEL, maxTokens = 3500, timeoutMs } = {}) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey || apiKey === 'your_mistral_api_key_here') {
     throw new Error('MISTRAL_API_KEY is not configured. Please set it in backend/.env');
@@ -628,7 +657,7 @@ async function callMistralJson(messages, { model = 'mistral-small-latest', maxTo
       max_tokens: maxTokens,
       response_format: { type: 'json_object' },
     }),
-  });
+  }, undefined, { timeoutMs });
   if (!response.ok) {
     const err = await response.text();
     throw new Error(`Mistral API error ${response.status}: ${err}`);
@@ -1062,7 +1091,9 @@ async function identifyDocumentTypeQuick({ buffer, mimetype, docType, docLabel }
     }
   }
 
-  if (text.length < 100) {
+  const attachment = text.length < 100 ? documentAttachment(buffer, mimetype) : null;
+
+  if (text.length < 100 && !attachment) {
     throw new VerificationError(
       'INSUFFICIENT_TEXT',
       'Unable to verify document type because insufficient text could be extracted.',
@@ -1088,16 +1119,21 @@ ${profile.mustNotBe || ''}
 Indicative keywords in genuine "${docLabel}" documents:
 ${profile.mustHaveAny.length ? profile.mustHaveAny.map(k => `  • ${k}`).join('\n') : '  (none specified)'}
 
-Document text sample (may be truncated):
+${attachment
+    ? 'Document: attached as a scanned file — read it directly.'
+    : `Document text sample (may be truncated):
 """
 ${sample}
-"""
+"""`}
 
 Return JSON only.`;
 
   const raw = await callMistralJson(
-    [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-    { model: 'mistral-small-latest', maxTokens: 200 }
+    [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: attachment ? [{ type: 'text', text: userPrompt }, attachment] : userPrompt },
+    ],
+    { model: MISTRAL_TEXT_MODEL, maxTokens: 200, timeoutMs: attachment ? 120000 : undefined }
   );
 
   return parseQuickVerificationResponse(raw);
@@ -1152,7 +1188,13 @@ async function verifyDocumentBuffer({ buffer, mimetype, docType, docLabel }) {
 
   const hasText = pages.join('').trim().length > 100;
 
-  if (!hasText) {
+  // ── Step 2b: no usable text — let the model read the file itself ──────
+  // Mistral reads attached PDFs/images server-side, which still works when
+  // the dedicated OCR model is unavailable on the account's tier.
+  const attachment = hasText ? null : documentAttachment(buffer, mimetype);
+  if (attachment) textSource = 'model-document-reader';
+
+  if (!hasText && !attachment) {
     throw new VerificationError(
       'INSUFFICIENT_TEXT',
       'Unable to verify this document because text extraction and OCR produced insufficient text.',
@@ -1239,10 +1281,12 @@ ${profile.mustNotBe || ''}
 Indicative keywords/phrases found in genuine "${docLabel}" documents (presence of several of these is a strong signal — but the absence of all of them is a strong signal of a WRONG document type):
 ${profile.mustHaveAny.length ? profile.mustHaveAny.map(k => `  • ${k}`).join('\n') : '  (no specific keywords)'}
 
-Document text (with page markers):
+${attachment
+    ? 'Document: attached as a scanned file — read it directly. Use 1-based page numbers of the attached file for "page", and copy evidence verbatim from what you read.'
+    : `Document text (with page markers):
 """
 ${pageText}
-"""
+"""`}
 
 Checklist parameters to verify (return one entry per item, in order):
 ${items.map((it, i) => `${i + 1}. ${it}`).join('\n')}
@@ -1253,8 +1297,8 @@ Return ONLY the JSON object described in the schema — no preamble, no markdown
   const classificationStarted = Date.now();
   const raw = await callMistralJson([
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt },
-  ]);
+    { role: 'user', content: attachment ? [{ type: 'text', text: userPrompt }, attachment] : userPrompt },
+  ], attachment ? { timeoutMs: 120000 } : undefined);
   timings.classificationMs = Date.now() - classificationStarted;
 
   // ── Step 5: parse and normalise ───────────────────────────────────────
@@ -1582,8 +1626,8 @@ app.post('/api/applications/:appNum/pre-verify', auth.authenticate, auth.require
         return [docId, { error: `Read failed: ${readErr.message}` }];
       }
 
-      const docType = CHECKLISTS[docId] ? docId : 'default';
-      const docLabel = doc.name || docId;
+      const docType = docTypeForSlot(docId);
+      const docLabel = TEMPLATE_REQUIREMENTS[docId]?.label || doc.name || docId;
       const mimetype = doc.type || 'application/pdf';
       let job;
 
@@ -1667,7 +1711,7 @@ app.post('/api/applications/:appNum/document/:docId/verify', auth.authenticate, 
       return res.status(404).json({ error: 'File not stored' });
     }
 
-    const docType = CHECKLISTS[docId] ? docId : 'default';
+    const docType = docTypeForSlot(docId);
     const docLabel = TEMPLATE_REQUIREMENTS[docId]?.label || doc.name || docId;
     const mimetype = doc.type || 'application/pdf';
     const job = await beginVerificationJob(application, docId, doc, buffer, 'deep');
