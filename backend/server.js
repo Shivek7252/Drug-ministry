@@ -1502,6 +1502,10 @@ function fileHash(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
+// A job still "processing" after this long is treated as abandoned (e.g. the
+// server restarted mid-job) and may be replaced. Covers the slowest scan path.
+const IN_FLIGHT_JOB_TTL_MS = 5 * 60 * 1000;
+
 async function beginVerificationJob(application, docId, doc, buffer, operation) {
   const jobId = crypto.randomUUID();
   const hash = fileHash(buffer);
@@ -1515,17 +1519,54 @@ async function beginVerificationJob(application, docId, doc, buffer, operation) 
     fileHash: hash,
     startedAt: new Date(),
   };
+  // Claim the document atomically: only one verification may run per document,
+  // otherwise concurrent requests (double-mounted viewer, Retry, the pre-verify
+  // sweep) supersede each other and the loser reports a stale result.
   const result = await Application.collection.updateOne(
-    { _id: application._id },
+    {
+      _id: application._id,
+      $or: [
+        { [verificationPath(docId, 'state')]: { $ne: 'processing' } },
+        { [verificationPath(docId, 'startedAt')]: { $lt: new Date(Date.now() - IN_FLIGHT_JOB_TTL_MS) } },
+      ],
+    },
     { $set: { [verificationPath(docId)]: state, [`documents.${docId}.validated`]: false } },
   );
   if (result.matchedCount !== 1) {
-    throw new VerificationError('PERSISTENCE_FAILED', 'Could not persist verification start state.', {
+    throw new VerificationError('JOB_IN_FLIGHT', 'This document is already being verified.', {
       retryable: true,
-      httpStatus: 503,
+      httpStatus: 409,
     });
   }
   return { jobId, hash, version, operation, startedAt: state.startedAt };
+}
+
+/* Waits for another request's in-flight verification of this document to
+   settle and returns its stored validationResult (or null on timeout). */
+async function waitForVerificationJob(applicationId, docId) {
+  const deadline = Date.now() + IN_FLIGHT_JOB_TTL_MS;
+  while (Date.now() < deadline) {
+    await sleep(1500);
+    const app = await Application.collection.findOne(
+      { _id: applicationId },
+      { projection: { [verificationPath(docId)]: 1 } },
+    );
+    const vr = app?.documents?.[docId]?.validationResult;
+    if (!vr || vr.state !== 'processing') return vr || null;
+  }
+  return null;
+}
+
+function cachedVerificationResponse(vr) {
+  return {
+    ...vr.fullResults,
+    state: vr.state || 'completed',
+    cached: true,
+    verifiedAt: vr.verifiedAt || vr.fullResults.verifiedAt || null,
+    jobId: vr.jobId || null,
+    version: vr.version || 0,
+    fileHash: vr.fileHash || null,
+  };
 }
 
 async function finishVerificationJob(application, docId, job, resultPayload) {
@@ -1641,6 +1682,8 @@ app.post('/api/applications/:appNum/pre-verify', auth.authenticate, auth.require
         });
         return [docId, { ...completed, cached: false }];
       } catch (verifyErr) {
+        // Already being verified by another request — leave that job alone.
+        if (!job && verifyErr.code === 'JOB_IN_FLIGHT') return [docId, { state: 'processing' }];
         const failed = job
           ? await failVerificationJob(application, docId, job, verifyErr)
           : failurePayload(verifyErr);
@@ -1684,15 +1727,7 @@ app.post('/api/applications/:appNum/document/:docId/verify', auth.authenticate, 
 
     // Cache hit
     if (!force && doc.validationResult?.fullResults) {
-      return res.json({
-        ...doc.validationResult.fullResults,
-        state: doc.validationResult.state || 'completed',
-        cached: true,
-        verifiedAt: doc.validationResult.verifiedAt || doc.validationResult.fullResults.verifiedAt || null,
-        jobId: doc.validationResult.jobId || null,
-        version: doc.validationResult.version || 0,
-        fileHash: doc.validationResult.fileHash || null,
-      });
+      return res.json(cachedVerificationResponse(doc.validationResult));
     }
 
     // Load bytes
@@ -1714,7 +1749,17 @@ app.post('/api/applications/:appNum/document/:docId/verify', auth.authenticate, 
     const docType = docTypeForSlot(docId);
     const docLabel = TEMPLATE_REQUIREMENTS[docId]?.label || doc.name || docId;
     const mimetype = doc.type || 'application/pdf';
-    const job = await beginVerificationJob(application, docId, doc, buffer, 'deep');
+    let job;
+    try {
+      job = await beginVerificationJob(application, docId, doc, buffer, 'deep');
+    } catch (claimErr) {
+      if (claimErr.code !== 'JOB_IN_FLIGHT') throw claimErr;
+      // Another request is already verifying this document — share its result.
+      const settled = await waitForVerificationJob(application._id, docId);
+      if (settled?.fullResults) return res.json(cachedVerificationResponse(settled));
+      // The other job was only a quick type check, or failed: run the full check now.
+      job = await beginVerificationJob(application, docId, doc, buffer, 'deep');
+    }
 
     try {
       const verifyResult = await verifyDocumentBuffer({ buffer, mimetype, docType, docLabel });
