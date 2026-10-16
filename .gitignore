@@ -41,3 +41,13 @@ Thumbs.db
 .kiro/
 .qoder/
 skills-lock.json
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local browser profiles from visual/e2e checks (contain cookies & login data)
+.visual-check-edge/
+
+# Test output
+frontend/test-results/
